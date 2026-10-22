@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { gradeSession, type ClarificationAnswer, type GradeOutcome, type Question } from '@/core/grading/grade';
 import { t } from '@/core/i18n';
 import { loadSessionView, type SessionView } from '@/core/session/view';
@@ -29,12 +29,17 @@ export function SessionPage({ sessionId }: { sessionId: number }) {
   const [replies, setReplies] = useState<Record<number, Reply>>({});
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
+  const root = useRef<HTMLDivElement>(null);
+  const focusResults = useRef(false);
 
   useEffect(() => {
     let live = true;
     loadSessionView(deps.db, sessionId).then(
       (v) => {
-        if (live) setView(v);
+        if (live) {
+          setView(v);
+          setLoadError(null);
+        }
       },
       (e: unknown) => {
         if (live) setLoadError(e instanceof Error ? e.message : String(e));
@@ -47,6 +52,7 @@ export function SessionPage({ sessionId }: { sessionId: number }) {
 
   const handle = useCallback((outcome: GradeOutcome) => {
     if (outcome.kind === 'graded') {
+      focusResults.current = true;
       setQuestions([]);
       setReload((n) => n + 1);
     } else if (outcome.kind === 'questions') setQuestions(outcome.questions);
@@ -87,12 +93,24 @@ export function SessionPage({ sessionId }: { sessionId: number }) {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
+        if (!view || loadError) return;
         submit();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
+
+  useEffect(() => {
+    if (questions.length > 0) root.current?.querySelector<HTMLElement>('[data-question] :is(input, button)')?.focus();
+  }, [questions]);
+
+  useEffect(() => {
+    if (graded && focusResults.current) {
+      focusResults.current = false;
+      document.getElementById('feedback-title')?.focus();
+    }
+  }, [graded]);
 
   if (loadError) return <Notice>{t(lang, 'today.loadError', { message: loadError })}</Notice>;
   if (!view) return null;
@@ -114,7 +132,7 @@ export function SessionPage({ sessionId }: { sessionId: number }) {
   };
 
   return (
-    <>
+    <div ref={root}>
       <SessionHeader view={view} lang={lang} />
       {graded && <FeedbackSummary view={view} lang={lang} />}
       {view.blocks.map((block, i) => (
@@ -163,6 +181,6 @@ export function SessionPage({ sessionId }: { sessionId: number }) {
           </Button>
         </div>
       )}
-    </>
+    </div>
   );
 }

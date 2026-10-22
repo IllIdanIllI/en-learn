@@ -28,9 +28,9 @@ export function SpotBlock({ block, lang, values, onChange, graded }: {
                 <ul className="mt-4 flex flex-col gap-3">
                   {(p.errors ?? []).map((e) => <GradedItem key={e.id} item={e} lang={lang} />)}
                 </ul>
-                {(p.extra ?? []).map((x) => (
-                  <p key={x.text} className="reading mt-3 rounded-sm bg-note/10 px-3 py-2 text-note">
-                    {t(lang, 'spot.notError', { text: x.text })}. {x.explanation}
+                {(p.extra ?? []).map((x, i) => (
+                  <p key={i} className="reading mt-3 rounded-sm bg-note/10 px-3 py-2 text-note">
+                    {t(lang, 'spot.notError', { text: x.text, explanation: x.explanation })}
                   </p>
                 ))}
               </>

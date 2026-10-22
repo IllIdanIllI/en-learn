@@ -38,12 +38,14 @@ export function StartSession({ lang, generating, error, onStart }: {
           {t(lang, 'today.light')}
         </Toggle>
       </div>
-      {generating && (
-        <div role="status">
-          <Skeleton />
-          <p className="mt-4 text-muted-foreground">{t(lang, 'today.generating')}</p>
-        </div>
-      )}
+      <div role="status">
+        {generating && (
+          <>
+            <Skeleton />
+            <p className="mt-4 text-muted-foreground">{t(lang, 'today.generating')}</p>
+          </>
+        )}
+      </div>
     </>
   );
 }

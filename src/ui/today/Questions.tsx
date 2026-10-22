@@ -11,7 +11,7 @@ export function Questions({ question, reply, lang, onChange }: {
 }) {
   if (question.kind === 'llm') {
     return (
-      <div className="mt-3">
+      <div data-question className="mt-3">
         <p className="reading text-muted-foreground">{question.text}</p>
         <Input
           className="mt-2 max-w-md"
@@ -27,7 +27,7 @@ export function Questions({ question, reply, lang, onChange }: {
   const [before = '', after = ''] = t(lang, 'q.shorthand', { symbol: '\u0000' }).split('\u0000');
   const label = t(lang, 'q.skip');
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-3">
+    <div data-question className="mt-3 flex flex-wrap items-center gap-3">
       <p className="text-muted-foreground">
         {question.kind === 'blank' ? (
           label

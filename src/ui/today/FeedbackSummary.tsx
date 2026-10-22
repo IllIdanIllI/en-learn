@@ -3,14 +3,14 @@ import type { SessionView } from '@/core/session/view';
 
 /** Plain text at the top of a graded page: score per block, then Correct, To fix, Tomorrow's review. */
 export function FeedbackSummary({ view, lang }: { view: SessionView; lang: Lang }) {
-  const scored = view.blocks.filter((b) => b.score);
+  const scored = view.blocks.filter((b) => b.score && b.score.counted > 0);
   const right = scored.reduce((n, b) => n + (b.score?.correct ?? 0), 0);
   const wrong = scored.reduce((n, b) => n + ((b.score?.counted ?? 0) - (b.score?.correct ?? 0)), 0);
   const patterns = view.feedback?.patterns ?? [];
   const tomorrow = view.feedback?.tomorrow ?? [];
   return (
     <section aria-labelledby="feedback-title" className="mt-8">
-      <h2 id="feedback-title" className="title">{t(lang, 'feedback.title')}</h2>
+      <h2 id="feedback-title" tabIndex={-1} className="title outline-none">{t(lang, 'feedback.title')}</h2>
       <ul className="mt-4 max-w-sm">
         {scored.map((b) => (
           <li key={b.id} className="label tabular flex justify-between gap-6 border-b border-border py-1.5">

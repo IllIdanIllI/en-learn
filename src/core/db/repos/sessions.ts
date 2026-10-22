@@ -169,7 +169,7 @@ export async function listGradingItems(db: Db, sessionId: number): Promise<Gradi
   );
   return rows.map((r) => ({
     id: r.id, blockId: r.block_id, blockOrd: r.block_ord, format: r.format,
-    passage: r.passage === null ? null : (JSON.parse(r.passage) as string[]), ord: r.ord, prompt: r.prompt,
+    passage: r.passage === null || r.format !== 'spot' ? null : (JSON.parse(r.passage) as string[]), ord: r.ord, prompt: r.prompt,
     expected: r.expected, paragraph: r.paragraph, topicId: r.topic_id, topicKey: r.topic_key, ruleId: r.rule_id,
     ruleVersion: r.rule_version, ruleSection: r.rule_section, ruleBody: r.rule_body, spellingWordId: r.spelling_word_id,
     status: r.status,

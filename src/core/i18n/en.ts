@@ -130,7 +130,7 @@ export const en = {
   'reason.dropped': 'item dropped',
   'reason.skipped': 'skipped',
   'spot.lines': 'Your lines',
-  'spot.notError': 'Not an error: {text}',
+  'spot.notError': 'Not an error: {text}. {explanation}',
   'feedback.title': 'Results',
   'feedback.score': '{correct} of {counted}',
   'feedback.correct': 'Correct',

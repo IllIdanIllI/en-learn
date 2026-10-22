@@ -132,7 +132,7 @@ export const ru: Record<keyof typeof en, string> = {
   'reason.dropped': 'задание снято',
   'reason.skipped': 'пропущено',
   'spot.lines': 'Ваши строки',
-  'spot.notError': 'Это не ошибка: {text}',
+  'spot.notError': 'Это не ошибка: {text}. {explanation}',
   'feedback.title': 'Итоги',
   'feedback.score': '{correct} из {counted}',
   'feedback.correct': 'Верно',

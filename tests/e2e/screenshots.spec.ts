@@ -137,11 +137,13 @@ test.describe('today session', () => {
     await expect(page.getByText('Пропустить это задание?').first()).toBeVisible();
     await expect(page.getByText('Значит ли', { exact: false })).toBeVisible();
     await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.locator('[data-question] :focus')).toHaveCount(1);
     await page.screenshot({ path: `${SHOTS}/today-questions.png`, fullPage: true });
     // Skipping the blanks and accepting the shorthand lets grading finish.
     for (const yes of await page.getByRole('radio', { name: 'Да' }).all()) await yes.click();
     await page.getByRole('button', { name: 'Проверить ответы' }).click();
     await expect(page.getByText('Итоги')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: 'Итоги' })).toBeFocused();
   });
 
   test('graded session shows the feedback summary and verdicts with a mark, not only colour', async ({ page }) => {

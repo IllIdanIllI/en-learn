@@ -4,10 +4,6 @@ Record of the decisions made on the learner's behalf while building S1 (from the
 
 ## Decisions (in the order they were made)
 
-| T3 self | Db.execute returns {lastInsertId,rowsAffected}; spec §3 says Promise<void> | Ruling below |
-| T6 self | loadSeed() reads seed/ but tests use tests/fixtures/seed; T21 calls loadSeed(today) | Ruling below |
-| T8 self | consistency test "first session 10 days ago → n:10" vs n=daysBetween+1 | Ruling below |
-| T9→T10 | callStructured must substitute {{nativeLanguage}} (stated only in T10) | Ruling below |
 - Db.execute returns {lastInsertId,rowsAffected} (plan) over spec's void — inserts need ids; plugin-sql returns both — cost if wrong: none.
 - T6 adds pure parseSeed(files:{programme:string; rules:Record<string,string>}, today) and loadSeed(today) wrapper (Vite glob on /seed); startDate = first Monday on/after today, endDate = start+20 days; tests use parseSeed on fixture files — plan's loadSeed() had no date input and couldn't read fixtures — cost if wrong: small rename in T18/T21.
 - T8 consistency fixture's "10 days ago" means first session on today−9 (10 days inclusive → n=10) — matches spec D17 inclusive count — cost if wrong: off-by-one in caption.

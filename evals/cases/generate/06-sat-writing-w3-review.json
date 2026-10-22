@@ -1,0 +1,28 @@
+{
+  "id": "06-sat-writing-w3-review",
+  "description": "Saturday of week 3 with review input from the day before",
+  "date": "2026-11-14",
+  "history": [
+    {
+      "date": "2026-11-13",
+      "topic": "present-perfect-past-simple",
+      "format": "fix",
+      "items": [
+        {
+          "prompt": "I wrote five emails so far.",
+          "expected": "have written",
+          "answer": "✓",
+          "verdict": "wrong",
+          "ruleSection": "Ловушки"
+        },
+        {
+          "prompt": "We moved to London in 2019.",
+          "expected": "✓",
+          "answer": "✓",
+          "verdict": "correct",
+          "ruleSection": "Формула"
+        }
+      ]
+    }
+  ]
+}

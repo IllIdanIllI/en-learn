@@ -67,6 +67,6 @@ E. **Dispute and drop (criterion 4).**
    - If it fails: record the decision, the score before and after, and the `dispute` row in `llm_call`.
 
 F. **Light day (criterion 5).**
-   - Action: on the next day (or another fresh database with the date moved), press "Start light day", answer, submit.
+   - Action: on the next day (or another fresh database with the date moved), on a rest day press "Start light day", or use the light-day toggle before starting; answer, submit.
    - Expected: a shorter session. Progress marks the day as a light day (`light day`), not as a full day.
    - If it fails: record the number of items generated and how Progress shows the day.

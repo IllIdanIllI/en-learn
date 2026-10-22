@@ -1,0 +1,36 @@
+{
+  "id": "08-light-rest-day-due",
+  "description": "Light day on a rest day (Wednesday) with a due re-check",
+  "date": "2026-10-28",
+  "light": true,
+  "history": [
+    {
+      "date": "2026-10-27",
+      "topic": "articles",
+      "format": "fix",
+      "items": [
+        {
+          "prompt": "My sister is engineer at a bank.",
+          "expected": "an engineer",
+          "answer": "✓",
+          "verdict": "wrong",
+          "ruleSection": "Ловушки"
+        },
+        {
+          "prompt": "She lives in Spain with her family.",
+          "expected": "✓",
+          "answer": "✓",
+          "verdict": "correct",
+          "ruleSection": "Формула"
+        },
+        {
+          "prompt": "He is going to an university in Leeds.",
+          "expected": "a university",
+          "answer": "✓",
+          "verdict": "wrong",
+          "ruleSection": "Ловушки"
+        }
+      ]
+    }
+  ]
+}

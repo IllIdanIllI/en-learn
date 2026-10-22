@@ -1,0 +1,36 @@
+{
+  "id": "07-sun-review-rewrite-w2",
+  "description": "Sunday of week 2, review input with one answer flagged as inattention",
+  "date": "2026-11-08",
+  "history": [
+    {
+      "date": "2026-11-07",
+      "topic": "conditionals",
+      "format": "gap",
+      "items": [
+        {
+          "prompt": "If it ___ tomorrow, we will stay at home. (rain)",
+          "expected": "rains",
+          "answer": "will rain",
+          "verdict": "wrong",
+          "ruleSection": "Ловушки"
+        },
+        {
+          "prompt": "If you heat ice, it ___. (melt)",
+          "expected": "melts",
+          "answer": "melts",
+          "verdict": "correct",
+          "ruleSection": "Формула"
+        },
+        {
+          "prompt": "If I ___ more money, I would travel. (have)",
+          "expected": "had",
+          "answer": "would have",
+          "verdict": "wrong",
+          "ruleSection": "Ловушки",
+          "inattention": true
+        }
+      ]
+    }
+  ]
+}

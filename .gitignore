@@ -7,3 +7,4 @@ src-tauri/target/
 !.yarn/releases
 test-results/
 playwright-report/
+evals/results/

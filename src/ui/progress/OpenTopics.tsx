@@ -41,10 +41,13 @@ export function OpenTopics({ topics, states, ruleIds, lang }: {
           const ruleId = ruleIds.get(topic.id);
           return (
             <TableRow key={topic.id}>
-              <TableCell>{topic.title}</TableCell>
+              <TableCell>
+                {topic.title}
+                {topic.archived && <span className="label ml-2 text-muted-foreground">{t(lang, 'progress.archived')}</span>}
+              </TableCell>
               <TableCell><StatusChip closed={state.status === 'closed'} lang={lang} /></TableCell>
               <TableCell className="tabular text-muted-foreground">{last ? t(lang, `progress.event.${last.event}`, { date: last.date }) : ''}</TableCell>
-              <TableCell className="tabular text-muted-foreground">{state.pending.join(', ')}</TableCell>
+              <TableCell className="tabular text-muted-foreground">{topic.archived ? '' : state.pending.join(', ')}</TableCell>
               <TableCell>
                 {ruleId !== undefined && (
                   <Link to={`/rules/${ruleId}`} aria-label={`${t(lang, 'progress.rule')}: ${topic.title}`} className="text-primary underline underline-offset-2">{t(lang, 'progress.rule')}</Link>

@@ -27,7 +27,7 @@ S1 acceptance = requirements §7 criteria 1–5.
 | D6 | Validation TD-1…TD-8 = code checks + a second LLM call (6.3). |
 | D7 | Obsidian export is one-way (S2). |
 | D8 | Native language default: Russian (configurable: Russian, English). It applies to rules **and UI text** (NF-5); tasks are in English. |
-| D9 | Seed data written from scratch: sample 3-week programme + rules for its topics, with sources. Placement test = future idea. |
+| D9 | Seed data written from scratch: sample 3-week programme + rules for its topics, with sources; its start date is the day of setup (week 1 begins today). Placement test = future idea. |
 | D10 | Learner enters vocabulary manually (S2). |
 | D11 | Model is a setting per call kind; default `claude-sonnet-5-5`; any kind can be switched to `claude-haiku-5-5`. `--max-budget-usd` is an optional setting, empty by default (learner's decision; deviates from TS-3/NF-6 wording "per call cap"). |
 | D12 | Tests: Vitest for logic; Playwright screenshots for UI. Yarn 4 (corepack), `node-modules` linker. |
@@ -94,11 +94,12 @@ README.md             setup in <10 min, what is sent to Anthropic (NF-7, NF-9); 
 | `weekday_slot` | weekday (1 = Mon … 7 = Sun, PK), slot (`error_spotting` / `topic` / `second_set` / `speaking` / `writing` / `review_rewrite` / `rest`) |
 | `rule` | id, topic_id (unique), current_version |
 | `rule_version` | rule_id, version, body (Markdown, FR-14 skeleton), sources (JSON), reason, created_at |
-| `session` | id, date (unique), title, is_light, status (`draft` / `generated` / `graded`), created_at, graded_at |
+| `session` | id (autoincrement: ids are never reused), date (unique), title, is_light, status (`draft` / `generated` / `graded`), created_at, graded_at |
 | `session_support` | session_id, topic_id — rule of that topic opened before submit (D19) |
 | `block` | id, session_id, ord, kind (`spelling` / `review` / `task` / `speaking`), format (`gap` / `fix` / `spot` / `spelling` / `question`), title, instruction, format_example, passage (JSON paragraphs, `spot` only), minutes |
 | `item` | id, block_id, ord, prompt, expected, paragraph (`spot` only), topic_id (NULL for spelling), rule_id, rule_version, rule_section, spelling_word_id (spelling only), is_check (bool), status (`active` / `dropped` / `defect`), note |
 | `answer` | item_id (PK), text, verdict (`correct` / `wrong` / `rule_gap` / `skipped`), fix, rule_section, explanation, vocabulary_note, is_inattention, dispute_text, dispute_reply, dispute_decision (`keep` / `correct` / `drop`) |
+| `draft_answer` | session_id, key (`i:<itemId>` or `p:<blockId>:<paragraph>`), text — PK (session_id, key); unsubmitted answers of an ungraded session, saved as the learner types and deleted when the session is graded |
 | `spot_answer` | block_id, paragraph, text — raw learner lines for a `spot` paragraph |
 | `extra_finding` | block_id, paragraph, text, explanation — a `spot` correction that was not an error (shown, not scored) |
 | `session_feedback` | session_id (PK), patterns (JSON), tomorrow (JSON) — display only |
@@ -167,7 +168,9 @@ LLM check — `validate_session` (TD-2, TD-3, TD-5, TD-6): per item `ok` or `def
 
 `no programme` → setup · `rule missing` → draft rule · `rest day` → message + Start light day · `no session` → empty state, **Start session**, Light day toggle · `generating` → skeleton + "Building today's session…" · `generated` → full session, key hidden, **Check answers** (⌘↵), ghost **Rebuild** (discards the ungraded session; also used to switch light day on/off) · `needs clarification` → inline questions · `graded` → feedback summary on top, verdicts per item.
 
-Ungraded sessions from earlier days stay viewable, are not counted as practised, and are ignored by context and scheduling.
+Answers are saved as drafts while typing (`draft_answer`), so a reload or a visit to another page keeps them; grading deletes them.
+
+Ungraded sessions from earlier days stay viewable, are not counted as practised, and are ignored by context and scheduling. When there is no session for today and the most recent `generated` session is from an earlier date, Today shows that session (its own title and date, no Rebuild) with a secondary **Start today's session** action; it can be answered and graded as usual (everything uses `session.date`), and after grading it stays on screen until the page is left.
 
 ## 7. Scheduling
 
@@ -192,6 +195,7 @@ Example: error on day 0 → checks 1, 3, 7. Correct on 1, 3, 7 without support �
 - Same replay as 7.1 per word on `spelling_attempt` (no support concept): wrong → due +1/+3/+7 (reactivates a retired word); two correct attempts ≥3 days apart → retired; pending empty and not retired → due d+3.
 - Selection per session: due words (oldest due first) up to 15; if fewer than 10, fill with non-retired words tested least recently, up to 10. Light day: 5. Block omitted if no words.
 - Graded by code: trimmed, case-insensitive exact match against the word in `spelling_variant`.
+- Word state is replayed from the effective verdict (4.1) of the attempt's spelling item: a won dispute counts as correct; a dropped item, a defect, or a lost dispute with `drop` is skipped. A word the grader reported inside another answer has no spelling item and keeps its stored attempt.
 - After grading, each spelling item shows an inline **Mnemonic** field (saved to `spelling_word.mnemonic`); the mnemonic is shown with the item in later sessions after grading, never before.
 
 ## 8. Answer checking
@@ -275,7 +279,7 @@ Verify, with fallbacks:
 
 Sidebar: Today, Progress, Rules, Error bank, Settings. Words, Writing, Speaking are hidden until S2/S3 (deviation from DESIGN.md's 8 items, temporary). All per `DESIGN.md`: warm dark default + paper theme, Literata bundled locally, no modals (inline fields, rule side panel 420px), verdicts with icon + word, spellcheck/autocorrect off, ⌘↵ submit.
 
-- **Today:** header line with total minutes and "Read §N before block K" derived from the task block's items; opening any rule from a session records `session_support` (D19).
+- **Today** (no `claude`: a notice with a link to the Claude check instead of Start): header line with total minutes and "Read §N before block K" derived from the task block's items; opening any rule from a session records `session_support` (D19).
 - **Progress:** consistency grid (10 × 10; days before the first session drawn as empty outlines; practised = sage 70%, light = sage 35%); caption "Practised X of the last N days, Y light" (D17); progress log per graded session (date, light label, score per block, errors, patterns, disputes, defects, cost); open topics table (7.1).
 - **Error bank:** derived table (4.1) was → should be, kind, topic, date; filters by kind and topic.
 - **Rules:** 9.
@@ -283,9 +287,10 @@ Sidebar: Today, Progress, Rules, Error bank, Settings. Words, Writing, Speaking 
 
 ## 12. Error handling
 
-- CLI missing / not signed in → setup page (10.2), never a silent failure.
+- CLI missing / not signed in at start → Today shows a notice linking to the Claude check page (10.2) instead of building; Rules, Error bank, Progress and Settings stay usable. Not signed in during a call → "Run `claude` in Terminal and sign in" with a button that rechecks and retries; budget reached → message with a link to Settings. The LLM error code (`not_signed_in`, `budget`, …) travels with the result so the UI can pick the text; other codes show the message and **Retry**.
 - CLI errors, timeouts, invalid responses → retry rules (8.3 step 5) → inline Dusk Note notice with the exact message and **Retry**.
 - Failed generation leaves only a `draft`, removed later (3.1). Failed grading apply → **Retry** re-applies the kept result.
+- A render error in a page shows a calm fallback (Reload) inside the shell; a start-up failure shows an alert in the system language.
 - Migrations run at startup; a failed migration stops the app with the error shown.
 
 ## 13. Testing

@@ -24,7 +24,23 @@ export default tseslint.config(
             'react-dom',
             '@/adapters/*',
             '@/ui/*',
+            // The same layers reached by a relative path.
+            '**/adapters/**',
+            '**/ui/**',
           ],
+        },
+      ],
+    },
+  },
+  {
+    // SQL lives in core repos; the UI calls core functions.
+    files: ['src/ui/**'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.type='MemberExpression'][callee.property.name=/^(select|execute)$/]",
+          message: 'Do not write SQL in the UI: add a function to a core repo (src/core/db/repos) and call it.',
         },
       ],
     },

@@ -5,7 +5,7 @@ import { useSessionActions } from './sessionActions';
 
 /** The link is the section, set in the line "Read § X before block N"; it opens the rule panel. */
 export function SessionHeader({ view, lang, rebuilding, onRebuild }: {
-  view: SessionView; lang: Lang; rebuilding: boolean; onRebuild: (light: boolean) => void;
+  view: SessionView; lang: Lang; rebuilding: boolean; onRebuild?: (light: boolean) => void;
 }) {
   const { openRule } = useSessionActions();
   const first = view.readFirst;
@@ -35,7 +35,7 @@ export function SessionHeader({ view, lang, rebuilding, onRebuild }: {
           </>
         )}
       </p>
-      {view.status === 'generated' && <LightToggle isLight={view.isLight} lang={lang} busy={rebuilding} onRebuild={onRebuild} />}
+      {view.status === 'generated' && onRebuild && <LightToggle isLight={view.isLight} lang={lang} busy={rebuilding} onRebuild={onRebuild} />}
     </header>
   );
 }

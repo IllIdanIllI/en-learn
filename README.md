@@ -22,7 +22,11 @@ yarn tauri dev     # run the app
 yarn tauri build   # build an app bundle
 ```
 
-On first start the app asks you to set up a programme. The sample programme is 3 weeks of IELTS grammar with starter rules.
+On first start the app asks you to set up a programme. The sample programme is 3 weeks of IELTS grammar with starter rules. Its start date is the day you set it up, so week 1 begins today.
+
+## Your answers
+
+Answers are saved while you type, so closing the app or opening another page does not lose them. A session you did not finish stays on Today (with its own date) until you grade it or start today's session.
 
 ## Where data lives
 

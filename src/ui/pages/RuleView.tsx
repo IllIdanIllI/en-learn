@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { t } from '@/core/i18n';
-import { getRule, ruleHistory, saveRuleVersion } from '@/core/db/repos/rules';
+import { getRule, getRuleTopicTitle, ruleHistory, saveRuleVersion } from '@/core/db/repos/rules';
 import { useCore } from '@/ui/app/CoreProvider';
 import { useLoaded } from '@/ui/app/useLoaded';
 import { Button } from '@/ui/components/ui/button';
@@ -27,10 +27,10 @@ export function RuleView() {
     const [current, history, title] = await Promise.all([
       getRule(deps.db, ruleId),
       ruleHistory(deps.db, ruleId),
-      deps.db.select<{ title: string }>('SELECT t.title AS title FROM rule r JOIN topic t ON t.id = r.topic_id WHERE r.id = ?', [ruleId]),
+      getRuleTopicTitle(deps.db, ruleId),
     ]);
     const viewed = shown === null || shown === current.version ? current : await getRule(deps.db, ruleId, shown);
-    return { current, viewed, history, title: title[0]?.title ?? '' };
+    return { current, viewed, history, title };
   }, `${reload}:${shown ?? ''}`);
 
   const back = (

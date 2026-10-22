@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { recordSupport } from '@/core/grading/actions';
+import { draftsToAnswers, itemDraftKey, loadDraftAnswers, saveDraftAnswer, spotDraftKey } from '@/core/db/repos/drafts';
 import { gradeSession, type ClarificationAnswer, type GradeOutcome, type Question } from '@/core/grading/grade';
 import { t } from '@/core/i18n';
 import { loadSessionView, type SessionView } from '@/core/session/view';
 import { Button } from '@/ui/components/ui/button';
 import { useCore } from '@/ui/app/CoreProvider';
 import { Block } from './Block';
+import { ErrorNotice } from './ErrorNotice';
 import { FeedbackSummary } from './FeedbackSummary';
 import { GradedItem } from './GradedItem';
 import { ItemRow } from './ItemRow';
@@ -18,16 +20,22 @@ import { Notice } from './chips';
 import { RulePanel, type RuleTarget } from './RulePanel';
 import { SessionActionsProvider, type SessionActions } from './sessionActions';
 
-type Failure = { message: string; retry: () => Promise<GradeOutcome> };
+type Failure = { message: string; code?: string; retry: () => Promise<GradeOutcome> };
 
-/** Answers live in component state keyed by item id and `${blockId}:${paragraph}`; a reload loses them. */
-export function SessionPage({ sessionId, rebuilding, onRebuild }: {
-  sessionId: number; rebuilding: boolean; onRebuild: (light: boolean) => void;
+const DRAFT_DELAY_MS = 300;
+
+/**
+ * Answers live in component state keyed by item id and `${blockId}:${paragraph}`, and are saved as drafts (debounced)
+ * so a reload or another page does not lose them. Without `onRebuild` the session cannot be rebuilt (an earlier day).
+ */
+export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded }: {
+  sessionId: number; rebuilding: boolean; onRebuild?: (light: boolean) => void; onGraded?: () => void;
 }) {
   const { deps, lang } = useCore();
   const [view, setView] = useState<SessionView | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
+  const [draftsReady, setDraftsReady] = useState(false);
   const [items, setItems] = useState<Record<number, string>>({});
   const [spot, setSpot] = useState<Record<string, string>>({});
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -56,14 +64,65 @@ export function SessionPage({ sessionId, rebuilding, onRebuild }: {
     };
   }, [deps, sessionId, reload]);
 
+  useEffect(() => {
+    let live = true;
+    loadDraftAnswers(deps.db, sessionId).then(
+      (drafts) => {
+        if (!live) return;
+        const restored = draftsToAnswers(drafts);
+        setItems(restored.items);
+        setSpot(restored.spot);
+        setDraftsReady(true);
+      },
+      (e: unknown) => {
+        console.error('loadDraftAnswers failed', e);
+        if (live) setDraftsReady(true);
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [deps.db, sessionId]);
+
+  const pending = useRef(new Map<string, { text: string; timer: ReturnType<typeof setTimeout> }>());
+  const write = useRef({ db: deps.db, sessionId });
+  useEffect(() => {
+    write.current = { db: deps.db, sessionId };
+  }, [deps.db, sessionId]);
+  const flushAll = useCallback(async () => {
+    const entries = [...pending.current];
+    pending.current.clear();
+    await Promise.all(
+      entries.map(([key, { text, timer }]) => {
+        clearTimeout(timer);
+        return saveDraftAnswer(write.current.db, write.current.sessionId, key, text).catch((e: unknown) => console.error('saveDraftAnswer failed', e));
+      }),
+    );
+  }, []);
+  const dropPending = () => {
+    for (const { timer } of pending.current.values()) clearTimeout(timer);
+    pending.current.clear();
+  };
+  const persist = (key: string, text: string) => {
+    clearTimeout(pending.current.get(key)?.timer);
+    const timer = setTimeout(() => {
+      pending.current.delete(key);
+      saveDraftAnswer(write.current.db, write.current.sessionId, key, text).catch((e: unknown) => console.error('saveDraftAnswer failed', e));
+    }, DRAFT_DELAY_MS);
+    pending.current.set(key, { text, timer });
+  };
+  // Leaving the page keeps what was typed in the last moments.
+  useEffect(() => () => void flushAll(), [flushAll]);
+
   const handle = useCallback((outcome: GradeOutcome) => {
     if (outcome.kind === 'graded') {
       focusResults.current = true;
+      onGraded?.();
       setQuestions([]);
       setReload((n) => n + 1);
     } else if (outcome.kind === 'questions') setQuestions(outcome.questions);
-    else setFailure({ message: outcome.message, retry: outcome.retry });
-  }, []);
+    else setFailure({ message: outcome.message, code: outcome.code, retry: outcome.retry });
+  }, [onGraded]);
 
   const run = useCallback(
     async (start: () => Promise<GradeOutcome>) => {
@@ -90,7 +149,12 @@ export function SessionPage({ sessionId, rebuilding, onRebuild }: {
     });
 
   const submit = () => {
-    if (!busy) void run(() => gradeSession(deps, sessionId, { items, spot }, clarifications()));
+    if (!busy) {
+      void run(async () => {
+        await flushAll(); // a late draft write must not land after the drafts are deleted by grading
+        return gradeSession(deps, sessionId, { items, spot }, clarifications());
+      });
+    }
   };
   const graded = view?.status === 'graded';
 
@@ -130,10 +194,15 @@ export function SessionPage({ sessionId, rebuilding, onRebuild }: {
   }, [graded]);
 
   if (loadError) return <Notice>{t(lang, 'today.loadError', { message: loadError })}</Notice>;
-  if (!view) return null;
+  if (!view || !draftsReady) return null;
 
+  const rebuild = onRebuild && ((light: boolean) => {
+    dropPending(); // the session and its drafts are deleted by the rebuild
+    onRebuild(light);
+  });
   const setAnswer = (id: number, value: string) => {
     setItems((prev) => ({ ...prev, [id]: value }));
+    persist(itemDraftKey(id), value);
     // An edited answer invalidates a yes/no given about its old text.
     setReplies((prev) => {
       if (prev[id]?.kind === 'llm' || !(id in prev)) return prev;
@@ -151,7 +220,7 @@ export function SessionPage({ sessionId, rebuilding, onRebuild }: {
   return (
     <SessionActionsProvider value={actions}>
       <div ref={root}>
-        <SessionHeader view={view} lang={lang} rebuilding={rebuilding} onRebuild={onRebuild} />
+        <SessionHeader view={view} lang={lang} rebuilding={rebuilding} onRebuild={rebuild} />
         {graded && <FeedbackSummary view={view} lang={lang} />}
         {view.blocks.map((block, i) => (
           <Block key={block.id} block={block} number={i + 1} lang={lang}>
@@ -163,7 +232,11 @@ export function SessionPage({ sessionId, rebuilding, onRebuild }: {
                 lang={lang}
                 values={spot}
                 graded={graded}
-                onChange={(key, value) => setSpot((prev) => ({ ...prev, [key]: value }))}
+                onChange={(key, value) => {
+                  setSpot((prev) => ({ ...prev, [key]: value }));
+                  const [blockId, paragraph] = key.split(':').map(Number) as [number, number];
+                  persist(spotDraftKey(blockId, paragraph), value);
+                }}
               />
             ) : (
               <ol className="flex flex-col gap-3">
@@ -187,12 +260,14 @@ export function SessionPage({ sessionId, rebuilding, onRebuild }: {
         {!graded && (
           <div className="mt-12">
             {failure && (
-              <Notice className="mb-4">
-                <span>{t(lang, 'grade.error', { message: failure.message })}</span>
-                <Button variant="secondary" size="sm" disabled={busy} onClick={() => void run(failure.retry)}>
-                  {t(lang, 'today.retry')}
-                </Button>
-              </Notice>
+              <ErrorNotice
+                kind="grade"
+                className="mb-4"
+                message={failure.message}
+                code={failure.code}
+                busy={busy}
+                onRetry={() => void run(failure.retry)}
+              />
             )}
             <Button id="check-answers" disabled={busy} onClick={submit}>
               {t(lang, busy ? 'today.checking' : 'today.check')}

@@ -22,7 +22,7 @@ export async function bootTauri(): Promise<CoreInit> {
 
   const runner = new TauriProcessRunner();
   const prereq = await checkPrerequisites(runner);
-  // Without a usable `claude` the app routes to /prerequisites; no call is made, so the Llm is never reached.
+  // Without a usable `claude` Today shows a notice instead of building and no call is made, so this Llm is not reached.
   const llm: Llm = prereq.ok
     ? new ClaudeCli(runner, prereq.location, dataDir, home)
     : { call: () => Promise.reject(new Error('claude is not available')) };
@@ -47,10 +47,10 @@ export async function bootTauri(): Promise<CoreInit> {
 
 /** Browser preview: sql.js, canned LLM, fixed clock; `?state=` picks the fixture. */
 export async function bootPreview(search: string): Promise<CoreInit> {
-  const { buildPreview, parsePreviewState, parsePreviewDelay, withDelay } = await import('@/adapters/preview/fixtures');
+  const { buildPreview, parsePreviewState, parsePreviewDelay, parsePreviewFail, withDelay, withFailure } = await import('@/adapters/preview/fixtures');
   const { MINI_PROGRAMME, MINI_RULES } = await import('@/adapters/preview/miniSeed');
   const core = await buildPreview(parsePreviewState(search));
-  const deps = { ...core.deps, llm: withDelay(core.deps.llm, parsePreviewDelay(search)) };
+  const deps = { ...core.deps, llm: withFailure(withDelay(core.deps.llm, parsePreviewDelay(search)), parsePreviewFail(search)) };
   return {
     ...core,
     deps,

@@ -1,7 +1,7 @@
 import { t } from '@/core/i18n';
 import { getTopics } from '@/core/db/repos/programme';
 import { listRules } from '@/core/db/repos/rules';
-import { listGradedSessions } from '@/core/db/repos/sessions';
+import { listBlockTitles, listGradedSessions } from '@/core/db/repos/sessions';
 import { consistency } from '@/core/progress/derive';
 import { getTopicStates, loadProgressLog } from '@/core/progress/history';
 import { useCore } from '@/ui/app/CoreProvider';
@@ -14,13 +14,13 @@ import { Notice } from '@/ui/today/chips';
 export function Progress() {
   const { deps, lang } = useCore();
   const loaded = useLoaded(async () => {
-    const [sessions, topics, states, rules, log, blocks] = await Promise.all([
-      listGradedSessions(deps.db),
+    const sessions = await listGradedSessions(deps.db);
+    const [topics, states, rules, log, blockTitles] = await Promise.all([
       getTopics(deps.db),
       getTopicStates(deps.db),
       listRules(deps.db),
       loadProgressLog(deps.db),
-      deps.db.select<{ id: number; title: string }>('SELECT id, title FROM block'),
+      listBlockTitles(deps.db, sessions.map((s) => s.id)),
     ]);
     return {
       grid: consistency(sessions.map((s) => ({ date: s.date, isLight: s.isLight, status: 'graded' as const })), deps.clock.today()),
@@ -28,7 +28,7 @@ export function Progress() {
       states,
       ruleIds: new Map(rules.map((r) => [r.topic.id, r.ruleId])),
       log,
-      blockTitles: new Map(blocks.map((b) => [b.id, b.title])),
+      blockTitles,
     };
   });
 

@@ -1,4 +1,4 @@
-import type { Clock, Deps, Llm, ProcessRunner } from '@/core/ports';
+import type { Clock, Deps, Llm, LlmErrorCode, ProcessRunner } from '@/core/ports';
 import type { ISODate } from '@/core/domain';
 import type { PrereqResult } from '@/core/prereq';
 import { CLAUDE_LOCATIONS } from '@/core/llm/claude';
@@ -15,6 +15,7 @@ import { MINI_PROGRAMME, MINI_RULES } from './miniSeed';
 
 export const PREVIEW_STATES = [
   'empty', 'no_session', 'generated', 'questions', 'graded', 'progress', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing',
+  'earlier_session', 'progress_archived',
 ] as const;
 export type PreviewState = (typeof PREVIEW_STATES)[number];
 
@@ -38,6 +39,7 @@ const ANSWERS: Record<string, string> = {
 
 const TUESDAY = '2026-10-20';
 const WEDNESDAY = '2026-10-21';
+const THURSDAY = '2026-10-22';
 
 /**
  * Earlier days of the `progress` fixture, played through the core on that day's date: five more graded sessions, the
@@ -74,6 +76,22 @@ export function parsePreviewState(search: string): PreviewState {
 export function parsePreviewDelay(search: string): number {
   const ms = Number(new URLSearchParams(search).get('delay'));
   return Number.isFinite(ms) && ms > 0 ? Math.min(ms, 60_000) : 0;
+}
+
+/** `?fail=` makes every LLM call fail with that code, to see the messages the app gives for it. */
+export function parsePreviewFail(search: string): LlmErrorCode | null {
+  const value = new URLSearchParams(search).get('fail');
+  const codes: LlmErrorCode[] = ['not_signed_in', 'budget', 'timeout', 'cli_error'];
+  return codes.find((c) => c === value) ?? null;
+}
+
+export function withFailure(llm: Llm, code: LlmErrorCode | null): Llm {
+  if (code === null) return llm;
+  return {
+    async call() {
+      return { ok: false, code, message: `Preview failure: ${code}`, costUsd: 0, durationMs: 1, raw: '' };
+    },
+  };
 }
 
 export function withDelay(llm: Llm, ms: number): Llm {
@@ -150,18 +168,26 @@ export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
   for (const [word, hint] of SPELLING_WORDS) await findOrCreateSpellingWord(deps.db, word, hint, clock.now());
 
   const today = clock.today();
-  if (state === 'progress') {
+  const progressLike = state === 'progress' || state === 'progress_archived';
+  if (progressLike) {
     for (const day of EARLIER_DAYS) {
       clock.set(day.date);
       await playDay(deps, day.light);
     }
     clock.set(today);
   }
-  if (state === 'generated' || state === 'questions' || state === 'graded' || state === 'progress') {
+  if (state === 'earlier_session') {
+    // Yesterday's session was built and left unanswered; today has none yet.
+    requireOk(await generateSession(deps, { light: false }), 'generateSession');
+    clock.set(THURSDAY);
+  }
+  if (state === 'generated' || state === 'questions' || state === 'graded' || progressLike) {
     requireOk(await generateSession(deps, { light: false }), 'generateSession');
   }
-  if (state === 'questions' || state === 'graded' || state === 'progress') {
+  if (state === 'questions' || state === 'graded' || progressLike) {
     await answerToday(deps, state === 'questions' ? 'questions' : 'graded');
   }
+  // A topic dropped from the programme while it still has history is kept, archived.
+  if (state === 'progress_archived') await deps.db.execute("UPDATE topic SET archived = 1 WHERE key = 'articles'");
   return core();
 }

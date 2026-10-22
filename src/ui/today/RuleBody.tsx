@@ -18,6 +18,8 @@ const components: Components = {
   a: ({ href, children }) => (
     <a href={href} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">{children}</a>
   ),
+  // The app makes no network calls of its own: a rule cannot pull in remote images.
+  img: () => null,
   code: ({ children }) => <code className="answer rounded-sm bg-input px-1">{children}</code>,
   table: ({ children }) => <div className="mt-3"><Table className="border border-border">{children}</Table></div>,
   thead: ({ children }) => <TableHeader>{children}</TableHeader>,

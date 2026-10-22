@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { t, type Lang } from '@/core/i18n';
 import type { Source } from '@/core/llm/types';
-import { getRule } from '@/core/db/repos/rules';
+import { getRule, getRuleTopicTitle } from '@/core/db/repos/rules';
 import { useCore } from '@/ui/app/CoreProvider';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/ui/components/ui/sheet';
 import { RuleBody } from './RuleBody';
@@ -49,9 +49,9 @@ export function RulePanel({ target, onClose }: { target: RuleTarget | null; onCl
     (async () => {
       const [current, title] = await Promise.all([
         getRule(deps.db, id),
-        deps.db.select<{ title: string }>('SELECT t.title AS title FROM rule r JOIN topic t ON t.id = r.topic_id WHERE r.id = ?', [id]),
+        getRuleTopicTitle(deps.db, id),
       ]);
-      return { title: title[0]?.title ?? '', ...current };
+      return { title, ...current };
     })().then(
       (value) => {
         if (live) setRule({ id, value });

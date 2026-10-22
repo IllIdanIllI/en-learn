@@ -22,7 +22,7 @@ test('shell collapses to icons below 1100px', async ({ page }) => {
   await page.screenshot({ path: `${SHOTS}/shell-collapsed.png` });
 });
 
-for (const state of ['empty', 'no_session', 'generated', 'questions', 'graded', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing']) {
+for (const state of ['empty', 'no_session', 'generated', 'questions', 'graded', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing', 'earlier_session', 'progress_archived']) {
   test(`today loads in state ${state}`, async ({ page }) => {
     const errors: string[] = [];
     page.on('console', (m) => {
@@ -470,5 +470,133 @@ test.describe('rules, error bank and progress', () => {
     await page.getByRole('radio', { name: 'English' }).click();
     await page.getByRole('link', { name: 'Progress' }).click();
     await expect(page.getByText('Practised 6 of the last 10 days, 1 light')).toBeVisible();
+  });
+});
+
+test.describe('answers, earlier sessions, errors and fallbacks', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 1400 });
+  });
+
+  test('typed answers survive a visit to another page', async ({ page }) => {
+    await page.goto('/?state=generated#/today');
+    const first = page.getByPlaceholder('Ответ').first();
+    await first.fill('necessary');
+    await page.getByRole('link', { name: 'Прогресс' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Прогресс' })).toBeVisible();
+    await page.getByRole('link', { name: 'Сегодня' }).click();
+    await expect(page.getByPlaceholder('Ответ').first()).toHaveValue('necessary');
+  });
+
+  test('an earlier ungraded session is shown with its own title and a way to start today', async ({ page }) => {
+    await page.goto('/?state=earlier_session#/today');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Вт 20 окт');
+    await expect(page.getByText('Эта сессия от', { exact: false })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Пересобрать' })).toHaveCount(0);
+    await page.getByPlaceholder('Ответ').first().fill('necessary');
+    await page.screenshot({ path: `${SHOTS}/today-earlier.png`, fullPage: true });
+    // The window regaining focus (midnight check) keeps the session and what was typed.
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect(page.getByPlaceholder('Ответ').first()).toHaveValue('necessary');
+    await page.getByRole('button', { name: 'Начать сегодняшнюю сессию' }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Чт 22 окт', { timeout: 15_000 });
+    await expect(page.getByRole('button', { name: 'Начать сегодняшнюю сессию' })).toHaveCount(0);
+  });
+
+  test('an earlier session can be answered and graded; the feedback stays', async ({ page }) => {
+    await page.goto('/?state=earlier_session#/today');
+    await page.getByRole('button', { name: 'Проверить ответы' }).click();
+    for (const yes of await page.getByRole('radio', { name: 'Да' }).all()) await yes.click();
+    await page.getByRole('button', { name: 'Проверить ответы' }).click();
+    await expect(page.getByRole('heading', { name: 'Итоги' })).toBeVisible({ timeout: 15_000 });
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect(page.getByRole('heading', { name: 'Итоги' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Начать сегодняшнюю сессию' })).toBeVisible();
+  });
+
+  test('not signed in: the message names the command and the button rechecks', async ({ page }) => {
+    await page.goto('/?state=no_session&fail=not_signed_in#/today');
+    await page.getByRole('button', { name: 'Начать сессию' }).click();
+    const alert = page.getByRole('alert');
+    await expect(alert).toContainText('Выполните `claude` в Терминале и войдите в аккаунт.');
+    await expect(alert).not.toContainText('Preview failure');
+    await alert.getByRole('button', { name: 'Я вошёл' }).click();
+    await expect(alert).toContainText('Вход в Claude пока не выполнен.');
+  });
+
+  test('budget: the message links to Settings', async ({ page }) => {
+    await page.goto('/?state=no_session&fail=budget#/today');
+    await page.getByRole('button', { name: 'Начать сессию' }).click();
+    await expect(page.getByRole('alert')).toContainText('Достигнут лимит бюджета на один вызов.');
+    await page.getByRole('link', { name: 'Изменить в настройках' }).click();
+    await expect(page.locator('#settings-budget')).toBeVisible();
+  });
+
+  test('other failures keep the message and Retry', async ({ page }) => {
+    await page.goto('/?state=no_session&fail=timeout#/today');
+    await page.getByRole('button', { name: 'Начать сессию' }).click();
+    await expect(page.getByRole('alert')).toContainText('Сессия не собрана: Preview failure: timeout');
+    await expect(page.getByRole('button', { name: 'Повторить' })).toBeVisible();
+  });
+
+  test('a failed check shows the code message too', async ({ page }) => {
+    await page.goto('/?state=generated&fail=budget#/today');
+    await page.getByRole('button', { name: 'Проверить ответы' }).waitFor();
+    for (const box of await page.getByRole('textbox').all()) await box.fill('an');
+    await page.getByRole('button', { name: 'Проверить ответы' }).click();
+    await expect(page.getByRole('alert')).toContainText('Достигнут лимит бюджета на один вызов.', { timeout: 15_000 });
+  });
+
+  test('without claude only Today changes; the other pages stay usable', async ({ page }) => {
+    await page.goto('/?state=prereq_missing#/today');
+    await expect(page.getByRole('alert')).toContainText('Claude недоступен');
+    await expect(page.getByRole('button', { name: 'Начать сессию' })).toHaveCount(0);
+    await page.getByRole('link', { name: 'Открыть проверку Claude' }).click();
+    await expect(page).toHaveURL(/#\/prerequisites$/);
+    for (const [link, heading] of [['Правила', 'Правила'], ['Банк ошибок', 'Банк ошибок'], ['Прогресс', 'Прогресс'], ['Настройки', 'Настройки']]) {
+      await page.getByRole('navigation').getByRole('link', { name: link }).click();
+      await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
+    }
+  });
+
+  test('archived topics are labelled and show no next check dates', async ({ page }) => {
+    await page.goto('/?state=progress_archived#/progress');
+    const row = page.getByRole('table', { name: 'Темы' }).getByRole('row', { name: /Articles/ });
+    await expect(row).toContainText('в архиве');
+    await expect(row).not.toContainText('2026-10-23');
+  });
+
+  test('a rule body does not load remote images', async ({ page }) => {
+    const requests: string[] = [];
+    page.on('request', (r) => requests.push(r.url()));
+    await page.goto('/?state=no_session#/rules');
+    await page.getByRole('link', { name: 'Articles' }).click();
+    await page.getByRole('button', { name: 'Править' }).click();
+    await page.getByRole('textbox', { name: 'Текст правила (Markdown)' }).fill('## Формула\n\ntext ![x](https://example.invalid/pixel.png)');
+    await expect(page.getByText('text', { exact: false }).last()).toBeVisible();
+    await expect(page.locator('main img')).toHaveCount(0);
+    expect(requests.filter((u) => u.includes('example.invalid'))).toEqual([]);
+  });
+
+  test('a page that fails to render shows a calm fallback and the sidebar still works', async ({ page }) => {
+    await page.route('**/src/ui/pages/Rules.tsx*', (route) =>
+      route.fulfill({ contentType: 'text/javascript', body: 'export function Rules() { throw new Error("boom"); }' }),
+    );
+    await page.goto('/?state=no_session#/rules');
+    const alert = page.getByRole('alert');
+    await expect(alert).toContainText('Что-то пошло не так.');
+    await expect(alert.getByRole('button', { name: 'Перезагрузить' })).toBeVisible();
+    await page.getByRole('navigation').getByRole('link', { name: 'Настройки' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Настройки' })).toBeVisible();
+  });
+
+  test('a start-up failure is shown as an alert in the interface language', async ({ browser }) => {
+    // Settings are unavailable at that point, so the system language decides: Russian is the app's default.
+    const context = await browser.newContext({ locale: 'ru-RU' });
+    const page = await context.newPage();
+    await page.route('**/*.wasm', (route) => route.abort());
+    await page.goto('/?state=no_session#/today');
+    await expect(page.getByRole('alert')).toContainText('Приложение не запустилось.');
+    await context.close();
   });
 });

@@ -13,7 +13,7 @@ Setup: Claude Code installed at `~/.local/bin/claude` and signed in. Start with 
 
 2. **`$HOME` expands in the shell scope.**
    - Action: same as step 1. The version check runs `$HOME/.local/bin/claude --version` through the scope `claude-local-version`.
-   - Expected: found, not "Not found". The Prerequisites page does not appear.
+   - Expected: found, not "Not found". Today does not show the "Claude is not available" notice.
    - If it fails: record the exact error from the devtools console (Cmd+Opt+I). Fix to try: `sudo ln -s ~/.local/bin/claude /usr/local/bin/claude`, restart the app, and check the line shows `/usr/local/bin/claude`. Record that the symlink was needed.
 
 3. **A long multi-line prompt passes the argument validators.**
@@ -28,9 +28,9 @@ Setup: Claude Code installed at `~/.local/bin/claude` and signed in. Start with 
 
 5. **Not signed in.**
    - Action: run `claude auth logout` in a terminal, then reload the app (Cmd+R) or restart it.
-   - Expected: the Prerequisites page shows `~/.local/bin/claude` as "Installed, not signed in", with the fix steps.
+   - Expected: Today shows "Claude is not available" with a link to the Claude check; that page shows `~/.local/bin/claude` as "Installed, not signed in", with the fix steps. Rules, Error bank, Progress and Settings still open.
    - Then, with a session already generated, trigger a call (grade a session) while logged out.
-   - Expected: an error message, no data is lost, and Retry works after `claude` is signed in again.
+   - Expected: the message "Run `claude` in Terminal and sign in" with an "I have signed in" button, no data is lost, and the button retries once `claude` is signed in again.
    - If it fails: record the full envelope. Run `claude -p --output-format json --tools "" -- hi` in a terminal and copy stdout, stderr and the exit code. `parseEnvelope` matches `not logged in`, `login`, `authenticat` or `/login`, so the wording matters.
    - Sign in again by running `claude` before going on.
 
@@ -42,12 +42,12 @@ Setup: Claude Code installed at `~/.local/bin/claude` and signed in. Start with 
 ## Acceptance walk-through
 
 A. **Fresh database and setup (criterion 1).**
-   - Action: delete `enlearn.db`, start the app, accept the sample programme (3 weeks), start date next Monday.
+   - Action: delete `enlearn.db`, start the app, accept the sample programme (3 weeks), start date = today.
    - Expected: the programme is saved, the starter rules appear on the Rules page, Today opens.
    - If it fails: record the step and the message.
 
 B. **Today's full session (criterion 2).**
-   - Action: on Today, generate the session. Use a day that is not rest (change the programme start so today is in week 1, or wait for a weekday slot that is not `rest`).
+   - Action: on Today, generate the session. Use a day that is not rest (the sample programme starts today, so today is in week 1; if today's weekday slot is `rest`, wait for a day that is not).
    - Expected: blocks appear in order (spelling, review or task, and so on). The answer key is hidden. Each item has an input. Spelling words are shown with their hint.
    - If it fails: record the message and the `llm_call` rows (`kind`, `ok`, `error`).
 

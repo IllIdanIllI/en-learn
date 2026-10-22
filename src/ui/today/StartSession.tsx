@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { t, type Lang } from '@/core/i18n';
 import { Button } from '@/ui/components/ui/button';
 import { Toggle } from '@/ui/components/ui/toggle';
-import { Notice } from './chips';
+import { ErrorNotice } from './ErrorNotice';
+
+export type GenError = { message: string; code?: string };
 
 function Skeleton() {
   return (
@@ -16,7 +18,7 @@ function Skeleton() {
 
 /** Empty state with the primary action, and the loading and error states of generation. */
 export function StartSession({ lang, generating, error, rest = false, onStart }: {
-  lang: Lang; generating: boolean; error: string | null; rest?: boolean; onStart: (light: boolean) => void;
+  lang: Lang; generating: boolean; error: GenError | null; rest?: boolean; onStart: (light: boolean) => void;
 }) {
   const [lightChoice, setLight] = useState(false);
   // A rest day has no toggle: the only way to practise is a light day.
@@ -24,12 +26,7 @@ export function StartSession({ lang, generating, error, rest = false, onStart }:
   return (
     <>
       {error !== null && (
-        <Notice className="mt-6">
-          <span>{t(lang, 'today.genError', { message: error })}</span>
-          <Button variant="secondary" size="sm" disabled={generating} onClick={() => onStart(light)}>
-            {t(lang, 'today.retry')}
-          </Button>
-        </Notice>
+        <ErrorNotice kind="gen" className="mt-6" message={error.message} code={error.code} busy={generating} onRetry={() => onStart(light)} />
       )}
       {!rest && <p className="reading mt-6 text-muted-foreground">{t(lang, 'today.empty')}</p>}
       <div className="mt-6 flex items-center gap-3">

@@ -57,6 +57,7 @@ export async function generateSession(deps: Deps, opts: { light: boolean }): Pro
       const prompt = problems.length === 0 ? base : `${base}\n## Problems in the previous attempt (fix them)\n\n${problems.map((p) => `- ${p}`).join('\n')}\n`;
       const gen = await callStructured<GeneratedSession>(deps, 'generate_session', prompt, {
         sessionId,
+        maxAttempts: 1,
         check: (s) => violations(s, ctx).join('\n') || null,
       });
       if (!gen.ok) {
@@ -64,7 +65,7 @@ export async function generateSession(deps: Deps, opts: { light: boolean }): Pro
         problems = [gen.message];
         continue;
       }
-      const val = await callStructured<ValidationResult>(deps, 'validate_session', renderValidationInput(gen.data, ctx.allowed), { sessionId });
+      const val = await callStructured<ValidationResult>(deps, 'validate_session', renderValidationInput(gen.data, ctx.allowed), { sessionId, maxAttempts: 1 });
       if (!val.ok) {
         if (FATAL.has(val.code)) return await fail(deps, sessionId, val.message);
         problems = [val.message];
@@ -95,10 +96,11 @@ async function fail(deps: Deps, sessionId: number, message: string): Promise<Gen
 
 /** Deletes an ungraded session (rows cascade) and builds a new one for today. */
 export async function rebuildSession(deps: Deps, sessionId: number, opts: { light: boolean }): Promise<GenerateResult> {
-  const rows = await deps.db.select<{ status: string }>('SELECT status FROM session WHERE id = ?', [sessionId]);
+  const rows = await deps.db.select<{ status: string; date: string }>('SELECT status, date FROM session WHERE id = ?', [sessionId]);
   const row = rows[0];
   if (!row) throw new Error(`Session ${sessionId} not found`);
   if (row.status === 'graded') throw new Error('Cannot rebuild a graded session');
+  if (row.date !== deps.clock.today()) throw new Error("Cannot rebuild a session of another day");
   await deleteSession(deps.db, sessionId);
   return generateSession(deps, opts);
 }

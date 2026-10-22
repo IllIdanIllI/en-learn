@@ -64,11 +64,11 @@ export async function buildGenerationContext(deps: Deps, d: ISODate, light: bool
     topicKey: r.topicId === null ? null : (byId.get(r.topicId)?.key ?? null),
   });
   const reviewInputs = last
-    ? facts.errorRows.filter((r) => r.date === last.date && r.effective === 'wrong' && !r.isInattention).map(entry)
+    ? facts.errorRows.filter((r) => r.format !== 'spelling' && r.date === last.date && r.effective === 'wrong' && !r.isInattention).map(entry)
     : [];
   const since = addDays(d, -INATTENTION_DAYS);
   const inattention = facts.errorRows
-    .filter((r) => r.effective === 'wrong' && r.isInattention && r.date >= since && r.date < d)
+    .filter((r) => r.format !== 'spelling' && r.effective === 'wrong' && r.isInattention && r.date >= since && r.date < d)
     .map(entry);
 
   const allowed = new Map<string, RuleRef>();

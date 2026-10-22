@@ -136,6 +136,8 @@ describe('generateSession', () => {
     });
     expect((await generateSession(deps, { light: false })).ok).toBe(true);
     expect(await count(db, 'llm_call')).toBe(3);
+    const kinds = await db.select<{ kind: string }>('SELECT kind FROM llm_call ORDER BY id');
+    expect(kinds.map((k) => k.kind)).toEqual(['generate_session', 'generate_session', 'validate_session']);
     expect(await count(db, 'session')).toBe(1);
     expect((await sessions(db))[0]?.status).toBe('generated');
   });
@@ -148,6 +150,15 @@ describe('generateSession', () => {
     if (!res.ok) expect(res.message).toContain('need at least 3');
     expect(await count(db, 'session')).toBe(0);
     expect(await count(db, 'block')).toBe(0);
+    const calls = await db.select<{ kind: string }>('SELECT kind FROM llm_call');
+    expect(calls.map((c) => c.kind)).toEqual(['generate_session', 'generate_session']);
+  });
+
+  test('an error thrown after the draft insert leaves no session rows', async () => {
+    const { db, deps } = await setup('2026-10-20', {});
+    deps.llm.call = async () => { throw new Error('boom'); };
+    await expect(generateSession(deps, { light: false })).rejects.toThrow('boom');
+    expect(await count(db, 'session')).toBe(0);
   });
 
   test('defects that break the counts fail the attempt', async () => {
@@ -264,6 +275,13 @@ describe('generateSession', () => {
     await db.execute("UPDATE session SET status = 'graded'");
     await expect(rebuildSession(deps, 1, { light: false })).rejects.toThrow('graded');
   });
+
+  test('rebuildSession refuses a session of another day', async () => {
+    const { db, deps } = await setup('2026-10-20', {});
+    await gradeWrong(db, '2026-10-19');
+    await db.execute("UPDATE session SET status = 'generated'");
+    await expect(rebuildSession(deps, 1, { light: false })).rejects.toThrow('another day');
+  });
 });
 
 describe('context', () => {
@@ -277,6 +295,22 @@ describe('context', () => {
     ]) expect(text).toContain(label);
     expect(text).toContain('Use "a" before a consonant sound and "an" before a vowel sound.');
     expect(text).toContain('learner answer: a');
+  });
+});
+
+describe('spelling in review', () => {
+  test('a graded spelling miss is not review input and creates no review block', async () => {
+    const { db, deps } = await setup('2026-10-20', {});
+    await db.execute("INSERT INTO session (date, title, is_light, status, created_at) VALUES ('2026-10-19','old',0,'graded','x')");
+    await db.execute("INSERT INTO block (session_id, ord, kind, format, title, instruction, minutes) VALUES (1,0,'spelling','spelling','s','i',3)");
+    await db.execute("INSERT INTO item (block_id, ord, prompt, expected, status) VALUES (1,0,'the hint','receive','active'),(1,1,'hint2','separate','active')");
+    await db.execute("INSERT INTO answer (item_id, text, verdict, fix, is_inattention) VALUES (1,'recieve','wrong','receive',0),(2,'seperate','wrong','separate',1)");
+    const ctx = await buildGenerationContext(deps, '2026-10-20', false);
+    expect(ctx.reviewInputs).toEqual([]);
+    expect(ctx.inattention).toEqual([]);
+    expect(ctx.blocks.map((b) => b.kind)).toEqual(['task', 'speaking']);
+    expect(renderContext(ctx)).not.toContain('recieve');
+    expect(renderContext(ctx)).not.toContain('seperate');
   });
 });
 

@@ -4,7 +4,7 @@ import type { Deps, LlmErrorCode, LlmResult } from '@/core/ports';
 import { getSettings } from '@/core/db/repos/settings';
 import { insertLlmCall } from '@/core/db/repos/llmCalls';
 
-const MAX_ATTEMPTS = 2;
+const DEFAULT_MAX_ATTEMPTS = 2;
 const RETRYABLE: ReadonlySet<LlmErrorCode> = new Set(['timeout', 'invalid_json', 'schema', 'check', 'cli_error']);
 
 const ajv = new Ajv({ allErrors: true, strict: false });
@@ -23,7 +23,7 @@ export async function callStructured<T>(
   deps: Deps,
   kind: LlmKind,
   userPrompt: string,
-  opts: { sessionId?: number; check?: (data: T) => string | null } = {},
+  opts: { sessionId?: number; check?: (data: T) => string | null; maxAttempts?: number } = {},
 ): Promise<LlmResult<T>> {
   const settings = await getSettings(deps.db);
   const prompt = await deps.prompts.load(kind);
@@ -32,7 +32,7 @@ export async function callStructured<T>(
   const validate = validatorFor(prompt.schema);
 
   let last: LlmResult<T> | undefined;
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= (opts.maxAttempts ?? DEFAULT_MAX_ATTEMPTS); attempt++) {
     const res = await deps.llm.call({
       kind,
       systemPrompt: prompt.system.replaceAll('{{nativeLanguage}}', language),

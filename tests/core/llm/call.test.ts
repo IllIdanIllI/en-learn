@@ -59,6 +59,15 @@ describe('callStructured', () => {
     expect(await rows(deps)).toHaveLength(1);
   });
 
+  test('maxAttempts 1 does not retry a check failure', async () => {
+    const llm = new FakeLlm({ grade: [good({ word: 'a' }), good({ word: 'b' })] });
+    const deps = await setup(llm);
+    const r = await callStructured<{ word: string }>(deps, 'grade', 'p', { check: () => 'tone', maxAttempts: 1 });
+    expect(r.ok).toBe(false);
+    expect(llm.calls).toHaveLength(1);
+    expect(await rows(deps)).toHaveLength(1);
+  });
+
   test('gives up after two attempts on timeout', async () => {
     const llm = new FakeLlm({ grade: [bad('timeout'), bad('timeout'), good({ word: 'x' })] });
     const deps = await setup(llm);

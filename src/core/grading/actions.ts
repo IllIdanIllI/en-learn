@@ -3,7 +3,7 @@ import type { DisputeDecision, ISODate } from '@/core/domain';
 import type { DisputeReply, Source } from '@/core/llm/types';
 import { callStructured } from '@/core/llm/call';
 import { listGradingItems } from '@/core/db/repos/sessions';
-import { saveRuleVersion } from '@/core/db/repos/rules';
+import { getRule, saveRuleVersion } from '@/core/db/repos/rules';
 
 /** Support (D19): the learner opened the topic's rule before submitting. Ignored unless the session is still generated. */
 export async function recordSupport(db: Db, sessionId: number, topicId: number): Promise<void> {
@@ -29,7 +29,11 @@ export async function disputeItem(deps: Deps, itemId: number, text: string): Pro
   const item = (await listGradingItems(deps.db, answer.session_id)).find((i) => i.id === itemId);
   if (!item) throw new Error('Item not found');
 
-  await deps.db.execute('UPDATE answer SET dispute_text = ? WHERE item_id = ?', [text, itemId]);
+  // A new objection starts a new decision: the previous reply and decision no longer apply.
+  await deps.db.execute(
+    'UPDATE answer SET dispute_text = ?, dispute_reply = NULL, dispute_decision = NULL WHERE item_id = ?',
+    [text, itemId],
+  );
   const message = [
     `Topic key: ${item.topicKey ?? '(none)'}`,
     `Prompt: ${item.prompt}`,
@@ -76,7 +80,11 @@ export async function decideRuleGap(db: Db, gapId: number, approve: boolean, now
   if (!gap) throw new Error('Rule gap not found');
   if (gap.status !== 'pending') throw new Error('Rule gap already decided');
   if (approve) {
-    await saveRuleVersion(db, { ruleId: gap.rule_id }, gap.proposal, JSON.parse(gap.sources) as Source[], 'rule gap', now);
+    // A crash after the version write but before the status write leaves the gap pending; a retry must not add a duplicate version.
+    const current = await getRule(db, gap.rule_id);
+    if (current.body !== gap.proposal) {
+      await saveRuleVersion(db, { ruleId: gap.rule_id }, gap.proposal, JSON.parse(gap.sources) as Source[], 'rule gap', now);
+    }
   }
   await db.execute('UPDATE rule_gap SET status = ? WHERE id = ?', [approve ? 'approved' : 'rejected', gapId]);
 }

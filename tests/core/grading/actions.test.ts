@@ -7,7 +7,7 @@ import { FixedClock } from '@/adapters/test/fixedClock';
 import { parseSeed, saveProgramme, insertSeedRules } from '@/core/programme/setup';
 import { insertBlock, insertDraftSession, insertItem, setSessionStatus } from '@/core/db/repos/sessions';
 import { upsertAnswer, upsertRuleGap } from '@/core/db/repos/answers';
-import { getRule, ruleHistory } from '@/core/db/repos/rules';
+import { getRule, ruleHistory, saveRuleVersion } from '@/core/db/repos/rules';
 import { loadGradedFacts, getTopicStates } from '@/core/progress/history';
 import { blockScores } from '@/core/progress/derive';
 import type { Db, Deps, Llm, LlmResult } from '@/core/ports';
@@ -146,6 +146,35 @@ describe('disputeItem', () => {
     expect(seen).toEqual(['objection']);
   });
 
+  test('a new objection clears the previous reply and decision', async () => {
+    const { db, ids } = await gradedSession([{ ...WRONG }]);
+    const llm = new FakeLlm({ dispute: [ok(reply('drop')), ok(reply('keep'))] });
+    const deps = depsFor(db, llm);
+    await disputeItem(deps, ids[0]!, 'first objection');
+    await decideDispute(db, ids[0]!, 'drop');
+    await disputeItem(deps, ids[0]!, 'second objection');
+    const row = (await db.select<{ dispute_text: string; dispute_reply: string; dispute_decision: string | null }>(
+      'SELECT dispute_text, dispute_reply, dispute_decision FROM answer WHERE item_id = ?', [ids[0]],
+    ))[0]!;
+    expect(row.dispute_text).toBe('second objection');
+    expect(row.dispute_reply).toBe(JSON.stringify(reply('keep')));
+    expect(row.dispute_decision).toBeNull();
+  });
+
+  test('a new objection whose call fails leaves no stale reply or decision', async () => {
+    const { db, ids } = await gradedSession([{ ...WRONG }]);
+    const failed: LlmResult<unknown> = { ok: false, code: 'cli_error', message: 'boom', costUsd: 0, durationMs: 1, raw: '' };
+    const llm = new FakeLlm({ dispute: [ok(reply('drop')), failed, failed] });
+    const deps = depsFor(db, llm);
+    await disputeItem(deps, ids[0]!, 'first objection');
+    await decideDispute(db, ids[0]!, 'drop');
+    await disputeItem(deps, ids[0]!, 'second objection');
+    const row = (await db.select<{ dispute_reply: string | null; dispute_decision: string | null }>(
+      'SELECT dispute_reply, dispute_decision FROM answer WHERE item_id = ?', [ids[0]],
+    ))[0]!;
+    expect(row).toEqual({ dispute_reply: null, dispute_decision: null });
+  });
+
   test('LLM failure keeps dispute_text and leaves dispute_reply empty', async () => {
     const { db, ids } = await gradedSession([{ ...WRONG }]);
     const failed: LlmResult<unknown> = { ok: false, code: 'cli_error', message: 'boom', costUsd: 0, durationMs: 1, raw: '' };
@@ -222,6 +251,19 @@ describe('decideRuleGap', () => {
     expect((await ruleHistory(db, 1))[0]).toEqual({ version: 2, reason: 'rule gap', createdAt: NOW });
     expect(await count(db, 'SELECT COUNT(*) AS n FROM rule_gap WHERE id = ? AND status = ?', [gapId, 'approved'])).toBe(1);
     expect(await effective()).toBe('correct');
+  });
+
+  test('retry after a crash between the version write and the status write adds no duplicate version', async () => {
+    const { db, ids } = await gradedSession([{ ...GAP }]);
+    const gapId = (await db.select<{ id: number }>('SELECT id FROM rule_gap'))[0]!.id;
+    // Simulated crash: the version was saved, but the gap is still pending.
+    await saveRuleVersion(db, { ruleId: 1 }, PROPOSAL, GAP_SOURCES, 'rule gap', NOW);
+    expect(await count(db, 'SELECT COUNT(*) AS n FROM rule_gap WHERE id = ? AND status = ?', [gapId, 'pending'])).toBe(1);
+    await decideRuleGap(db, gapId, true, NOW);
+    expect((await getRule(db, 1)).version).toBe(2);
+    expect(await count(db, 'SELECT COUNT(*) AS n FROM rule_version WHERE rule_id = 1')).toBe(2);
+    expect(await count(db, 'SELECT COUNT(*) AS n FROM rule_gap WHERE id = ? AND status = ?', [gapId, 'approved'])).toBe(1);
+    expect((await loadGradedFacts(db)).errorRows.find((r) => r.itemId === ids[0])!.effective).toBe('correct');
   });
 
   test('reject leaves the rule unchanged and the item not counted', async () => {

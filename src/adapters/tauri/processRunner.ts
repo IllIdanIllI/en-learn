@@ -29,21 +29,13 @@ export class TauriProcessRunner implements ProcessRunner {
       cmd.on('close', ({ code }) => finish(() => resolve({ code, stdout, stderr, timedOut })));
       cmd.on('error', (err) => finish(() => reject(new Error(String(err)))));
       cmd.spawn().then(
-        async (child) => {
+        (child) => {
+          if (settled) return;
           timer = setTimeout(() => {
             timedOut = true;
             void child.kill().catch(() => undefined);
             finish(() => resolve({ code: null, stdout, stderr, timedOut: true }));
           }, opts.timeoutMs);
-          if (opts.stdin !== undefined) {
-            try {
-              // The plugin API has no way to close stdin; the CLI reads the prompt until EOF.
-              await child.write(opts.stdin);
-            } catch (e) {
-              void child.kill().catch(() => undefined);
-              finish(() => reject(e instanceof Error ? e : new Error(String(e))));
-            }
-          }
         },
         (e: unknown) => finish(() => reject(e instanceof Error ? e : new Error(String(e)))),
       );

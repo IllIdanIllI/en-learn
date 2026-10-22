@@ -4,7 +4,7 @@ export type EnvelopeResult =
   | { ok: true; data: unknown; costUsd: number }
   | { ok: false; code: LlmErrorCode; message: string; costUsd: number };
 
-const NOT_SIGNED_IN = /not logged in|log ?in|authenticat|\/login/i;
+const NOT_SIGNED_IN = /not logged in|\blog ?in\b|authenticat|\/login/i;
 
 export function parseEnvelope(stdout: string): EnvelopeResult {
   let env: Record<string, unknown>;

@@ -35,6 +35,12 @@ describe('parseEnvelope', () => {
     if (!r.ok) expect(r.code).toBe('not_signed_in');
   });
 
+  test('words merely containing login-like text are not not_signed_in', () => {
+    const r = parseEnvelope('{"is_error":true,"errors":["Opened dialog in editor"]}');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe('cli_error');
+  });
+
   test('other is_error maps to cli_error', () => {
     const r = parseEnvelope('{"is_error":true,"errors":["boom"],"total_cost_usd":0.1}');
     expect(r.ok).toBe(false);

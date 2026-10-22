@@ -17,7 +17,6 @@ export class ClaudeCli implements Llm {
     let res: RunResult;
     try {
       res = await this.runner.run(scope, buildClaudeArgs(req), {
-        stdin: req.userPrompt,
         cwd: this.cwd,
         env,
         timeoutMs: req.timeoutMs,

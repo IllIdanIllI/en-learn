@@ -31,5 +31,6 @@ export function buildClaudeArgs(req: LlmRequest): string[] {
     '--strict-mcp-config',
   ];
   if (req.budgetUsd !== null) args.push('--max-budget-usd', String(req.budgetUsd));
+  args.push('--', req.userPrompt);
   return args;
 }

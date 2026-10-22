@@ -32,7 +32,7 @@ S1 acceptance = requirements §7 criteria 1–5.
 | D11 | Model is a setting per call kind; default `claude-sonnet-5-5`; any kind can be switched to `claude-haiku-5-5`. `--max-budget-usd` is an optional setting, empty by default (learner's decision; deviates from TS-3/NF-6 wording "per call cap"). |
 | D12 | Tests: Vitest for logic; Playwright screenshots for UI. Yarn 4 (corepack), `node-modules` linker. |
 | D13 | Architecture: everything in the webview with a pure TypeScript core. |
-| D14 | Migrations: numbered `.sql` files run by TypeScript; plain SQL in typed repo functions, no ORM; user prompt passed to `claude` via stdin. |
+| D14 | Migrations: numbered `.sql` files run by TypeScript; plain SQL in typed repo functions, no ORM; user prompt passed to `claude` as the last argument after `--` (`claude -p` waits for stdin EOF and the Tauri shell cannot close stdin). |
 | D15 | Spelling is in S1. The speaking question is shown as text only until S3. |
 | D16 | Until S2/S3, slots that need writing or recording produce review + error spotting (table 6.1). |
 | D17 | Consistency = practised days in the last `N` days, `N = min(days since first session, 100)`; light days counted separately. |
@@ -241,9 +241,10 @@ Call kinds: `rule_draft`, `generate_session`, `validate_session`, `grade`, `disp
 ```
 claude -p --output-format json --json-schema '<schema JSON>' --system-prompt '<prompt text>'
        --tools "" --model <model.kind> --no-session-persistence --strict-mcp-config
-       [--max-budget-usd <budget>]
-stdin: user prompt with the assembled context
+       [--max-budget-usd <budget>] -- '<user prompt with the assembled context>'
 ```
+
+The user prompt is the last argument after `--`, not stdin: `claude -p` waits for stdin EOF and the Tauri shell cannot close stdin.
 
 - Working directory: app data dir (no `CLAUDE.md`). `--bare` is not used: it disables OAuth sign-in.
 - Env: `PATH` extended with `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin` (an npm-installed `claude` needs `node` on PATH; apps started from Finder get a minimal PATH).

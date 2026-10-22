@@ -115,14 +115,16 @@ CREATE TABLE answer (
 CREATE TABLE spot_answer (
   block_id INTEGER NOT NULL REFERENCES block(id) ON DELETE CASCADE,
   paragraph INTEGER NOT NULL,
-  text TEXT NOT NULL
+  text TEXT NOT NULL,
+  UNIQUE (block_id, paragraph)
 );
 
 CREATE TABLE extra_finding (
   block_id INTEGER NOT NULL REFERENCES block(id) ON DELETE CASCADE,
   paragraph INTEGER NOT NULL,
   text TEXT NOT NULL,
-  explanation TEXT NOT NULL
+  explanation TEXT NOT NULL,
+  UNIQUE (block_id, paragraph, text)
 );
 
 CREATE TABLE session_feedback (
@@ -138,7 +140,8 @@ CREATE TABLE rule_gap (
   proposal TEXT NOT NULL,
   explanation TEXT NOT NULL,
   sources TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected'))
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+  UNIQUE (item_id)
 );
 
 CREATE TABLE spelling_attempt (

@@ -33,6 +33,7 @@ export async function applyGraded(db: Db, clock: Clock, items: GradingItem[], g:
     const it = refs.byRef.get(e.ref);
     if (it) entries.set(it.id, e);
   }
+  const defects: [number, string][] = [];
   const found = new Set(g.result.spot.flatMap((s) => s.found));
 
   for (const it of items) {
@@ -41,7 +42,7 @@ export async function applyGraded(db: Db, clock: Clock, items: GradingItem[], g:
     if (it.format === 'spot') {
       const text = g.spot.get(`${it.blockId}:${it.paragraph}`) ?? '';
       if (e?.verdict === 'defect') {
-        await markItemDefect(db, it.id, e.explanation);
+        defects.push([it.id, e.explanation]);
         continue;
       }
       const isFound = found.has(refs.refOf.get(it.id)!);
@@ -61,7 +62,7 @@ export async function applyGraded(db: Db, clock: Clock, items: GradingItem[], g:
       });
       if (it.spellingWordId !== null) await upsertSpellingAttempt(db, it.spellingWordId, g.sessionId, correct);
     } else if (e?.verdict === 'defect') {
-      await markItemDefect(db, it.id, e.explanation);
+      defects.push([it.id, e.explanation]);
     } else if (e && (e.verdict === 'correct' || e.verdict === 'wrong' || e.verdict === 'rule_gap')) {
       await upsertAnswer(db, {
         itemId: it.id, text, verdict: e.verdict, fix: e.fix, ruleSection: e.ruleSection || it.ruleSection,
@@ -91,5 +92,7 @@ export async function applyGraded(db: Db, clock: Clock, items: GradingItem[], g:
     await upsertSpellingAttempt(db, id, g.sessionId, false);
   }
   await upsertSessionFeedback(db, g.sessionId, g.result.patterns, g.result.tomorrow);
+  // Defect marks change item.status, which gates re-grading, so they are written last, right before 'graded'.
+  for (const [id, note] of defects) await markItemDefect(db, id, note);
   await markSessionGraded(db, g.sessionId, clock.now());
 }

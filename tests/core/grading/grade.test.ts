@@ -252,7 +252,7 @@ describe('gradeSession', () => {
     expect(res.kind).toBe('error');
     expect((await sessionRow(db)).status).toBe('generated');
     if (res.kind !== 'error') return;
-    await res.retry();
+    expect(await res.retry()).toEqual({ kind: 'graded' });
     expect((await sessionRow(db)).status).toBe('graded');
     expect(llm.calls).toHaveLength(1);
     expect(await verdicts(db)).toMatchObject({ 4: 'wrong', 5: 'correct' });
@@ -309,5 +309,38 @@ describe('gradeSession', () => {
     expect((await verdicts(db))[2]).toBeUndefined();
     expect(await rows(db, 'SELECT item_id, rule_id, status, proposal FROM rule_gap')).toEqual([{ item_id: 3, rule_id: 1, status: 'pending', proposal: 'New body' }]);
     expect((await verdicts(db))[3]).toBe('rule_gap');
+  });
+
+  test('apply failing after answers are written leaves item statuses unchanged', async () => {
+    const r = fullResult({ items: [entry('b1.i0', 'defect', { explanation: 'Two valid answers.' }), entry('b1.i1', 'correct'), entry('b1.i2', 'correct'), ...spotEntries([0, 1])] });
+    const { db, deps, sid, failure } = await setup('2026-10-20', '2026-10-20', [ok(r)]);
+    failure.pending = /INTO session_feedback/;
+    const res = await gradeSession(deps, sid, subm(), []);
+    expect(res.kind).toBe('error');
+    expect(await answerCount(db)).toBeGreaterThan(0);
+    expect(await rows(db, "SELECT id FROM item WHERE status != 'active'")).toEqual([]);
+    if (res.kind !== 'error') return;
+    expect(await res.retry()).toEqual({ kind: 'graded' });
+    expect(await rows(db, "SELECT id FROM item WHERE status = 'defect'")).toEqual([{ id: 2 }]);
+  });
+
+  test('retry after an LLM error that then yields questions returns the questions', async () => {
+    const bad = fullResult({ patterns: ['again'] });
+    const clar = fullResult({ items: [entry('b1.i0', 'correct'), entry('b1.i1', 'needs_clarification', { question: 'Which?' }), entry('b1.i2', 'correct'), ...spotEntries([0, 1])] });
+    const { deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(bad), ok(bad), ok(clar), ok(result({ items: [entry('b1.i1', 'correct')] }))]);
+    const res = await gradeSession(deps, sid, subm({ items: { 3: 'a/an' } }), []);
+    expect(res.kind).toBe('error');
+    if (res.kind !== 'error') return;
+    expect(await res.retry()).toEqual({ kind: 'questions', questions: [{ itemId: 3, kind: 'llm', text: 'Which?' }] });
+    expect(await gradeSession(deps, sid, subm(), [{ itemId: 3, text: 'an' }])).toEqual({ kind: 'graded' });
+  });
+
+  test('a rule_gap verdict without a ruleGaps entry is an invalid response and is retried', async () => {
+    const noGap = fullResult({ items: [entry('b1.i0', 'rule_gap'), entry('b1.i1', 'correct'), entry('b1.i2', 'correct'), ...spotEntries([0, 1])] });
+    const withGap = { ...noGap, ruleGaps: [{ ref: 'b1.i0', ruleTopicKey: 'articles', proposal: 'P', explanation: 'E', sources: [] }] };
+    const { db, llm, deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(noGap), ok(withGap)]);
+    expect(await gradeSession(deps, sid, subm(), [])).toEqual({ kind: 'graded' });
+    expect(llm.calls).toHaveLength(2);
+    expect(await rows(db, 'SELECT status FROM rule_gap')).toEqual([{ status: 'pending' }]);
   });
 });

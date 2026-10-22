@@ -13,7 +13,7 @@ export interface ClarificationAnswer { itemId: number; skip?: boolean; shorthand
 export type GradeOutcome =
   | { kind: 'questions'; questions: Question[] }
   | { kind: 'graded' }
-  | { kind: 'error'; message: string; retry: () => Promise<void> };
+  | { kind: 'error'; message: string; retry: () => Promise<GradeOutcome> };
 
 /** Partial result waiting for answers to `needs_clarification` questions. Lost on reload: the learner re-submits. */
 interface Awaiting { graded: Graded; questions: Map<number, string> }
@@ -33,7 +33,7 @@ function merge(a: GradeResult, b: GradeResult): GradeResult {
   };
 }
 
-const errorOutcome = (message: string, retry: () => Promise<void>): GradeOutcome => ({ kind: 'error', message, retry });
+const errorOutcome = (message: string, retry: () => Promise<GradeOutcome>): GradeOutcome => ({ kind: 'error', message, retry });
 
 /** Spec 8.2 and 8.3: pre-check, spelling by code, one `grade` call, apply. */
 export async function gradeSession(
@@ -42,10 +42,7 @@ export async function gradeSession(
   sub: Submission,
   clarifications: ClarificationAnswer[],
 ): Promise<GradeOutcome> {
-  const again = async () => {
-    const r = await gradeSession(deps, sessionId, sub, clarifications);
-    if (r.kind === 'error') throw new Error(r.message);
-  };
+  const again = () => gradeSession(deps, sessionId, sub, clarifications);
   try {
     return await run(deps, sessionId, sub, clarifications, again);
   } catch (e) {
@@ -54,7 +51,7 @@ export async function gradeSession(
 }
 
 async function run(
-  deps: Deps, sessionId: number, sub: Submission, clarifications: ClarificationAnswer[], again: () => Promise<void>,
+  deps: Deps, sessionId: number, sub: Submission, clarifications: ClarificationAnswer[], again: () => Promise<GradeOutcome>,
 ): Promise<GradeOutcome> {
   const session = await getSession(deps.db, sessionId);
   if (!session) return errorOutcome('Session not found', again);
@@ -132,6 +129,8 @@ async function run(
       check: (r) => {
         const missing = missingRefs(batch, refs, r);
         if (missing.length > 0) return `missing refs: ${missing.join(', ')}`;
+        const noProposal = r.items.filter((i) => i.verdict === 'rule_gap' && !r.ruleGaps.some((g) => g.ref === i.ref));
+        if (noProposal.length > 0) return `rule_gap without ruleGaps entry: ${noProposal.map((i) => i.ref).join(', ')}`;
         return toneViolations(proseOf(r)).join('; ') || null;
       },
     });
@@ -156,11 +155,10 @@ async function run(
 }
 
 async function applyKept(deps: Deps, items: GradingItem[], graded: Graded): Promise<GradeOutcome> {
-  const apply = () => applyGraded(deps.db, deps.clock, items, graded);
   try {
-    await apply();
+    await applyGraded(deps.db, deps.clock, items, graded);
     return { kind: 'graded' };
   } catch (e) {
-    return errorOutcome(e instanceof Error ? e.message : String(e), apply);
+    return errorOutcome(e instanceof Error ? e.message : String(e), () => applyKept(deps, items, graded));
   }
 }

@@ -100,3 +100,72 @@ export async function listGradedSpellingAttempts(
   );
   return rows.map((r) => ({ wordId: r.word_id, sessionId: r.session_id, date: r.date, correct: r.correct === 1 }));
 }
+
+export interface AnswerWrite {
+  itemId: number;
+  text: string;
+  verdict: Verdict;
+  fix: string | null;
+  ruleSection: string | null;
+  explanation: string | null;
+  vocabularyNote: string | null;
+}
+
+/** Idempotent per item; dispute and inattention columns are left alone. */
+export async function upsertAnswer(db: Db, a: AnswerWrite): Promise<void> {
+  await db.execute(
+    `INSERT INTO answer (item_id, text, verdict, fix, rule_section, explanation, vocabulary_note)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(item_id) DO UPDATE SET text = excluded.text, verdict = excluded.verdict, fix = excluded.fix,
+       rule_section = excluded.rule_section, explanation = excluded.explanation, vocabulary_note = excluded.vocabulary_note`,
+    [a.itemId, a.text, a.verdict, a.fix, a.ruleSection, a.explanation, a.vocabularyNote],
+  );
+}
+
+export async function upsertSpotAnswer(db: Db, blockId: number, paragraph: number, text: string): Promise<void> {
+  await db.execute(
+    'INSERT INTO spot_answer (block_id, paragraph, text) VALUES (?, ?, ?) ON CONFLICT(block_id, paragraph) DO UPDATE SET text = excluded.text',
+    [blockId, paragraph, text],
+  );
+}
+
+export async function upsertExtraFinding(db: Db, blockId: number, paragraph: number, text: string, explanation: string): Promise<void> {
+  await db.execute(
+    `INSERT INTO extra_finding (block_id, paragraph, text, explanation) VALUES (?, ?, ?, ?)
+     ON CONFLICT(block_id, paragraph, text) DO UPDATE SET explanation = excluded.explanation`,
+    [blockId, paragraph, text, explanation],
+  );
+}
+
+/** A pending proposal; the status of an existing row is kept. */
+export async function upsertRuleGap(
+  db: Db,
+  g: { itemId: number; ruleId: number; proposal: string; explanation: string; sources: string },
+): Promise<void> {
+  await db.execute(
+    `INSERT INTO rule_gap (item_id, rule_id, proposal, explanation, sources) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(item_id) DO UPDATE SET proposal = excluded.proposal, explanation = excluded.explanation, sources = excluded.sources`,
+    [g.itemId, g.ruleId, g.proposal, g.explanation, g.sources],
+  );
+}
+
+/** One attempt per word per session; wrong wins. */
+export async function upsertSpellingAttempt(db: Db, wordId: number, sessionId: number, correct: boolean): Promise<void> {
+  await db.execute(
+    `INSERT INTO spelling_attempt (word_id, session_id, correct) VALUES (?, ?, ?)
+     ON CONFLICT(word_id, session_id) DO UPDATE SET correct = MIN(spelling_attempt.correct, excluded.correct)`,
+    [wordId, sessionId, correct ? 1 : 0],
+  );
+}
+
+export async function upsertSessionFeedback(db: Db, sessionId: number, patterns: string[], tomorrow: string[]): Promise<void> {
+  await db.execute(
+    `INSERT INTO session_feedback (session_id, patterns, tomorrow) VALUES (?, ?, ?)
+     ON CONFLICT(session_id) DO UPDATE SET patterns = excluded.patterns, tomorrow = excluded.tomorrow`,
+    [sessionId, JSON.stringify(patterns), JSON.stringify(tomorrow)],
+  );
+}
+
+export async function markItemDefect(db: Db, itemId: number, note: string): Promise<void> {
+  await db.execute("UPDATE item SET status = 'defect', note = CASE WHEN ? = '' THEN note ELSE ? END WHERE id = ?", [note, note, itemId]);
+}

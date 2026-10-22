@@ -119,3 +119,59 @@ export async function deleteSession(db: Db, id: number): Promise<void> {
 export async function cleanupDrafts(db: Db): Promise<void> {
   await db.execute("DELETE FROM session WHERE status = 'draft'");
 }
+
+export async function markSessionGraded(db: Db, id: number, gradedAt: string): Promise<void> {
+  await db.execute("UPDATE session SET status = 'graded', graded_at = ? WHERE id = ?", [gradedAt, id]);
+}
+
+export async function getSession(db: Db, id: number): Promise<{ id: number; date: ISODate; status: SessionStatus } | null> {
+  const rows = await db.select<{ id: number; date: string; status: SessionStatus }>('SELECT id, date, status FROM session WHERE id = ?', [id]);
+  return rows[0] ?? null;
+}
+
+export interface GradingItem {
+  id: number;
+  blockId: number;
+  blockOrd: number;
+  format: BlockFormat;
+  passage: string[] | null;
+  ord: number;
+  prompt: string;
+  expected: string;
+  paragraph: number | null;
+  topicId: number | null;
+  topicKey: string | null;
+  ruleId: number | null;
+  ruleVersion: number | null;
+  ruleSection: string | null;
+  ruleBody: string | null;
+  spellingWordId: number | null;
+  status: ItemStatus;
+}
+
+/** Every item of a session in display order, with its topic key and the rule body of its stored version. */
+export async function listGradingItems(db: Db, sessionId: number): Promise<GradingItem[]> {
+  const rows = await db.select<{
+    id: number; block_id: number; block_ord: number; format: BlockFormat; passage: string | null; ord: number;
+    prompt: string; expected: string; paragraph: number | null; topic_id: number | null; topic_key: string | null;
+    rule_id: number | null; rule_version: number | null; rule_section: string | null; rule_body: string | null;
+    spelling_word_id: number | null; status: ItemStatus;
+  }>(
+    `SELECT i.id AS id, i.block_id AS block_id, b.ord AS block_ord, b.format AS format, b.passage AS passage, i.ord AS ord,
+            i.prompt AS prompt, i.expected AS expected, i.paragraph AS paragraph, i.topic_id AS topic_id, t.key AS topic_key,
+            i.rule_id AS rule_id, i.rule_version AS rule_version, i.rule_section AS rule_section, rv.body AS rule_body,
+            i.spelling_word_id AS spelling_word_id, i.status AS status
+     FROM item i JOIN block b ON b.id = i.block_id
+     LEFT JOIN topic t ON t.id = i.topic_id
+     LEFT JOIN rule_version rv ON rv.rule_id = i.rule_id AND rv.version = i.rule_version
+     WHERE b.session_id = ? ORDER BY b.ord, i.ord`,
+    [sessionId],
+  );
+  return rows.map((r) => ({
+    id: r.id, blockId: r.block_id, blockOrd: r.block_ord, format: r.format,
+    passage: r.passage === null ? null : (JSON.parse(r.passage) as string[]), ord: r.ord, prompt: r.prompt,
+    expected: r.expected, paragraph: r.paragraph, topicId: r.topic_id, topicKey: r.topic_key, ruleId: r.rule_id,
+    ruleVersion: r.rule_version, ruleSection: r.rule_section, ruleBody: r.rule_body, spellingWordId: r.spelling_word_id,
+    status: r.status,
+  }));
+}

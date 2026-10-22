@@ -1,8 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Deps, ProcessRunner } from '@/core/ports';
+import type { Deps, Llm, ProcessRunner } from '@/core/ports';
 import type { Lang } from '@/core/i18n';
-import type { PrereqResult } from '@/core/prereq';
+import { checkPrerequisites, type PrereqResult } from '@/core/prereq';
+import type { ClaudeLocation } from '@/core/llm/claude';
+import type { ProgrammeInput, SeedRule } from '@/core/programme/setup';
 import { getSettings, type Settings } from '@/core/db/repos/settings';
+
+export interface SeedBundle { programme: ProgrammeInput; rules: SeedRule[] }
 
 export interface CoreInit {
   deps: Deps;
@@ -10,6 +14,12 @@ export interface CoreInit {
   /** Result of the `claude` check; null in preview states where it is not part of the fixture. */
   prereq: PrereqResult | null;
   settings: Settings;
+  /** Seed programme and rules for the setup form; null when no seed is available. */
+  loadSeedInput(): SeedBundle | null;
+  /** Folder shown in Settings where prompt overrides live. */
+  promptsDir: string;
+  /** Builds the real Llm once a `claude` location works; absent in preview, where a recheck changes nothing. */
+  makeLlm?: (location: ClaudeLocation) => Llm;
 }
 
 export interface Core {
@@ -18,6 +28,10 @@ export interface Core {
   lang: Lang;
   settings: Settings;
   prereq: PrereqResult | null;
+  loadSeedInput(): SeedBundle | null;
+  promptsDir: string;
+  /** Reruns the `claude` check; on success the Llm is swapped in and `prereq` becomes ok. */
+  recheckPrerequisites(): Promise<PrereqResult | null>;
   /** Re-reads settings and bumps `version`; pages that load data depend on `version`. */
   refresh(): void;
   version: number;
@@ -45,7 +59,9 @@ function useTheme(theme: Settings['theme']): void {
 }
 
 export function CoreProvider({ init, children }: { init: CoreInit; children: ReactNode }) {
-  const { deps, runner, prereq } = init;
+  const { runner, loadSeedInput, promptsDir, makeLlm } = init;
+  const [deps, setDeps] = useState(init.deps);
+  const [prereq, setPrereq] = useState(init.prereq);
   const [settings, setSettings] = useState(init.settings);
   const [version, setVersion] = useState(0);
 
@@ -59,14 +75,24 @@ export function CoreProvider({ init, children }: { init: CoreInit; children: Rea
     );
   }, [deps]);
 
+  const recheckPrerequisites = useCallback(async () => {
+    if (!makeLlm) return prereq;
+    const result = await checkPrerequisites(runner);
+    if (result.ok) setDeps((d) => ({ ...d, llm: makeLlm(result.location) }));
+    setPrereq(result);
+    return result;
+  }, [makeLlm, prereq, runner]);
+
   useTheme(settings.theme);
   useEffect(() => {
     document.documentElement.lang = settings.nativeLanguage;
   }, [settings.nativeLanguage]);
 
   const value = useMemo<Core>(
-    () => ({ deps, runner, lang: settings.nativeLanguage, settings, prereq, refresh, version }),
-    [deps, runner, settings, prereq, refresh, version],
+    () => ({
+      deps, runner, lang: settings.nativeLanguage, settings, prereq, loadSeedInput, promptsDir, recheckPrerequisites, refresh, version,
+    }),
+    [deps, runner, settings, prereq, loadSeedInput, promptsDir, recheckPrerequisites, refresh, version],
   );
   return <CoreContext.Provider value={value}>{children}</CoreContext.Provider>;
 }

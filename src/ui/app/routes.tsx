@@ -2,6 +2,9 @@ import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { t, type MessageKey } from '@/core/i18n';
 import { AppShell } from './AppShell';
 import { useCore } from './CoreProvider';
+import { Prerequisites } from '@/ui/pages/Prerequisites';
+import { Settings } from '@/ui/pages/Settings';
+import { Setup } from '@/ui/pages/Setup';
 
 /** Stands in until the page tasks replace it: the page title in Headline style. */
 function Placeholder({ titleKey }: { titleKey: MessageKey }) {
@@ -15,9 +18,6 @@ const PAGES: { path: string; titleKey: MessageKey }[] = [
   { path: 'rules', titleKey: 'nav.rules' },
   { path: 'rules/:id', titleKey: 'nav.rules' },
   { path: 'errors', titleKey: 'nav.errors' },
-  { path: 'settings', titleKey: 'nav.settings' },
-  { path: 'setup', titleKey: 'page.setup' },
-  { path: 'prerequisites', titleKey: 'page.prerequisites' },
 ];
 
 export function AppRoutes() {
@@ -29,6 +29,9 @@ export function AppRoutes() {
           {PAGES.map(({ path, titleKey }) => (
             <Route key={path} path={path} element={<Placeholder titleKey={titleKey} />} />
           ))}
+          <Route path="settings" element={<Settings />} />
+          <Route path="setup" element={<Setup />} />
+          <Route path="prerequisites" element={<Prerequisites />} />
           <Route path="*" element={<Navigate to="/today" replace />} />
         </Route>
       </Routes>

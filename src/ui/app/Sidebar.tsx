@@ -17,7 +17,7 @@ export function Sidebar() {
   const { lang } = useCore();
   return (
     <nav
-      aria-label="Main"
+      aria-label={t(lang, 'nav.label')}
       className="flex w-14 shrink-0 flex-col gap-1 border-r border-border bg-sidebar px-2 py-4 text-sidebar-foreground min-[1100px]:w-[220px]"
     >
       {ITEMS.map(({ to, key, icon: Icon }) => {

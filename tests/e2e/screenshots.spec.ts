@@ -350,3 +350,123 @@ test.describe('today actions', () => {
     expect(await heading.evaluate((el) => getComputedStyle(el).outlineWidth)).toBe('2px');
   });
 });
+
+test.describe('rules, error bank and progress', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 1100 });
+  });
+
+  test('the rules list shows every rule with its version and lists topics without a rule', async ({ page }) => {
+    await page.goto('/?state=spot_rule_missing#/rules');
+    await expect(page.getByRole('heading', { level: 1, name: 'Правила' })).toBeVisible();
+    await expect(page.getByRole('row')).toHaveCount(4);
+    await expect(page.getByRole('link', { name: 'Articles' })).toBeVisible();
+    await expect(page.getByRole('row', { name: /Articles/ })).toContainText('Учить');
+    await expect(page.getByRole('row', { name: /Articles/ })).toContainText('1');
+    await expect(page.getByRole('heading', { name: 'Темы без правил' })).toBeVisible();
+    await expect(page.getByText('Third person s')).toBeVisible();
+    await page.screenshot({ path: `${SHOTS}/rules-list.png` });
+  });
+
+  test('a rule opens with its table, sources and history; Edit needs a reason and adds a version', async ({ page }) => {
+    await page.goto('/?state=no_session#/rules');
+    await page.getByRole('link', { name: 'Articles' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Articles' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Артикль' })).toBeVisible();
+    await expect(page.getByText('Cambridge Dictionary').first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'История версий' })).toBeVisible();
+    await page.screenshot({ path: `${SHOTS}/rule-view.png`, fullPage: true });
+
+    await page.getByRole('button', { name: 'Править' }).click();
+    const body = page.getByRole('textbox', { name: 'Текст правила (Markdown)' });
+    await body.fill('## Формула\n\na / an + новая запись.');
+    await expect(page.getByText('a / an + новая запись.', { exact: true }).last()).toBeVisible();
+    await page.getByRole('button', { name: 'Сохранить правило' }).click();
+    await expect(page.getByRole('alert')).toContainText('Укажите причину правки');
+    await page.getByRole('textbox', { name: 'Причина правки' }).fill('Упростил формулу');
+    await page.screenshot({ path: `${SHOTS}/rule-edit.png`, fullPage: true });
+    await page.getByRole('button', { name: 'Сохранить правило' }).click();
+    await expect(page.getByText('Правило, версия 2')).toBeVisible();
+    await expect(page.getByRole('row', { name: /Упростил формулу/ })).toBeVisible();
+
+    await page.getByRole('row', { name: /seed/ }).getByRole('button', { name: 'Показать' }).click();
+    await expect(page.getByText('Правило, версия 1')).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Артикль' })).toBeVisible();
+    await page.getByRole('button', { name: 'К текущей версии' }).click();
+    await expect(page.getByText('a / an + новая запись.', { exact: true })).toBeVisible();
+  });
+
+  test('a topic without a rule is drafted from the rules list and saved only on confirm', async ({ page }) => {
+    await page.goto('/?state=rule_missing#/rules');
+    await expect(page.getByRole('link', { name: 'Articles' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Составить правило' }).click();
+    await expect(page.getByRole('textbox', { name: 'Текст правила (Markdown)' })).toContainText('## Формула');
+    await page.screenshot({ path: `${SHOTS}/rule-draft.png`, fullPage: true });
+    await page.getByRole('button', { name: 'Отмена' }).click();
+    await expect(page.getByRole('link', { name: 'Articles' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Составить правило' }).click();
+    await page.getByRole('button', { name: 'Сохранить правило' }).click();
+    await expect(page.getByRole('link', { name: 'Articles' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Темы без правил' })).toHaveCount(0);
+  });
+
+  test('the error bank lists mistakes newest first and filters by kind and topic', async ({ page }) => {
+    await page.goto('/?state=progress#/errors');
+    await expect(page.getByRole('heading', { level: 1, name: 'Банк ошибок' })).toBeVisible();
+    const rows = page.locator('tbody tr');
+    await expect(rows.first()).toBeVisible();
+    expect(await rows.count()).toBeGreaterThan(3);
+    await expect(rows.first().locator('td').nth(0)).toHaveClass(/answer/);
+    const dates = await rows.locator('td:nth-child(5)').allTextContents();
+    expect(dates).toEqual([...dates].sort().reverse());
+    expect(await page.content()).not.toMatch(/streak/i);
+    await page.screenshot({ path: `${SHOTS}/errors.png`, fullPage: true });
+
+    const all = await rows.count();
+    await page.getByLabel('Тип ошибки').selectOption('spelling');
+    const spelling = await rows.count();
+    expect(spelling).toBeGreaterThan(0);
+    expect(spelling).toBeLessThan(all);
+    for (const kind of await rows.locator('td:nth-child(3)').allTextContents()) expect(kind).toBe('Орфография');
+    await page.getByLabel('Тип ошибки').selectOption('');
+    await page.getByLabel('Тема', { exact: true }).selectOption({ label: 'Articles' });
+    expect(await rows.count()).toBeLessThan(all);
+    for (const topic of await rows.locator('td:nth-child(4)').allTextContents()) expect(topic).toBe('Articles');
+  });
+
+  test('the error bank explains an empty bank in one sentence', async ({ page }) => {
+    await page.goto('/?state=no_session#/errors');
+    await expect(page.getByText('Ошибок пока нет')).toBeVisible();
+    await expect(page.locator('table')).toHaveCount(0);
+  });
+
+  test('progress shows the consistency grid, open topics and the session log', async ({ page }) => {
+    await page.goto('/?state=progress#/progress');
+    await expect(page.getByRole('heading', { level: 1, name: 'Прогресс' })).toBeVisible();
+    await expect(page.getByText('Дней с занятиями: 6 из 10. Лёгких: 1.')).toBeVisible();
+    await expect(page.locator('[data-testid="day-cell"]')).toHaveCount(100);
+    await expect(page.locator('[data-testid="day-cell"][data-state="practised"]')).toHaveCount(5);
+    await expect(page.locator('[data-testid="day-cell"][data-state="light"]')).toHaveCount(1);
+    await expect(page.locator('[data-testid="day-cell"][aria-label="2026-10-18: лёгкий день"]')).toHaveCount(1);
+    const text = (await page.locator('body').innerText()) + (await page.content());
+    expect(text).not.toMatch(/streak|flame/i);
+
+    const topics = page.getByRole('table', { name: 'Темы' });
+    await expect(topics.getByText('Открыта').first()).toBeVisible();
+    await page.getByRole('table', { name: 'Журнал занятий' }).scrollIntoViewIfNeeded();
+    await expect(page.getByRole('table', { name: 'Журнал занятий' }).locator('tbody tr')).toHaveCount(6);
+    await expect(page.getByText('Лёгкий день').first()).toBeVisible();
+    await expect(page.getByText(/\$0\.\d{4}/).first()).toBeVisible();
+    await page.screenshot({ path: `${SHOTS}/progress.png`, fullPage: true });
+
+    await topics.getByRole('link', { name: 'Правило' }).first().click();
+    await expect(page).toHaveURL(/#\/rules\/\d+$/);
+  });
+
+  test('progress in English', async ({ page }) => {
+    await page.goto('/?state=progress#/settings');
+    await page.getByRole('radio', { name: 'English' }).click();
+    await page.getByRole('link', { name: 'Progress' }).click();
+    await expect(page.getByText('Practised 6 of the last 10 days, 1 light')).toBeVisible();
+  });
+});

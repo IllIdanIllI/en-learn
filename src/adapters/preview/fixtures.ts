@@ -1,4 +1,5 @@
-import type { Deps, Llm, ProcessRunner } from '@/core/ports';
+import type { Clock, Deps, Llm, ProcessRunner } from '@/core/ports';
+import type { ISODate } from '@/core/domain';
 import type { PrereqResult } from '@/core/prereq';
 import { CLAUDE_LOCATIONS } from '@/core/llm/claude';
 import { bundledPrompts } from '@/core/llm/bundledPrompts';
@@ -8,13 +9,12 @@ import { generateSession } from '@/core/session/generate';
 import { gradeSession } from '@/core/grading/grade';
 import { listGradingItems, getSessionByDate } from '@/core/db/repos/sessions';
 import { findOrCreateSpellingWord } from '@/core/db/repos/spelling';
-import { FixedClock } from '@/adapters/test/fixedClock';
 import { createSqlJsDb } from './sqljsDb';
 import { previewLlm } from './previewLlm';
 import { MINI_PROGRAMME, MINI_RULES } from './miniSeed';
 
 export const PREVIEW_STATES = [
-  'empty', 'no_session', 'generated', 'questions', 'graded', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing',
+  'empty', 'no_session', 'generated', 'questions', 'graded', 'progress', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing',
 ] as const;
 export type PreviewState = (typeof PREVIEW_STATES)[number];
 
@@ -38,6 +38,32 @@ const ANSWERS: Record<string, string> = {
 
 const TUESDAY = '2026-10-20';
 const WEDNESDAY = '2026-10-21';
+
+/**
+ * Earlier days of the `progress` fixture, played through the core on that day's date: five more graded sessions, the
+ * 18th a light day. With today's session they make 6 practised days of the 10 since the first one, 1 of them light.
+ */
+const EARLIER_DAYS: { date: ISODate; light: boolean }[] = [
+  { date: '2026-10-11', light: false },
+  { date: '2026-10-13', light: false },
+  { date: '2026-10-15', light: false },
+  { date: '2026-10-17', light: false },
+  { date: '2026-10-18', light: true },
+];
+
+/** A clock the fixture can move between days; the app gets it at the final date. */
+class SteppedClock implements Clock {
+  constructor(private date: ISODate) {}
+  set(date: ISODate): void {
+    this.date = date;
+  }
+  today(): ISODate {
+    return this.date;
+  }
+  now(): string {
+    return `${this.date}T12:00:00.000Z`;
+  }
+}
 
 export function parsePreviewState(search: string): PreviewState {
   const value = new URLSearchParams(search).get('state');
@@ -73,8 +99,35 @@ function requireOk(result: { ok: boolean; message?: string }, what: string): voi
   if (!result.ok) throw new Error(`Preview fixture: ${what} failed: ${result.message ?? ''}`);
 }
 
+/** Answers today's session: `graded` answers every second item right; `questions` leaves blanks that raise questions. */
+async function answerToday(deps: Deps, state: 'questions' | 'graded'): Promise<void> {
+  const session = await getSessionByDate(deps.db, deps.clock.today());
+  if (!session) throw new Error('Preview fixture: no session');
+  const items = await listGradingItems(deps.db, session.id);
+  const answers: Record<number, string> = {};
+  const spot: Record<string, string> = {};
+  if (state === 'graded') {
+    // Every second answer is right, the rest are wrong, so the page shows both verdicts.
+    items.forEach((it, i) => {
+      if (it.format === 'spot' && it.paragraph !== null) {
+        const key = `${it.blockId}:${it.paragraph}`;
+        spot[key] = `${spot[key] ?? ''}${i % 2 === 0 ? `${it.prompt} → ${it.expected}` : ''}\n`;
+      } else if (it.format !== 'question') answers[it.id] = ANSWERS[it.prompt] ?? (i % 2 === 0 ? it.expected : 'wrong answer');
+    });
+  }
+  const outcome = await gradeSession(deps, session.id, { items: answers, spot }, []);
+  if (state === 'graded' && outcome.kind !== 'graded') throw new Error(`Preview fixture: grading gave ${outcome.kind}`);
+  if (state === 'questions' && outcome.kind !== 'questions') throw new Error(`Preview fixture: expected questions, got ${outcome.kind}`);
+}
+
+/** Generates and grades one earlier day's session. */
+async function playDay(deps: Deps, light: boolean): Promise<void> {
+  requireOk(await generateSession(deps, { light }), 'generateSession');
+  await answerToday(deps, 'graded');
+}
+
 export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
-  const clock = new FixedClock(state === 'rest' ? WEDNESDAY : TUESDAY);
+  const clock = new SteppedClock(state === 'rest' ? WEDNESDAY : TUESDAY);
   const deps: Deps = {
     db: await createSqlJsDb(),
     llm: previewLlm,
@@ -96,27 +149,19 @@ export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
   await insertSeedRules(deps.db, rules, clock.now());
   for (const [word, hint] of SPELLING_WORDS) await findOrCreateSpellingWord(deps.db, word, hint, clock.now());
 
-  if (state === 'generated' || state === 'questions' || state === 'graded') {
+  const today = clock.today();
+  if (state === 'progress') {
+    for (const day of EARLIER_DAYS) {
+      clock.set(day.date);
+      await playDay(deps, day.light);
+    }
+    clock.set(today);
+  }
+  if (state === 'generated' || state === 'questions' || state === 'graded' || state === 'progress') {
     requireOk(await generateSession(deps, { light: false }), 'generateSession');
   }
-  if (state === 'questions' || state === 'graded') {
-    const session = await getSessionByDate(deps.db, clock.today());
-    if (!session) throw new Error('Preview fixture: no session');
-    const items = await listGradingItems(deps.db, session.id);
-    const answers: Record<number, string> = {};
-    const spot: Record<string, string> = {};
-    if (state === 'graded') {
-      // Every second answer is right, the rest are wrong, so the page shows both verdicts.
-      items.forEach((it, i) => {
-        if (it.format === 'spot' && it.paragraph !== null) {
-          const key = `${it.blockId}:${it.paragraph}`;
-          spot[key] = `${spot[key] ?? ''}${i % 2 === 0 ? `${it.prompt} → ${it.expected}` : ''}\n`;
-        } else if (it.format !== 'question') answers[it.id] = ANSWERS[it.prompt] ?? (i % 2 === 0 ? it.expected : 'wrong answer');
-      });
-    }
-    const outcome = await gradeSession(deps, session.id, { items: answers, spot }, []);
-    if (state === 'graded' && outcome.kind !== 'graded') throw new Error(`Preview fixture: grading gave ${outcome.kind}`);
-    if (state === 'questions' && outcome.kind !== 'questions') throw new Error(`Preview fixture: expected questions, got ${outcome.kind}`);
+  if (state === 'questions' || state === 'graded' || state === 'progress') {
+    await answerToday(deps, state === 'questions' ? 'questions' : 'graded');
   }
   return core();
 }

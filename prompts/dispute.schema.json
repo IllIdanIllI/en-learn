@@ -1,0 +1,50 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "position",
+    "ruleSection",
+    "sources",
+    "recommendation"
+  ],
+  "properties": {
+    "position": {
+      "type": "string",
+      "description": "The position of the app in the learner native language"
+    },
+    "ruleSection": {
+      "type": "string",
+      "description": "Exact heading of the rule section; empty if none"
+    },
+    "sources": {
+      "type": "array",
+      "description": "Authoritative sources only; empty array if none",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "url"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Source name"
+          },
+          "url": {
+            "type": "string",
+            "description": "Real URL of the page that supports the claim"
+          }
+        }
+      }
+    },
+    "recommendation": {
+      "type": "string",
+      "enum": [
+        "keep",
+        "correct",
+        "drop"
+      ]
+    }
+  }
+}

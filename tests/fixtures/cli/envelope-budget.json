@@ -1,0 +1,1 @@
+{"type":"result","subtype":"error_max_budget_usd","is_error":true,"result":null,"structured_output":null,"total_cost_usd":0.0007484000000000001,"terminal_reason":"budget_exhausted","errors":["Reached maximum budget ($0.00001)"]}

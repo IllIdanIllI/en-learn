@@ -1,0 +1,371 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "enables the default permissions",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "sql:default",
+    "sql:allow-execute",
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "claude-local-version",
+          "cmd": "$HOME/.local/bin/claude",
+          "args": [
+            "--version"
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-local-auth",
+          "cmd": "$HOME/.local/bin/claude",
+          "args": [
+            "auth",
+            "status",
+            "--json"
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-local-call",
+          "cmd": "$HOME/.local/bin/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--no-session-persistence",
+            "--strict-mcp-config",
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-local-call-budget",
+          "cmd": "$HOME/.local/bin/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--no-session-persistence",
+            "--strict-mcp-config",
+            "--max-budget-usd",
+            {
+              "validator": "^\\d+(\\.\\d+)?$"
+            },
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-legacy-version",
+          "cmd": "$HOME/.claude/local/claude",
+          "args": [
+            "--version"
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-legacy-auth",
+          "cmd": "$HOME/.claude/local/claude",
+          "args": [
+            "auth",
+            "status",
+            "--json"
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-legacy-call",
+          "cmd": "$HOME/.claude/local/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--no-session-persistence",
+            "--strict-mcp-config",
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-legacy-call-budget",
+          "cmd": "$HOME/.claude/local/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--no-session-persistence",
+            "--strict-mcp-config",
+            "--max-budget-usd",
+            {
+              "validator": "^\\d+(\\.\\d+)?$"
+            },
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-homebrew-version",
+          "cmd": "/opt/homebrew/bin/claude",
+          "args": [
+            "--version"
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-homebrew-auth",
+          "cmd": "/opt/homebrew/bin/claude",
+          "args": [
+            "auth",
+            "status",
+            "--json"
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-homebrew-call",
+          "cmd": "/opt/homebrew/bin/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--no-session-persistence",
+            "--strict-mcp-config",
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-homebrew-call-budget",
+          "cmd": "/opt/homebrew/bin/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--no-session-persistence",
+            "--strict-mcp-config",
+            "--max-budget-usd",
+            {
+              "validator": "^\\d+(\\.\\d+)?$"
+            },
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-usr-local-version",
+          "cmd": "/usr/local/bin/claude",
+          "args": [
+            "--version"
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-usr-local-auth",
+          "cmd": "/usr/local/bin/claude",
+          "args": [
+            "auth",
+            "status",
+            "--json"
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-usr-local-call",
+          "cmd": "/usr/local/bin/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--no-session-persistence",
+            "--strict-mcp-config",
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-usr-local-call-budget",
+          "cmd": "/usr/local/bin/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--no-session-persistence",
+            "--strict-mcp-config",
+            "--max-budget-usd",
+            {
+              "validator": "^\\d+(\\.\\d+)?$"
+            },
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        }
+      ]
+    },
+    "shell:allow-kill",
+    {
+      "identifier": "fs:allow-read-text-file",
+      "allow": [
+        {
+          "path": "$APPDATA/prompts/**"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:allow-exists",
+      "allow": [
+        {
+          "path": "$APPDATA/prompts/**"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:allow-read-dir",
+      "allow": [
+        {
+          "path": "$APPDATA/prompts/**"
+        }
+      ]
+    }
+  ]
+}

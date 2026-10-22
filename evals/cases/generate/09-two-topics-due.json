@@ -1,0 +1,56 @@
+{
+  "id": "09-two-topics-due",
+  "description": "Thursday of week 2 with two topics due for a re-check (articles, conditionals)",
+  "date": "2026-11-05",
+  "history": [
+    {
+      "date": "2026-11-02",
+      "topic": "articles",
+      "format": "fix",
+      "items": [
+        {
+          "prompt": "My sister is engineer at a bank.",
+          "expected": "an engineer",
+          "answer": "✓",
+          "verdict": "wrong",
+          "ruleSection": "Ловушки"
+        },
+        {
+          "prompt": "She lives in Spain with her family.",
+          "expected": "✓",
+          "answer": "✓",
+          "verdict": "correct",
+          "ruleSection": "Формула"
+        },
+        {
+          "prompt": "He is going to an university in Leeds.",
+          "expected": "a university",
+          "answer": "✓",
+          "verdict": "wrong",
+          "ruleSection": "Ловушки"
+        }
+      ]
+    },
+    {
+      "date": "2026-11-03",
+      "topic": "conditionals",
+      "format": "gap",
+      "items": [
+        {
+          "prompt": "If it ___ tomorrow, we will stay at home. (rain)",
+          "expected": "rains",
+          "answer": "will rain",
+          "verdict": "wrong",
+          "ruleSection": "Ловушки"
+        },
+        {
+          "prompt": "If I ___ more time, I would learn French. (have)",
+          "expected": "had",
+          "answer": "had",
+          "verdict": "correct",
+          "ruleSection": "Формула"
+        }
+      ]
+    }
+  ]
+}

@@ -269,8 +269,8 @@ test.describe('today actions', () => {
 
   test('spelling items take a mnemonic that saves on blur', async ({ page }) => {
     await page.goto('/?state=graded#/today');
-    // Only words spelt wrong take a mnemonic: the two right ones have no input.
-    await expect(page.getByRole('textbox', { name: 'Мнемоника' })).toHaveCount(2);
+    // Every spelling item takes a mnemonic (spec 7.2), right or wrong.
+    await expect(page.getByRole('textbox', { name: 'Мнемоника' })).toHaveCount(4);
     const box = page.getByRole('textbox', { name: 'Мнемоника' }).first();
     await box.fill('одна c, две s');
     await box.blur();

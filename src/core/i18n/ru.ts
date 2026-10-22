@@ -143,6 +143,7 @@ export const ru: Record<keyof typeof en, string> = {
   'today.startLight': 'Начать лёгкий день',
   'today.rebuild': 'Пересобрать',
   'today.missingSpotRules': 'Для этих тем ещё нет правил, поэтому поиск ошибок их пропускает:',
+  'rule.title': 'Правило',
   'rule.close': 'Закрыть',
   'rule.version': 'Правило, версия {n}',
   'rule.sources': 'Источники',

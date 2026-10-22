@@ -18,8 +18,8 @@ export function SourceList({ sources, lang }: { sources: Source[]; lang: Lang })
     <div className="mt-4">
       <h4 className="label text-muted-foreground">{t(lang, 'rule.sources')}</h4>
       <ul className="mt-1 flex flex-col gap-0.5">
-        {sources.map((s) => (
-          <li key={s.url}>
+        {sources.map((s, i) => (
+          <li key={i}>
             {s.title} <span className="label text-faint">{s.url}</span>
           </li>
         ))}
@@ -85,7 +85,7 @@ export function RulePanel({ target, onClose }: { target: RuleTarget | null; onCl
         className="overflow-y-auto"
       >
         <SheetHeader className="pr-8">
-          <SheetTitle>{current && 'value' in current ? current.value.title : ''}</SheetTitle>
+          <SheetTitle>{current && 'value' in current ? current.value.title : t(lang, 'rule.title')}</SheetTitle>
           <SheetDescription className="label">
             {current && 'value' in current ? t(lang, 'rule.version', { n: current.value.version }) : ''}
           </SheetDescription>

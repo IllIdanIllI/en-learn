@@ -48,7 +48,7 @@ function GapProposal({ item, lang }: { item: ViewItem; lang: Lang }) {
   );
 }
 
-/** For words spelt wrong, or that already have one. Saved on blur; the saved text is what the input shows in later graded views. */
+/** Shown on every graded spelling item (spec 7.2). Saved on blur; the saved text is what the input shows in later graded views. */
 function Mnemonic({ item, lang }: { item: ViewItem; lang: Lang }) {
   const { deps } = useCore();
   const [value, setValue] = useState(item.mnemonic ?? '');
@@ -110,7 +110,7 @@ export function ItemActions({ item, lang }: { item: ViewItem; lang: Lang }) {
   return (
     <>
       {item.gap && <GapProposal item={item} lang={lang} />}
-      {item.format === 'spelling' && item.spellingWordId != null && (a.verdict === 'wrong' || item.mnemonic) && <Mnemonic item={item} lang={lang} />}
+      {item.format === 'spelling' && item.spellingWordId != null && <Mnemonic item={item} lang={lang} />}
       {(canDispute || canTag) && (
         <div className="mt-2 -ml-2.5 flex flex-wrap items-center gap-1">
           {canDispute && (

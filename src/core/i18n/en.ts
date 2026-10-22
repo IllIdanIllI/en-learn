@@ -141,6 +141,7 @@ export const en = {
   'today.startLight': 'Start light day',
   'today.rebuild': 'Rebuild',
   'today.missingSpotRules': 'These topics have no rule yet, so error spotting skips them:',
+  'rule.title': 'Rule',
   'rule.close': 'Close',
   'rule.version': 'Rule, version {n}',
   'rule.sources': 'Sources',

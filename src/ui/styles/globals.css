@@ -114,9 +114,11 @@
   }
 }
 
-/* The rule panel is a non-modal side panel: the content column makes room for it instead of sitting under it. */
-html[data-rule-panel] main {
-  padding-right: 420px;
+/* The rule panel is a non-modal side panel: the content column makes room for it instead of sitting under it (below 1100px the panel overlays the content edge). */
+@media (min-width: 1100px) {
+  html[data-rule-panel] main {
+    padding-right: 420px;
+  }
 }
 
 /* Typography roles (DESIGN.md section 3). */

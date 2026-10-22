@@ -4,6 +4,7 @@ import { t } from '@/core/i18n';
 import { generateSession, rebuildSession, type GenerateResult } from '@/core/session/generate';
 import { getTodayState, type TodayState } from '@/core/session/plan';
 import { useCore } from '@/ui/app/CoreProvider';
+import { Button } from '@/ui/components/ui/button';
 import { Notice } from '@/ui/today/chips';
 import { RuleDraft } from '@/ui/today/RuleDraft';
 import { SessionPage } from '@/ui/today/SessionPage';
@@ -63,7 +64,11 @@ export function Today() {
     }
   }, []);
   const start = (light: boolean) => void build(() => generateSession(deps, { light }));
-  const rebuild = (sessionId: number, light: boolean) => void build(() => rebuildSession(deps, sessionId, { light }));
+  const lastLight = useRef(false);
+  const rebuild = (sessionId: number, light: boolean) => {
+    lastLight.current = light;
+    void build(() => rebuildSession(deps, sessionId, { light }));
+  };
 
   if (loadError) {
     return (
@@ -77,7 +82,14 @@ export function Today() {
   if (state.kind === 'session') {
     return (
       <>
-        {genError !== null && <Notice className="mb-6">{t(lang, 'today.genError', { message: genError })}</Notice>}
+        {genError !== null && (
+          <Notice className="mb-6">
+            <span>{t(lang, 'today.genError', { message: genError })}</span>
+            <Button variant="secondary" size="sm" disabled={generating} onClick={() => rebuild(state.sessionId, lastLight.current)}>
+              {t(lang, 'today.retry')}
+            </Button>
+          </Notice>
+        )}
         <SessionPage
           key={`${state.sessionId}:${epoch}`}
           sessionId={state.sessionId}

@@ -16,6 +16,8 @@ Examine the objection against the rule text first, then against authoritative so
 - "correct": the learner is right: the answer is correct English and either the rule covers it or the rule is silent on it and the sources confirm it, or the grade applied the rule wrongly. The item should count as correct.
 - "drop": the item itself is defective: two answers are valid and the item does not say which one is wanted, the expected answer is wrong, or the item needs something the rule does not cover. The item should be dropped from the score.
 
+If the disputed item has the verdict "rule_gap" (natural English that the rulebook does not cover), the recommendations mean: "keep" = the item stays excluded from the score until the rule is edited (say so in the position); "correct" = count it as correct now, without a rule edit; "drop" = remove it from the score. For "wrong" items the meanings above stay.
+
 If the objection is only partly right, say which part and pick the recommendation that fits the item as it stands. Do not weaken a correct grade to avoid disagreement, and do not defend a grade that the rule does not support.
 
 # Position

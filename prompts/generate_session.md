@@ -17,10 +17,10 @@ Produce only the blocks the context asks for, in this order: review block (kind 
 - format "question" (speaking block, kind "speaking"): fill "question"; "items" and "paragraphs" are [] and formatExample is "". Always exactly one question, and it always starts with "Describe a time when".
 
 Counts:
-- Review block: at most 12 items; on a light day at most 5. Every topic whose re-check is due today or overdue gets at least one item in the review block with isCheck = true. All other items have isCheck = false. Outside the review block isCheck is always false.
-- Task block with format gap or fix: 6 to 10 items (at least 3 in any case).
+- Review block: format is always gap or fix, never spot. At most 12 items; on a light day at most 5. Every gap or fix block, review included, has at least 3 items: if the review input gives fewer than 3, pad the block with fresh sentences on the same topics (only constructions the rules cover). Every topic whose re-check is due today or overdue gets at least one item in the review block with isCheck = true, and these check items always win over the caps: on a light day the review block has at most 5 items unless more topics are due, in which case it has one check item per due topic. All other items have isCheck = false. Outside the review block isCheck is always false.
+- Task block with format gap or fix: 6 to 10 items.
 - Task block with format spot: 2 to 3 paragraphs, each with 5 to 7 hidden errors.
-- Light day: only the review block (at most 5 items) and the speaking block.
+- Light day: only the review block (see above) and the speaking block.
 
 # Task design rules (all are mandatory)
 
@@ -35,14 +35,14 @@ TD-8. Error-spotting texts are plain paragraphs: no lists, no headings, no line 
 
 # Content rules
 
-- Rule links: every item and every hidden error has topicKey (copied from the context) and ruleSection (the exact heading of the rule section that decides it, copied verbatim from that rule). Never invent a topic key or a section heading.
+- Rule links: every item and every hidden error has topicKey (copied from the context) and ruleSection (the heading text of the rule section that decides it, exactly as in the rule but without the leading ## and without surrounding spaces, for example "Formula"). Never invent a topic key or a section heading.
 - Review block: build the items from the review input (the learner's counted wrong answers) and from the due re-check topics. Re-test the same mechanism with fresh sentences; do not copy the old sentence unchanged. Rules describe general mechanisms: test the mechanism, not the learner's individual slip.
 - Task block: follow the task topic and slot given in the context. For a "learn" topic use gap or fix on its rule. For a "notice" topic and for error-spotting days use "spot" over the listed error-spotting topics, and put in some of the learner's recent inattention errors (careless slips) as hidden errors when they fit the topics.
 - Second set: if the context says it is a second set, use fresh sentences on the same topic.
 - Naturalness: write natural, exam-level sentences (IELTS / TOEFL register, varied everyday and academic subjects). No sentence may depend on a vocabulary choice; the only thing being tested is the rule.
 - Vocabulary is never the target. Do not make an item whose answer is a word choice unless a rule covers it.
 - Wrong fragments in "spot" must be errors under the rulebook, never matters of style or taste.
-- Each item has exactly one blank (gap) or one fragment to fix (fix). Mark the fragment to fix in the prompt so the learner knows where to look (for example with square brackets) and keep that marking the same across the block.
+- Each gap item has exactly one blank. In a fix item the prompt shows the whole sentence with the fragment to check marked in square brackets (same marking across the block), and expected is either ✓ (the fragment is correct) or the one or two word replacement for the marked fragment. The marked fragment must be unique in the sentence and the sentence must give enough context to decide it.
 - The instruction is one sentence. The formatExample is a complete filled example in the same shape the learner will type.
 - Titles are short and neutral.
 

@@ -2,6 +2,7 @@
 topic: conditionals
 sources:
 - British Council: Conditionals: zero, first and second | https://learnenglish.britishcouncil.org/free-resources/grammar/b1-b2/conditionals-zero-first-second
+- Cambridge Dictionary: Conditionals: if | https://dictionary.cambridge.org/grammar/british-grammar/conditionals-if
 - Cambridge Dictionary: Conditionals: typical errors | https://dictionary.cambridge.org/grammar/british-grammar/conditionals-typical-errors
 ---
 
@@ -23,9 +24,11 @@ sources:
 
 ## Объяснение
 
-В условных предложениях времена выбираются по степени реальности. Zero относится к общим истинам и правилам: в обеих частях Present Simple. First описывает реальную, возможную ситуацию в будущем: в части с if стоит Present Simple, в главной части will + инфинитив. Для first также используются unless, as long as, as soon as, in case. Second описывает маловероятную или воображаемую ситуацию в настоящем или будущем: if + Past Simple, would + инфинитив; Past Simple здесь не указывает на прошлое. После if правильно говорить if I were, хотя в разговорной речи часто звучит was.
+В условных предложениях времена выбираются по степени реальности. Zero относится к общим истинам и правилам: в обеих частях Present Simple. First описывает реальную, возможную ситуацию в будущем: в части с if стоит Present Simple, в главной части will + инфинитив. Для first также используются unless, as long as, as soon as, in case. Second описывает маловероятную или воображаемую ситуацию в настоящем или будущем: if + Past Simple, would + инфинитив; Past Simple здесь не указывает на прошлое. Во втором типе (воображаемая ситуация) правильно говорить if I were, хотя в разговорной речи часто звучит was.
 
 ## Ловушки
+
+(Ловушки с will и would ниже относятся к условию. Вежливые просьбы вроде I would be grateful if you would help или If you will wait a moment, … это другое употребление и они правильны.)
 
 - Will в части с if: ~~If it will rain, we will stay.~~ → If it **rains**, we will stay.
 - Would в части с if: ~~If I would have time, I would help.~~ → If I **had** time, I would help.
@@ -35,4 +38,5 @@ sources:
 ## Источники
 
 - [British Council: Conditionals: zero, first and second](https://learnenglish.britishcouncil.org/free-resources/grammar/b1-b2/conditionals-zero-first-second)
+- [Cambridge Dictionary: Conditionals: if](https://dictionary.cambridge.org/grammar/british-grammar/conditionals-if)
 - [Cambridge Dictionary: Conditionals: typical errors](https://dictionary.cambridge.org/grammar/british-grammar/conditionals-typical-errors)

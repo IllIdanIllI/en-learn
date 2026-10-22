@@ -45,6 +45,8 @@ describe('seed', () => {
 
   test('third-person-s is a background notice topic', () => {
     expect(seed.programme.background).toEqual([{ title: 'Third person -s', key: 'third-person-s', kind: 'notice' }]);
+    // parseSeed numbers only `weeks`; background topics are saved with week_no null.
+    expect(seed.programme.weeks.map((w) => w.key)).not.toContain('third-person-s');
   });
 
   test('one rule per topic', () => {
@@ -69,7 +71,10 @@ describe('seed', () => {
 
   test.each(seed.rules.map((r) => [r.topicKey, r] as const))('rule %s body lists its sources', (_k, rule) => {
     const section = rule.body.split('## Источники')[1] ?? '';
-    for (const s of rule.sources) expect(section).toContain(s.title);
+    for (const s of rule.sources) {
+      expect(section).toContain(s.title);
+      if (s.url) expect(section).toContain(s.url);
+    }
   });
 
   test('conditionals rule has no third or mixed conditional', () => {

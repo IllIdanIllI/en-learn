@@ -10,7 +10,7 @@ sources:
 
 | Форма | Когда | Пример |
 | --- | --- | --- |
-| have / has + причастие прошедшего времени | действие или состояние связано с настоящим; период ещё не закончился (today, this week, so far); опыт без указания времени | I **have visited** Rome. |
+| have / has + причастие прошедшего времени | действие или состояние связано с настоящим; период ещё продолжается (today, this week, so far); опыт без указания времени | I **have visited** Rome. |
 | Past Simple | названо время или период завершён (yesterday, last year, in January 1975) | I **visited** Rome last year. |
 
 ## Примеры
@@ -28,10 +28,10 @@ Present Perfect связывает прошлое с настоящим: важ�
 
 ## Ловушки
 
-- Present Perfect с точным прошедшим временем: ~~I have seen him yesterday.~~ → I **saw** him yesterday.
-- Past Simple с незаконченным периодом: ~~I wrote five emails this week.~~ (неделя ещё идёт) → I **have written** five emails this week.
+- Past Simple с периодом, который ещё продолжается (today, this week, so far): ~~I wrote five emails so far.~~ → I **have written** five emails so far. (Если период закончен, например last week, нужен Past Simple.)
 - Past Simple с yet в британском варианте: ~~I didn't pay yet.~~ → I **haven't paid** yet.
-- Present Perfect с конкретным моментом (this morning здесь относится к завершённому моменту): ~~I've woken up at seven o'clock this morning.~~ → I **woke up** at seven o'clock this morning.
+- Present Perfect с названным моментом: ~~I've woken up at seven o'clock this morning.~~ → I **woke up** at seven o'clock this morning.
+- Present Perfect с yesterday: ~~I have seen him yesterday.~~ → I **saw** him yesterday.
 - Лишнее have с названным периодом: ~~Have you been there in 2019?~~ → **Were** you there in 2019?
 
 ## Источники

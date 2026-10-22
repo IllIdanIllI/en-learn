@@ -1,0 +1,76 @@
+import { Ajv, type ValidateFunction } from 'ajv';
+import type { LlmKind } from '@/core/domain';
+import type { Deps, LlmErrorCode, LlmResult } from '@/core/ports';
+import { getSettings } from '@/core/db/repos/settings';
+import { insertLlmCall } from '@/core/db/repos/llmCalls';
+
+const MAX_ATTEMPTS = 2;
+const RETRYABLE: ReadonlySet<LlmErrorCode> = new Set(['timeout', 'invalid_json', 'schema', 'check', 'cli_error']);
+
+const ajv = new Ajv({ allErrors: true, strict: false });
+const validators = new WeakMap<object, ValidateFunction>();
+
+function validatorFor(schema: object): ValidateFunction {
+  let v = validators.get(schema);
+  if (!v) {
+    v = ajv.compile(schema);
+    validators.set(schema, v);
+  }
+  return v;
+}
+
+export async function callStructured<T>(
+  deps: Deps,
+  kind: LlmKind,
+  userPrompt: string,
+  opts: { sessionId?: number; check?: (data: T) => string | null } = {},
+): Promise<LlmResult<T>> {
+  const settings = await getSettings(deps.db);
+  const prompt = await deps.prompts.load(kind);
+  const language = settings.nativeLanguage === 'ru' ? 'Russian' : 'English';
+  const model = settings.models[kind];
+  const validate = validatorFor(prompt.schema);
+
+  let last: LlmResult<T> | undefined;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const res = await deps.llm.call({
+      kind,
+      systemPrompt: prompt.system.replaceAll('{{nativeLanguage}}', language),
+      userPrompt,
+      schema: prompt.schema,
+      model,
+      budgetUsd: settings.budgetUsd,
+      timeoutMs: kind === 'generate_session' ? 300000 : 120000,
+    });
+    last = checked<T>(res, validate, opts.check);
+    await insertLlmCall(deps.db, {
+      sessionId: opts.sessionId ?? null,
+      kind,
+      model,
+      costUsd: last.costUsd,
+      durationMs: last.durationMs,
+      ok: last.ok,
+      error: last.ok ? null : `${last.code}: ${last.message}`,
+      response: last.raw,
+      createdAt: deps.clock.now(),
+    });
+    if (last.ok || !RETRYABLE.has(last.code)) break;
+  }
+  return last as LlmResult<T>;
+}
+
+function checked<T>(
+  res: LlmResult<unknown>,
+  validate: ValidateFunction,
+  check: ((data: T) => string | null) | undefined,
+): LlmResult<T> {
+  if (!res.ok) return res;
+  const base = { costUsd: res.costUsd, durationMs: res.durationMs, raw: res.raw };
+  if (!validate(res.data)) {
+    return { ok: false, code: 'schema', message: ajv.errorsText(validate.errors), ...base };
+  }
+  const data = res.data as T;
+  const problem = check?.(data) ?? null;
+  if (problem !== null) return { ok: false, code: 'check', message: problem, ...base };
+  return { ok: true, data, ...base };
+}

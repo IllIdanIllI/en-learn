@@ -300,4 +300,49 @@ describe('checkGenerated', () => {
       expect(checkGenerated(s, ctx)).toEqual(['b1 items: 2 items, need at least 3']);
     });
   });
+
+  describe('English-only task content', () => {
+    test('Cyrillic in an item prompt fails', () => {
+      expect(checkGenerated(withItemPrompt('Если it rains, I ___ stay in.'), ctx)).toEqual([
+        'b0.i1 EN: task content must be English',
+      ]);
+    });
+
+    test('Cyrillic in an item expected answer fails', () => {
+      const s = valid();
+      s.blocks[0]!.items[1]!.expected = 'был';
+      expect(checkGenerated(s, ctx)).toEqual(['b0.i1 EN: task content must be English']);
+    });
+
+    test('Cyrillic in a paragraph fails', () => {
+      const s = valid();
+      s.blocks[2]!.paragraphs[0]!.text += ' Привет.';
+      expect(checkGenerated(s, ctx)).toEqual(['b2.p0 EN: task content must be English']);
+    });
+
+    test('Cyrillic in an error correction fails', () => {
+      const s = valid();
+      s.blocks[2]!.paragraphs[0]!.errors[0]!.correction = 'пошёл';
+      expect(checkGenerated(s, ctx)).toEqual(['b2.p0.e0 EN: task content must be English']);
+    });
+
+    test('Cyrillic in a speaking question fails', () => {
+      const s = valid();
+      s.blocks[3]!.question = 'Describe a time when вы устали.';
+      expect(checkGenerated(s, ctx)).toEqual(['b3 EN: task content must be English']);
+    });
+
+    test('Cyrillic in a format example fails', () => {
+      const s = valid();
+      s.blocks[1]!.formatExample = 'He go home. -> идёт';
+      expect(checkGenerated(s, ctx)).toEqual(['b1 EN: task content must be English']);
+    });
+
+    test('Cyrillic in title and instruction is allowed', () => {
+      const s = valid();
+      s.blocks[0]!.title = 'Повторение';
+      s.blocks[0]!.instruction = 'Заполните пропуски.';
+      expect(checkGenerated(s, ctx)).toEqual([]);
+    });
+  });
 });

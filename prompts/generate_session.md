@@ -6,7 +6,7 @@ The user message gives the context: date, week, weekday slot, whether it is a li
 
 # Output language
 
-All task content is in English: titles, instructions, format examples, item prompts, paragraphs, corrections and the speaking question. Never translate task content into the learner's native language ({{nativeLanguage}}), and never put {{nativeLanguage}} text into items.
+Every task item, text, expected answer, correction, format example and speaking question is English, without exception: the learner is never asked to translate or to learn another language, and no {{nativeLanguage}} word or letter may appear in them. Only the "title" and "instruction" of a block are interface text and may be written in {{nativeLanguage}}; keep them short. A code check rejects any Cyrillic letter in task content.
 
 # Blocks
 
@@ -27,7 +27,7 @@ Counts:
 TD-1. One answer format per block, shown with one filled example line in formatExample. Blanks are written exactly as three underscores ___ and nothing else. Never use a dash, ellipsis, underscore run of another length or any symbol that could look like an answer. Never put a standalone dash, ellipsis or symbol between spaces or brackets in a prompt.
 TD-2. Every item has exactly one expected answer under the rulebook. If two answers are valid, the instruction or the prompt must say which one is wanted (for example by giving the first letter or the base verb in brackets); if you cannot make it unambiguous, do not write the item.
 TD-3. Not used by you (spelling hints are written elsewhere). Never write spelling items.
-TD-4. A "fix" block mixes items that contain an error with items that are correct, including over-correction traps (a correct sentence that looks wrong). Every fix block has at least one correct item whose expected value is exactly ✓ and at least one item with a correction. The instruction tells the learner to write ✓ when the fragment is correct.
+TD-4. A "fix" block mixes sentences that contain an error with sentences that are correct, including over-correction traps (a correct sentence that looks wrong). Every fix block has at least one correct item whose expected value is exactly ✓ and at least one item with a correction. The instruction tells the learner to write ✓ when the sentence is correct, otherwise the corrected fragment.
 TD-5. Use only constructions that the provided rules cover, in items and in traps. If a construction or word pair has no rule in the context, do not use it. Never put word pairs that have no rule (for example a fixed verb plus preposition) into review or texts.
 TD-6. Every error is decidable from its own sentence and the text before it. Never rely on what comes later or on outside knowledge of a story.
 TD-7. Every fix is one or two words, in place. No item may be solvable only by rephrasing the sentence. In "fix" and "spot", every "expected" correction and every "correction" is one or two words.
@@ -42,8 +42,8 @@ TD-8. Error-spotting texts are plain paragraphs: no lists, no headings, no line 
 - Naturalness: write natural, exam-level sentences (IELTS / TOEFL register, varied everyday and academic subjects). No sentence may depend on a vocabulary choice; the only thing being tested is the rule.
 - Vocabulary is never the target. Do not make an item whose answer is a word choice unless a rule covers it.
 - Wrong fragments in "spot" must be errors under the rulebook, never matters of style or taste.
-- Each gap item has exactly one blank. In a fix item the prompt shows the whole sentence with the fragment to check marked in square brackets (same marking across the block), and expected is either ✓ (the fragment is correct) or the one or two word replacement for the marked fragment. The marked fragment must be unique in the sentence and the sentence must give enough context to decide it.
-- The instruction is one sentence. The formatExample is a complete filled example in the same shape the learner will type.
+- Each gap item has exactly one blank. In a fix item the prompt shows the whole sentence with no marking at all: no brackets, underline, bold or any other hint of where the error is, because the learner must find the fragment the same way as in a real text. Expected is ✓ when the sentence is correct, otherwise the one or two word corrected form of the wrong fragment. The wrong fragment must occur exactly once in the sentence, so the fix is unambiguous. The learner answers ✓ or the corrected fragment.
+- The instruction is one sentence. The formatExample is a complete filled example in the same shape the learner will type (for fix: an unmarked sentence and its ✓ or corrected fragment).
 - Titles are short and neutral.
 
 # Self-check before answering

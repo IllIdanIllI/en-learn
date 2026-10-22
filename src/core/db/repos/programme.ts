@@ -10,10 +10,10 @@ export async function getProgramme(db: Db): Promise<Programme | null> {
 }
 
 export async function getTopics(db: Db): Promise<Topic[]> {
-  const rows = await db.select<{ id: number; key: string; title: string; kind: TopicKind; week_no: number | null }>(
-    'SELECT id, key, title, kind, week_no FROM topic ORDER BY id',
+  const rows = await db.select<{ id: number; key: string; title: string; kind: TopicKind; week_no: number | null; archived: number }>(
+    'SELECT id, key, title, kind, week_no, archived FROM topic ORDER BY id',
   );
-  return rows.map((r) => ({ id: r.id, key: r.key, title: r.title, kind: r.kind, weekNo: r.week_no }));
+  return rows.map((r) => ({ id: r.id, key: r.key, title: r.title, kind: r.kind, weekNo: r.week_no, archived: r.archived === 1 }));
 }
 
 export async function getSlots(db: Db): Promise<Record<number, Slot>> {

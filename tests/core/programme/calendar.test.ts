@@ -4,10 +4,10 @@ import { dayPlan, errorSpottingTopics, weekNo } from '@/core/programme/calendar'
 
 const p: Programme = { id: 1, title: 'P', startDate: '2026-10-19', endDate: '2026-11-08' };
 const topics: Topic[] = [
-  { id: 1, key: 'a', title: 'A', kind: 'learn', weekNo: 1 },
-  { id: 2, key: 'b', title: 'B', kind: 'notice', weekNo: 2 },
-  { id: 3, key: 'c', title: 'C', kind: 'learn', weekNo: 3 },
-  { id: 4, key: 'bg', title: 'BG', kind: 'notice', weekNo: null },
+  { id: 1, key: 'a', title: 'A', kind: 'learn', weekNo: 1, archived: false },
+  { id: 2, key: 'b', title: 'B', kind: 'notice', weekNo: 2, archived: false },
+  { id: 3, key: 'c', title: 'C', kind: 'learn', weekNo: 3, archived: false },
+  { id: 4, key: 'bg', title: 'BG', kind: 'notice', weekNo: null, archived: false },
 ];
 const slots: Record<number, Slot> = {
   1: 'error_spotting', 2: 'topic', 3: 'rest', 4: 'second_set', 5: 'speaking', 6: 'writing', 7: 'review_rewrite',
@@ -67,6 +67,12 @@ describe('dayPlan', () => {
 describe('errorSpottingTopics', () => {
   test('includes weeks up to N plus background, splits by rule', () => {
     const r = errorSpottingTopics(topics, 2, (id) => id !== 2);
+    expect(r.included.map((t) => t.id)).toEqual([1, 4]);
+    expect(r.missingRule.map((t) => t.id)).toEqual([2]);
+  });
+  test('excludes archived topics from both lists', () => {
+    const archived: Topic = { id: 5, key: 'old', title: 'Old', kind: 'notice', weekNo: null, archived: true };
+    const r = errorSpottingTopics([...topics, archived], 2, (id) => id !== 5 && id !== 2);
     expect(r.included.map((t) => t.id)).toEqual([1, 4]);
     expect(r.missingRule.map((t) => t.id)).toEqual([2]);
   });

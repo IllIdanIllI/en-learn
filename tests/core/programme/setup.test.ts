@@ -76,10 +76,26 @@ describe('setup', () => {
     next.title = 'New';
     await replaceProgramme(db, next);
     const topics = await getTopics(db);
-    expect(topics.find((t) => t.key === 'conditionals')).toMatchObject({ id: x.id, weekNo: null });
+    expect(topics.find((t) => t.key === 'conditionals')).toMatchObject({ id: x.id, weekNo: null, archived: true });
+    expect(topics.filter((t) => t.key !== 'conditionals').every((t) => !t.archived)).toBe(true);
     expect(topics.find((t) => t.key === 'present-perfect')?.weekNo).toBe(1);
     expect(topics.find((t) => t.key === 'articles')?.weekNo).toBe(2);
     expect((await getProgramme(db))?.title).toBe('New');
+  });
+
+  test('replaceProgramme un-archives a topic that returns to the input', async () => {
+    const db = await createTestDb();
+    await saveProgramme(db, input());
+    const x = (await getTopics(db)).find((t) => t.key === 'conditionals')!;
+    await db.execute("INSERT INTO session (date, title, is_light, status, created_at) VALUES ('2026-10-20','S',0,'graded','x')");
+    await db.execute("INSERT INTO block (session_id, ord, kind, format, title, instruction, minutes) VALUES (1,1,'task','gap','B','i',5)");
+    await db.execute('INSERT INTO item (block_id, ord, prompt, expected, topic_id) VALUES (1,1,?,?,?)', ['p', 'e', x.id]);
+    const without = input();
+    without.weeks = without.weeks.filter((w) => w.key !== 'conditionals');
+    await replaceProgramme(db, without);
+    expect((await getTopics(db)).find((t) => t.key === 'conditionals')?.archived).toBe(true);
+    await replaceProgramme(db, input());
+    expect((await getTopics(db)).find((t) => t.key === 'conditionals')).toMatchObject({ archived: false, weekNo: 2 });
   });
 
   test('replaceProgramme deletes unreferenced topics', async () => {

@@ -42,6 +42,7 @@ export function errorSpottingTopics(
   const included: Topic[] = [];
   const missingRule: Topic[] = [];
   for (const t of topics) {
+    if (t.archived) continue;
     if (t.weekNo !== null && t.weekNo > week) continue;
     (hasRule(t.id) ? included : missingRule).push(t);
   }

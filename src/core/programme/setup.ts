@@ -88,7 +88,7 @@ export async function saveProgramme(db: Db, input: ProgrammeInput): Promise<numb
   );
   const all = [...input.weeks.map((t, i) => ({ t, weekNo: i + 1 })), ...input.background.map((t) => ({ t, weekNo: null }))];
   for (const { t, weekNo } of all) {
-    await db.execute('INSERT INTO topic (programme_id, key, title, kind, week_no) VALUES (?, ?, ?, ?, ?)', [
+    await db.execute('INSERT INTO topic (programme_id, key, title, kind, week_no, archived) VALUES (?, ?, ?, ?, ?, 0)', [
       id, t.key, t.title, t.kind, weekNo,
     ]);
   }
@@ -111,9 +111,9 @@ export async function replaceProgramme(db: Db, input: ProgrammeInput): Promise<v
   for (const { t, weekNo } of all) {
     const found = await db.select<{ id: number }>('SELECT id FROM topic WHERE key = ?', [t.key]);
     if (found[0]) {
-      await db.execute('UPDATE topic SET title = ?, kind = ?, week_no = ? WHERE id = ?', [t.title, t.kind, weekNo, found[0].id]);
+      await db.execute('UPDATE topic SET title = ?, kind = ?, week_no = ?, archived = 0 WHERE id = ?', [t.title, t.kind, weekNo, found[0].id]);
     } else {
-      await db.execute('INSERT INTO topic (programme_id, key, title, kind, week_no) VALUES (?, ?, ?, ?, ?)', [
+      await db.execute('INSERT INTO topic (programme_id, key, title, kind, week_no, archived) VALUES (?, ?, ?, ?, ?, 0)', [
         programmeId, t.key, t.title, t.kind, weekNo,
       ]);
     }
@@ -127,6 +127,8 @@ export async function replaceProgramme(db: Db, input: ProgrammeInput): Promise<v
        AND id NOT IN (SELECT topic_id FROM session_support)`,
     keys,
   );
+  // Topics left over are referenced; keep them out of the programme and error-spotting texts.
+  await db.execute(`UPDATE topic SET archived = 1 WHERE key NOT IN (${marks})`, keys);
 }
 
 export async function insertSeedRules(db: Db, rules: SeedRule[], now: string): Promise<void> {

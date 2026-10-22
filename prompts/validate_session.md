@@ -16,6 +16,10 @@ Also report as defective (using the reason to say why):
 - a blank or placeholder is anything other than ___ or could look like an answer (TD-1);
 - the wrong fragment of a hidden error does not occur verbatim in its paragraph, or the "error" is only a matter of style, taste or vocabulary rather than an error under the rulebook.
 
+# Language
+
+Every task item, text, expected answer, correction and speaking question must be English. Only block titles and instructions may be in another language. If you find task content that is not English, report that item as defective with the reason "EN: task content is not English". In a "fix" block the sentence is shown without any marking, so judge the item as the learner sees it: the wrong fragment must occur exactly once in the sentence, and the answer is ✓ or its one or two word correction.
+
 # How to answer
 
 Return one entry for every item and every hidden error in the input, using exactly the reference you were given. Do not skip, merge, add or rename references.

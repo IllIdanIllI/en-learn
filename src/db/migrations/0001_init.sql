@@ -18,7 +18,8 @@ CREATE TABLE topic (
   key TEXT NOT NULL UNIQUE,
   title TEXT NOT NULL,
   kind TEXT NOT NULL CHECK (kind IN ('learn','notice')),
-  week_no INTEGER
+  week_no INTEGER,
+  archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0,1))
 );
 
 CREATE UNIQUE INDEX topic_week_no_unique ON topic(week_no) WHERE week_no IS NOT NULL;

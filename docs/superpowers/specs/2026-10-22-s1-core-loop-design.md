@@ -40,6 +40,9 @@ S1 acceptance = requirements §7 criteria 1–5.
 | D19 | "Without support" = the learner did not open the rule of that topic during that session before submitting. |
 | D20 | Inattention errors from the last 14 days feed error-spotting texts (FR-25). |
 | D21 | `claude` is looked up at fixed locations (10.2); no custom path setting. |
+| D22 | Topics removed from the programme but still referenced are archived (`topic.archived = 1`, `week_no = NULL`) and no longer appear in error-spotting texts. |
+| D23 | `fix` sentences are shown unmarked (no brackets or underline); the learner answers `✓` or the corrected fragment, and the wrong fragment occurs exactly once in the sentence. |
+| D24 | Task content is always English; a code check rejects Cyrillic letters in it (6.3). Block titles and instructions are exempt. |
 
 ## 3. Architecture
 
@@ -154,6 +157,7 @@ Code checks (run on the generated JSON, and again after defect items are removed
 - TD-1: one format per block; `format_example` present; blanks are exactly `___`; no standalone placeholder token (`-`, `–`, `—`, `…`, `_` runs other than `___`) between spaces or brackets.
 - TD-4: every `fix` block has ≥1 item with expected `✓` and ≥1 with a correction.
 - TD-7: in `fix` and `spot`, every correction is 1–2 words.
+- English only (D24): any Cyrillic letter in task content (item prompt and expected, paragraph text, error wrong and correction, question, format example) is a violation `EN: task content must be English`; block title and instruction are exempt.
 - TD-8: `spot` paragraphs are single lines; 5–7 hidden errors per paragraph.
 - Every topic key exists and has a rule; every rule section exists in that rule; every due topic has a check item in the review block; minimum 3 items per `gap` / `fix` block.
 

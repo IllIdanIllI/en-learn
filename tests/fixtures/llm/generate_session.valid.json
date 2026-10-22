@@ -1,11 +1,12 @@
 {
   "blocks": [
     {
-      "kind": "review", "format": "fix", "title": "Review", "instruction": "Fix the underlined fragment if it is wrong. Write ✓ if the sentence is correct.",
-      "formatExample": "If it [rains], we stay at home. → ✓", "minutes": 5,
+      "kind": "review", "format": "fix", "title": "Review", "instruction": "Write ✓ if the sentence is correct, otherwise write the corrected fragment.",
+      "formatExample": "If it rains, we stay at home. → ✓", "minutes": 5,
       "items": [
-        { "prompt": "If she [will come], we will start.", "expected": "comes", "topicKey": "conditionals", "ruleSection": "Formula", "isCheck": true },
-        { "prompt": "If it [rains], we stay at home.", "expected": "✓", "topicKey": "conditionals", "ruleSection": "Formula", "isCheck": false }
+        { "prompt": "If she will come, we will start.", "expected": "comes", "topicKey": "conditionals", "ruleSection": "Formula", "isCheck": true },
+        { "prompt": "If it rains, we stay at home.", "expected": "✓", "topicKey": "conditionals", "ruleSection": "Formula", "isCheck": false },
+        { "prompt": "If they leave now, they will catch the train.", "expected": "✓", "topicKey": "conditionals", "ruleSection": "Formula", "isCheck": false }
       ],
       "paragraphs": [], "question": ""
     },

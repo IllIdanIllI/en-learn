@@ -8,4 +8,6 @@ export const en = {
   'nav.rules': 'Rules',
   'nav.errors': 'Error bank',
   'nav.settings': 'Settings',
+  'page.setup': 'Programme setup',
+  'page.prerequisites': 'Claude check',
 } as const;

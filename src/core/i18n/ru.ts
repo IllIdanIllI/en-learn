@@ -10,4 +10,6 @@ export const ru: Record<keyof typeof en, string> = {
   'nav.rules': 'Правила',
   'nav.errors': 'Банк ошибок',
   'nav.settings': 'Настройки',
+  'page.setup': 'Настройка программы',
+  'page.prerequisites': 'Проверка Claude',
 };

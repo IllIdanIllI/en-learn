@@ -33,13 +33,13 @@ const HEADINGS = ['Формула', 'Примеры', 'Объяснение', '�
 describe('seed', () => {
   const seed = load();
 
-  test('programme loads: 3 learn weeks, one notice, 21 days from next Monday', () => {
+  test('programme loads: 3 learn weeks, one notice, 21 days from today', () => {
     const p = seed.programme;
     expect(p.title).toBe('IELTS grammar, 3 weeks');
     expect(p.weeks.map((w) => w.key)).toEqual(['articles', 'conditionals', 'present-perfect-past-simple']);
     expect(p.weeks.every((w) => w.kind === 'learn')).toBe(true);
-    expect(p.startDate).toBe('2026-10-26');
-    expect(p.endDate).toBe('2026-11-15');
+    expect(p.startDate).toBe('2026-10-22');
+    expect(p.endDate).toBe('2026-11-11');
     expect(Object.values(p.slots)).toEqual(['error_spotting', 'topic', 'rest', 'second_set', 'speaking', 'writing', 'review_rewrite']);
   });
 

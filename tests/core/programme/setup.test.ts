@@ -17,8 +17,8 @@ describe('parseSeed', () => {
     const { programme, rules } = parseSeed(files, '2026-10-22'); // Thursday
     expect(programme.weeks).toHaveLength(3);
     expect(programme.background).toHaveLength(1);
-    expect(programme.startDate).toBe('2026-10-26');
-    expect(programme.endDate).toBe('2026-11-15');
+    expect(programme.startDate).toBe('2026-10-22');
+    expect(programme.endDate).toBe('2026-11-11');
     expect(programme.slots[2]).toBe('topic');
     expect(rules).toHaveLength(1);
     expect(rules[0]?.topicKey).toBe('articles');
@@ -29,8 +29,11 @@ describe('parseSeed', () => {
     });
     expect(rules[0]?.body.startsWith('## Basics')).toBe(true);
   });
-  test('Monday today keeps today as start', () => {
-    expect(parseSeed(files, '2026-10-19').programme.startDate).toBe('2026-10-19');
+  test('the start date is today on any weekday; calendar weeks count from it', () => {
+    expect(parseSeed(files, '2026-10-19').programme.startDate).toBe('2026-10-19'); // Monday
+    const sunday = parseSeed(files, '2026-10-25').programme;
+    expect(sunday.startDate).toBe('2026-10-25');
+    expect(sunday.endDate).toBe('2026-11-14');
   });
 });
 

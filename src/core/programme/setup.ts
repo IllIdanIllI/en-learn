@@ -1,6 +1,6 @@
 import type { ISODate, Slot, TopicKind } from '@/core/domain';
 import type { Db } from '@/core/ports';
-import { addDays, isoWeekday } from '@/core/dates';
+import { addDays } from '@/core/dates';
 
 export interface TopicInput { title: string; key: string; kind: TopicKind }
 export interface ProgrammeInput {
@@ -45,7 +45,8 @@ export function parseSeed(
     background: TopicInput[];
     slots: Record<string, Slot>;
   };
-  const startDate = addDays(today, (8 - isoWeekday(today)) % 7);
+  // The programme starts today, whatever the weekday: calendar weeks are date-based (see weekNo).
+  const startDate = today;
   const slots = {} as Record<1 | 2 | 3 | 4 | 5 | 6 | 7, Slot>;
   for (const wd of WEEKDAYS) {
     const slot = raw.slots[String(wd)];

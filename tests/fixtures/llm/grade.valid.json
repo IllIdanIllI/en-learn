@@ -1,0 +1,11 @@
+{
+  "items": [
+    { "ref": "b0.i0", "verdict": "wrong", "fix": "comes", "ruleSection": "Formula", "explanation": "После if в условном предложении первого типа используется настоящее время.", "vocabularyNote": "", "question": "" },
+    { "ref": "b0.i1", "verdict": "needs_clarification", "fix": "", "ruleSection": "", "explanation": "", "vocabularyNote": "", "question": "Что означает «+» в этом ответе?" }
+  ],
+  "spot": [ { "blockRef": "b1", "paragraph": 0, "found": ["b1.p0.e0"], "extra": [ { "text": "call → phone", "explanation": "Замена слова, а не исправление ошибки." } ] } ],
+  "patterns": ["Будущее время после if вместо настоящего"],
+  "tomorrow": ["if + настоящее время в условных предложениях"],
+  "spellingErrors": [ { "word": "necessary", "hint": "one collar, two sleeves" } ],
+  "ruleGaps": [ { "ref": "b0.i1", "ruleTopicKey": "conditionals", "proposal": "## Формула\n...", "explanation": "Ответ естественный, но правило его не описывает.", "sources": [ { "title": "British Council", "url": "https://learnenglish.britishcouncil.org/grammar" } ] } ]
+}

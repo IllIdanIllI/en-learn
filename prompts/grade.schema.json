@@ -1,0 +1,206 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "items",
+    "spot",
+    "patterns",
+    "tomorrow",
+    "spellingErrors",
+    "ruleGaps"
+  ],
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ref",
+          "verdict",
+          "fix",
+          "ruleSection",
+          "explanation",
+          "vocabularyNote",
+          "question"
+        ],
+        "properties": {
+          "ref": {
+            "type": "string",
+            "description": "Item reference exactly as given in the input"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "correct",
+              "wrong",
+              "rule_gap",
+              "defect",
+              "needs_clarification"
+            ]
+          },
+          "fix": {
+            "type": "string",
+            "description": "The correct form; empty if verdict is correct or needs_clarification"
+          },
+          "ruleSection": {
+            "type": "string",
+            "description": "Exact heading of the rule section applied; empty if none"
+          },
+          "explanation": {
+            "type": "string",
+            "description": "Short neutral explanation in the learner native language"
+          },
+          "vocabularyNote": {
+            "type": "string",
+            "description": "Vocabulary issue in the answer, else empty string"
+          },
+          "question": {
+            "type": "string",
+            "description": "Question to the learner, only for needs_clarification, else empty string"
+          }
+        }
+      }
+    },
+    "spot": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "blockRef",
+          "paragraph",
+          "found",
+          "extra"
+        ],
+        "properties": {
+          "blockRef": {
+            "type": "string",
+            "description": "Block reference, for example b2"
+          },
+          "paragraph": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "found": {
+            "type": "array",
+            "description": "Refs of the hidden errors the learner found",
+            "items": {
+              "type": "string"
+            }
+          },
+          "extra": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "text",
+                "explanation"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "The learner correction that is not a hidden error"
+                },
+                "explanation": {
+                  "type": "string",
+                  "description": "Why it is not an error, in the learner native language"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "patterns": {
+      "type": "array",
+      "description": "Named patterns behind the errors, in the learner native language",
+      "items": {
+        "type": "string"
+      }
+    },
+    "tomorrow": {
+      "type": "array",
+      "description": "What goes to tomorrow review, in the learner native language",
+      "items": {
+        "type": "string"
+      }
+    },
+    "spellingErrors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "word",
+          "hint"
+        ],
+        "properties": {
+          "word": {
+            "type": "string",
+            "description": "The correctly spelled word"
+          },
+          "hint": {
+            "type": "string",
+            "description": "Dictation-style hint without synonyms"
+          }
+        }
+      }
+    },
+    "ruleGaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ref",
+          "ruleTopicKey",
+          "proposal",
+          "explanation",
+          "sources"
+        ],
+        "properties": {
+          "ref": {
+            "type": "string",
+            "description": "Item reference"
+          },
+          "ruleTopicKey": {
+            "type": "string",
+            "description": "Topic key of the rule to extend"
+          },
+          "proposal": {
+            "type": "string",
+            "description": "The full new rule body"
+          },
+          "explanation": {
+            "type": "string",
+            "description": "Why the rule does not cover the answer, in the learner native language"
+          },
+          "sources": {
+            "type": "array",
+            "description": "Authoritative sources only; empty array if none",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "title",
+                "url"
+              ],
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "Source name"
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Real URL of the page that supports the claim"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

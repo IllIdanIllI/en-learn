@@ -1,0 +1,4 @@
+{ "items": [
+  { "ref": "b0.i0", "ok": true, "reason": "" },
+  { "ref": "b1.p0.e2", "ok": false, "reason": "Two corrections are valid under the rule: 'had' and 'were'." }
+] }

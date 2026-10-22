@@ -1,0 +1,6 @@
+{
+  "blocks": [
+    { "kind": "task", "format": "gap", "title": "Gap", "instruction": "Fill the gap.", "formatExample": "I ___ home. → go", "minutes": 5,
+      "items": [], "paragraphs": [], "question": "", "extraField": true }
+  ]
+}

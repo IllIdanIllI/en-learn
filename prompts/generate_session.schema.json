@@ -1,0 +1,152 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "blocks"
+  ],
+  "properties": {
+    "blocks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "format",
+          "title",
+          "instruction",
+          "formatExample",
+          "minutes",
+          "items",
+          "paragraphs",
+          "question"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "review",
+              "task",
+              "speaking"
+            ]
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "gap",
+              "fix",
+              "spot",
+              "question"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "description": "Short block title in English"
+          },
+          "instruction": {
+            "type": "string",
+            "description": "One-sentence instruction in English"
+          },
+          "formatExample": {
+            "type": "string",
+            "description": "One filled example line showing the answer format; empty string for a question block"
+          },
+          "minutes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "items": {
+            "type": "array",
+            "description": "Items of a gap or fix block; empty array for other formats",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "prompt",
+                "expected",
+                "topicKey",
+                "ruleSection",
+                "isCheck"
+              ],
+              "properties": {
+                "prompt": {
+                  "type": "string",
+                  "description": "The item text; blanks are exactly ___"
+                },
+                "expected": {
+                  "type": "string",
+                  "description": "The single expected answer; the check mark character for a correct \"fix\" item"
+                },
+                "topicKey": {
+                  "type": "string",
+                  "description": "Topic key copied from the context"
+                },
+                "ruleSection": {
+                  "type": "string",
+                  "description": "Exact heading of the rule section that decides this item"
+                },
+                "isCheck": {
+                  "type": "boolean",
+                  "description": "true if this item is a re-check of a due topic"
+                }
+              }
+            }
+          },
+          "paragraphs": {
+            "type": "array",
+            "description": "Paragraphs of a spot block; empty array for other formats",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "text",
+                "errors"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "One paragraph on a single line"
+                },
+                "errors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "wrong",
+                      "correction",
+                      "topicKey",
+                      "ruleSection"
+                    ],
+                    "properties": {
+                      "wrong": {
+                        "type": "string",
+                        "description": "The wrong fragment exactly as it appears in the text"
+                      },
+                      "correction": {
+                        "type": "string",
+                        "description": "The correction, one or two words"
+                      },
+                      "topicKey": {
+                        "type": "string",
+                        "description": "Topic key copied from the context"
+                      },
+                      "ruleSection": {
+                        "type": "string",
+                        "description": "Exact heading of the rule section that decides this error"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "question": {
+            "type": "string",
+            "description": "The speaking question; empty string for other formats"
+          }
+        }
+      }
+    }
+  }
+}

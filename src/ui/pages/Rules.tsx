@@ -37,9 +37,9 @@ export function Rules() {
               </TableHeader>
               <TableBody>
                 {loaded.data.rules.map((r) => (
-                  <TableRow key={r.ruleId}>
+                  <TableRow key={r.ruleId} className={r.topic.archived ? 'text-muted-foreground' : undefined}>
                     <TableCell>
-                      <Link to={`/rules/${r.ruleId}`} className="text-primary underline underline-offset-2">{r.topic.title}</Link>
+                      <Link to={`/rules/${r.ruleId}`} className={r.topic.archived ? 'underline underline-offset-2' : 'text-primary underline underline-offset-2'}>{r.topic.title}</Link>
                       {r.topic.archived && <span className="label ml-2 text-muted-foreground">{t(lang, 'rules.archived')}</span>}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{t(lang, r.topic.kind === 'learn' ? 'setup.kind.learn' : 'setup.kind.notice')}</TableCell>

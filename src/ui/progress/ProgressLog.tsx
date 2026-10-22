@@ -3,7 +3,7 @@ import type { ProgressLogRow } from '@/core/progress/derive';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/ui/components/ui/table';
 
 /** One row per graded session, newest first. Numbers are tabular so columns line up. */
-export function ProgressLog({ rows, lang }: { rows: ProgressLogRow[]; lang: Lang }) {
+export function ProgressLog({ rows, blockTitles, lang }: { rows: ProgressLogRow[]; blockTitles: Map<number, string>; lang: Lang }) {
   if (rows.length === 0) return <p className="mt-4 text-muted-foreground">{t(lang, 'progress.log.empty')}</p>;
   return (
     <Table className="mt-4" aria-label={t(lang, 'progress.log')}>
@@ -27,8 +27,8 @@ export function ProgressLog({ rows, lang }: { rows: ProgressLogRow[]; lang: Lang
               {r.isLight && <span className="label ml-2 text-muted-foreground">{t(lang, 'today.light')}</span>}
               {r.patterns.length > 0 && <p className="label mt-1 font-normal text-muted-foreground">{r.patterns.join(', ')}</p>}
             </TableCell>
-            <TableCell className="tabular whitespace-nowrap">
-              {r.scores.map((s) => t(lang, 'progress.score', { x: s.correct, y: s.counted })).join(' · ')}
+            <TableCell className="tabular">
+              {r.scores.map((s) => `${blockTitles.get(s.blockId) ?? ''} ${t(lang, 'progress.score', { x: s.correct, y: s.counted })}`.trim()).join(' · ')}
             </TableCell>
             <TableCell className="tabular">{r.errorCount}</TableCell>
             <TableCell className="tabular">{r.disputes}</TableCell>

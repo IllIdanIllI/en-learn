@@ -14,27 +14,25 @@ const CELL: Record<DayState, string> = {
  * without a session are an outline only, never a warning colour. The state is also in each cell's label.
  */
 export function ConsistencyGrid({ data, lang }: { data: Consistency; lang: Lang }) {
+  const caption = data.n === 0 ? t(lang, 'progress.noSessions') : t(lang, 'progress.caption', { x: data.practised, n: data.n, y: data.light });
   return (
     <div>
-      <div role="group" aria-label={t(lang, 'progress.consistency')} className="grid gap-[3px]" style={{ gridTemplateColumns: 'repeat(10, 12px)' }}>
+      <div role="img" aria-label={caption} className="grid gap-[3px]" style={{ gridTemplateColumns: 'repeat(10, 12px)' }}>
         {data.days.map((d) => {
           const label = t(lang, 'progress.day', { date: d.date, state: t(lang, `progress.day.${d.state}`) });
           return (
             <span
               key={d.date}
-              role="img"
+              aria-hidden
               data-testid="day-cell"
               data-state={d.state}
-              aria-label={label}
               title={label}
               className={cn('size-3 rounded-[2px] border', CELL[d.state])}
             />
           );
         })}
       </div>
-      <p className="mt-3 text-muted-foreground">
-        {data.n === 0 ? t(lang, 'progress.noSessions') : t(lang, 'progress.caption', { x: data.practised, n: data.n, y: data.light })}
-      </p>
+      <p className="mt-3 text-muted-foreground">{caption}</p>
     </div>
   );
 }

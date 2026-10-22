@@ -14,12 +14,13 @@ import { Notice } from '@/ui/today/chips';
 export function Progress() {
   const { deps, lang } = useCore();
   const loaded = useLoaded(async () => {
-    const [sessions, topics, states, rules, log] = await Promise.all([
+    const [sessions, topics, states, rules, log, blocks] = await Promise.all([
       listGradedSessions(deps.db),
       getTopics(deps.db),
       getTopicStates(deps.db),
       listRules(deps.db),
       loadProgressLog(deps.db),
+      deps.db.select<{ id: number; title: string }>('SELECT id, title FROM block'),
     ]);
     return {
       grid: consistency(sessions.map((s) => ({ date: s.date, isLight: s.isLight, status: 'graded' as const })), deps.clock.today()),
@@ -27,6 +28,7 @@ export function Progress() {
       states,
       ruleIds: new Map(rules.map((r) => [r.topic.id, r.ruleId])),
       log,
+      blockTitles: new Map(blocks.map((b) => [b.id, b.title])),
     };
   });
 
@@ -48,7 +50,7 @@ export function Progress() {
           </section>
           <section className="mt-12">
             <h2 className="title">{t(lang, 'progress.log')}</h2>
-            <ProgressLog rows={loaded.data.log} lang={lang} />
+            <ProgressLog rows={loaded.data.log} blockTitles={loaded.data.blockTitles} lang={lang} />
           </section>
         </>
       )}

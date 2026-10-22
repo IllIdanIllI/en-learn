@@ -11,6 +11,7 @@ import { Textarea } from '@/ui/components/ui/textarea';
 import { Notice } from '@/ui/today/chips';
 import { RuleBody } from '@/ui/today/RuleBody';
 import { SourceList } from '@/ui/today/RulePanel';
+import { bodyHasSources } from '@/ui/today/ruleSources';
 
 type Draft = { body: string; reason: string; error: string | null; saving: boolean };
 
@@ -111,7 +112,7 @@ export function RuleView() {
             </div>
           )}
           <RuleBody body={viewed.body} className="mt-6" />
-          <SourceList sources={viewed.sources} lang={lang} />
+          {!bodyHasSources(viewed.body) && <SourceList sources={viewed.sources} lang={lang} />}
         </>
       )}
 

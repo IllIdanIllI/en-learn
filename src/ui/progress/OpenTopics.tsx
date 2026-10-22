@@ -47,7 +47,7 @@ export function OpenTopics({ topics, states, ruleIds, lang }: {
               <TableCell className="tabular text-muted-foreground">{state.pending.join(', ')}</TableCell>
               <TableCell>
                 {ruleId !== undefined && (
-                  <Link to={`/rules/${ruleId}`} className="text-primary underline underline-offset-2">{t(lang, 'progress.rule')}</Link>
+                  <Link to={`/rules/${ruleId}`} aria-label={`${t(lang, 'progress.rule')}: ${topic.title}`} className="text-primary underline underline-offset-2">{t(lang, 'progress.rule')}</Link>
                 )}
               </TableCell>
             </TableRow>

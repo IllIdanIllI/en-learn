@@ -6,11 +6,12 @@ import { useCore } from '@/ui/app/CoreProvider';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/ui/components/ui/sheet';
 import { RuleBody } from './RuleBody';
 import { Notice } from './chips';
+import { bodyHasSources } from './ruleSources';
 
 /** `opener` is the element that opened the panel; focus returns to it on close. */
 export interface RuleTarget { ruleId: number; topicId: number | null; section: string; opener: HTMLElement | null }
 
-type Loaded = { title: string; body: string; version: number };
+type Loaded = { title: string; body: string; sources: Source[]; version: number };
 
 export function SourceList({ sources, lang }: { sources: Source[]; lang: Lang }) {
   if (sources.length === 0) return null;
@@ -92,7 +93,10 @@ export function RulePanel({ target, onClose }: { target: RuleTarget | null; onCl
         </SheetHeader>
         {current && 'error' in current && <Notice>{t(lang, 'rule.loadError', { message: current.error })}</Notice>}
         {current && 'value' in current && (
-          <RuleBody body={current.value.body} section={target?.section} />
+          <>
+            <RuleBody body={current.value.body} section={target?.section} />
+            {!bodyHasSources(current.value.body) && <SourceList sources={current.value.sources} lang={lang} />}
+          </>
         )}
       </SheetContent>
     </Sheet>

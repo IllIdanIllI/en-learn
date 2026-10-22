@@ -373,7 +373,8 @@ test.describe('rules, error bank and progress', () => {
     await page.getByRole('link', { name: 'Articles' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Articles' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Артикль' })).toBeVisible();
-    await expect(page.getByText('Cambridge Dictionary').first()).toBeVisible();
+    await expect(page.getByText('Cambridge Dictionary')).toHaveCount(1);
+    await expect(page.getByRole('heading', { name: 'Источники' })).toHaveCount(1);
     await expect(page.getByRole('heading', { name: 'История версий' })).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/rule-view.png`, fullPage: true });
 
@@ -424,13 +425,11 @@ test.describe('rules, error bank and progress', () => {
 
     const all = await rows.count();
     await page.getByLabel('Тип ошибки').selectOption('spelling');
-    const spelling = await rows.count();
-    expect(spelling).toBeGreaterThan(0);
-    expect(spelling).toBeLessThan(all);
+    await expect(rows).toHaveCount(all - 1);
     for (const kind of await rows.locator('td:nth-child(3)').allTextContents()) expect(kind).toBe('Орфография');
     await page.getByLabel('Тип ошибки').selectOption('');
     await page.getByLabel('Тема', { exact: true }).selectOption({ label: 'Articles' });
-    expect(await rows.count()).toBeLessThan(all);
+    await expect(rows).toHaveCount(1);
     for (const topic of await rows.locator('td:nth-child(4)').allTextContents()) expect(topic).toBe('Articles');
   });
 
@@ -447,7 +446,9 @@ test.describe('rules, error bank and progress', () => {
     await expect(page.locator('[data-testid="day-cell"]')).toHaveCount(100);
     await expect(page.locator('[data-testid="day-cell"][data-state="practised"]')).toHaveCount(5);
     await expect(page.locator('[data-testid="day-cell"][data-state="light"]')).toHaveCount(1);
-    await expect(page.locator('[data-testid="day-cell"][aria-label="2026-10-18: лёгкий день"]')).toHaveCount(1);
+    await expect(page.locator('[data-testid="day-cell"][title="2026-10-18: лёгкий день"]')).toHaveCount(1);
+    await expect(page.getByRole('img', { name: 'Дней с занятиями: 6 из 10. Лёгких: 1.' })).toBeVisible();
+    await expect(page.locator('[data-testid="day-cell"][aria-hidden="true"]')).toHaveCount(100);
     const text = (await page.locator('body').innerText()) + (await page.content());
     expect(text).not.toMatch(/streak|flame/i);
 
@@ -459,7 +460,8 @@ test.describe('rules, error bank and progress', () => {
     await expect(page.getByText(/\$0\.\d{4}/).first()).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/progress.png`, fullPage: true });
 
-    await topics.getByRole('link', { name: 'Правило' }).first().click();
+    await expect(page.getByRole('table', { name: 'Журнал занятий' })).toContainText(/Повторение[^·]* 2 из 4/);
+    await topics.getByRole('link', { name: 'Правило: Articles' }).click();
     await expect(page).toHaveURL(/#\/rules\/\d+$/);
   });
 

@@ -22,8 +22,8 @@ async function build(db: Db) {
   const b2 = await blk(2, 'task', 'spot', 10, JSON.stringify(['A old friend had a idea.']));
   const b3 = await blk(3, 'speaking', 'question', 3, 'Describe a time when you helped someone.');
   await insertItem(db, b0, 0, { ...base, prompt: 'Not optional', expected: 'necessary' });
-  await insertItem(db, b1, 0, { ...base, prompt: 'She bought ___ umbrella.', expected: 'KEY-AN', ruleSection: 'Basics' });
-  await insertItem(db, b1, 1, { ...base, prompt: 'He is ___ best.', expected: 'KEY-THE', ruleSection: 'Basics' });
+  await insertItem(db, b1, 0, { ...base, prompt: 'She bought ___ umbrella.', expected: 'KEY-AN', ruleSection: 'Basics', topicId: 1, ruleId: 1 });
+  await insertItem(db, b1, 1, { ...base, prompt: 'He is ___ best.', expected: 'KEY-THE', ruleSection: 'Basics', topicId: 1, ruleId: 1 });
   await insertItem(db, b1, 2, { ...base, prompt: 'Broken ___ item.', expected: 'KEY-DEFECT', status: 'defect', note: 'two answers possible' });
   await insertItem(db, b2, 0, { ...base, prompt: 'A old', expected: 'KEY-AN-OLD', paragraph: 0, ruleSection: 'Traps' });
   await insertItem(db, b2, 1, { ...base, prompt: 'a idea', expected: 'KEY-AN-IDEA', paragraph: 0, ruleSection: 'Traps' });
@@ -69,7 +69,7 @@ describe('loadSessionView before grading', () => {
     const { sid } = await build(db);
     const view = await loadSessionView(db, sid);
     expect(view.totalMinutes).toBe(25);
-    expect(view.readFirst).toEqual({ section: 'Basics', blockNumber: 2 });
+    expect(view.readFirst).toEqual({ section: 'Basics', blockNumber: 2, ruleId: 1, topicId: 1 });
   });
 
   test('readFirst is omitted when no task item has a rule section', async () => {
@@ -119,6 +119,17 @@ describe('loadSessionView after grading', () => {
     const view = await loadSessionView(db, sid);
     expect(view.blocks[0]!.items[0]).toMatchObject({ effective: 'correct', answer: { disputeText: 'but', disputeDecision: 'correct' } });
     expect(view.blocks[0]!.score).toEqual({ correct: 1, counted: 1 });
+  });
+
+  test('spelling items carry the word id and its saved mnemonic', async () => {
+    const db = await createTestDb();
+    const { sid } = await build(db);
+    await db.execute("INSERT INTO spelling_word (word, hint, created_at) VALUES ('necessary', 'one collar, two sleeves', 'x')");
+    await db.execute('UPDATE item SET spelling_word_id = 1 WHERE id = 1');
+    await grade(db, sid);
+    expect((await loadSessionView(db, sid)).blocks[0]!.items[0]).toMatchObject({ spellingWordId: 1, mnemonic: null });
+    await db.execute("UPDATE spelling_word SET mnemonic = 'one c, two s' WHERE id = 1");
+    expect((await loadSessionView(db, sid)).blocks[0]!.items[0]).toMatchObject({ spellingWordId: 1, mnemonic: 'one c, two s' });
   });
 
   test('throws for an unknown session', async () => {

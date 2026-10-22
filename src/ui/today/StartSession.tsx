@@ -15,10 +15,12 @@ function Skeleton() {
 }
 
 /** Empty state with the primary action, and the loading and error states of generation. */
-export function StartSession({ lang, generating, error, onStart }: {
-  lang: Lang; generating: boolean; error: string | null; onStart: (light: boolean) => void;
+export function StartSession({ lang, generating, error, rest = false, onStart }: {
+  lang: Lang; generating: boolean; error: string | null; rest?: boolean; onStart: (light: boolean) => void;
 }) {
-  const [light, setLight] = useState(false);
+  const [lightChoice, setLight] = useState(false);
+  // A rest day has no toggle: the only way to practise is a light day.
+  const light = rest || lightChoice;
   return (
     <>
       {error !== null && (
@@ -29,14 +31,16 @@ export function StartSession({ lang, generating, error, onStart }: {
           </Button>
         </Notice>
       )}
-      <p className="reading mt-6 text-muted-foreground">{t(lang, 'today.empty')}</p>
+      {!rest && <p className="reading mt-6 text-muted-foreground">{t(lang, 'today.empty')}</p>}
       <div className="mt-6 flex items-center gap-3">
         <Button disabled={generating} onClick={() => onStart(light)}>
-          {t(lang, 'today.start')}
+          {t(lang, rest ? 'today.startLight' : 'today.start')}
         </Button>
-        <Toggle pressed={light} disabled={generating} onPressedChange={setLight}>
-          {t(lang, 'today.light')}
-        </Toggle>
+        {!rest && (
+          <Toggle pressed={light} disabled={generating} onPressedChange={setLight}>
+            {t(lang, 'today.light')}
+          </Toggle>
+        )}
       </div>
       <div role="status">
         {generating && (

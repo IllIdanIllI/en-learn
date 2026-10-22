@@ -15,8 +15,8 @@ function SheetClose(props: React.ComponentProps<typeof SheetPrimitive.Close>) {
   return <SheetPrimitive.Close data-slot="sheet-close" {...props} />;
 }
 
-/** Right side panel (420px). No dimming overlay: it sits over the content area, not as a modal. */
-function SheetContent({ className, children, ...props }: React.ComponentProps<typeof SheetPrimitive.Content>) {
+/** Right side panel (420px). No dimming overlay: it sits over the content area, not as a modal. Use it with `modal={false}` on Sheet. */
+function SheetContent({ className, children, closeLabel = 'Close', ...props }: React.ComponentProps<typeof SheetPrimitive.Content> & { closeLabel?: string }) {
   return (
     <SheetPrimitive.Portal>
       <SheetPrimitive.Content
@@ -31,7 +31,7 @@ function SheetContent({ className, children, ...props }: React.ComponentProps<ty
         {children}
         <SheetPrimitive.Close
           className="absolute top-4 right-4 rounded-sm p-1 text-muted-foreground transition-colors duration-150 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label="Close"
+          aria-label={closeLabel}
         >
           <X className="size-4" strokeWidth={1.5} />
         </SheetPrimitive.Close>

@@ -1,6 +1,8 @@
 import { t, type Lang } from '@/core/i18n';
 import type { ViewItem } from '@/core/session/view';
+import { ItemActions } from './ItemActions';
 import { NoteChip, RuleRef, VerdictChip } from './chips';
+import { useSessionActions } from './sessionActions';
 
 function notCountedReason(item: ViewItem, lang: Lang): string | null {
   const a = item.answer;
@@ -16,6 +18,7 @@ function notCountedReason(item: ViewItem, lang: Lang): string | null {
  * instead. The verdict chip starts the answer line; the learner's wrong text stays visible in muted ink.
  */
 export function GradedItem({ item, number, lang }: { item: ViewItem; number?: number; lang: Lang }) {
+  const { openRule } = useSessionActions();
   const a = item.answer;
   const spot = item.format === 'spot';
   const reason = notCountedReason(item, lang);
@@ -44,10 +47,16 @@ export function GradedItem({ item, number, lang }: { item: ViewItem; number?: nu
               {!ok && reason === null && expected !== '' && <span>→ {expected}</span>}
             </>
           )}
-          {!ok && reason === null && section !== '' && <RuleRef section={section} />}
+          {!ok && reason === null && section !== '' && (
+            <RuleRef
+              section={section}
+              onOpen={item.ruleId === null ? undefined : (opener) => openRule({ ruleId: item.ruleId!, topicId: item.topicId, section }, opener)}
+            />
+          )}
         </p>
         {a && a.explanation !== '' && !ok && <p className="reading mt-2 text-muted-foreground">{a.explanation}</p>}
         {a && a.vocabularyNote !== '' && <p className="reading mt-2 rounded-sm bg-note/10 px-3 py-2 text-note">{a.vocabularyNote}</p>}
+        <ItemActions item={item} lang={lang} />
       </div>
     </li>
   );

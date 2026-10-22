@@ -1,4 +1,5 @@
 import type { Llm, LlmRequest, LlmResult } from '@/core/ports';
+import { MINI_RULES } from './miniSeed';
 import type {
   DisputeReply, GeneratedBlock, GeneratedItem, GeneratedParagraph, GeneratedSession, GradeResult, RuleDraft, ValidationResult,
 } from '@/core/llm/types';
@@ -6,6 +7,31 @@ import type {
 /** Canned, valid model outputs for preview mode. They are derived from the request text so they pass the code checks. */
 
 const SECTION = 'Ловушки';
+
+/** What the canned grader says about a wrong answer, per topic, so the feedback matches the items on the page. */
+const FEEDBACK: Record<string, { explanation: string; pattern: string; tomorrow: string }> = {
+  articles: {
+    explanation: 'Перед согласным звуком ставится a, перед гласным an: решает звук, а не буква.',
+    pattern: 'a или an выбирается по первому звуку следующего слова',
+    tomorrow: 'a / an перед словами с непроизносимой h',
+  },
+  conditionals: {
+    explanation: 'В части с if будущее время не используется: сверьтесь с формулой.',
+    pattern: 'Форма глагола после if: настоящее время вместо будущего',
+    tomorrow: 'if + настоящее время в условных предложениях',
+  },
+  'present-perfect': {
+    explanation: 'С точным указанием времени (yesterday, in 2019) нужен Past Simple.',
+    pattern: 'Present Perfect не сочетается с точным временем',
+    tomorrow: 'have / has + третья форма глагола',
+  },
+  'third-person-s': {
+    explanation: 'В Present Simple у he, she, it глагол получает окончание -s.',
+    pattern: 'Окончание -s для третьего лица единственного числа',
+    tomorrow: 'he / she / it + глагол с -s',
+  },
+};
+const feedbackFor = (key: string) => FEEDBACK[key] ?? (FEEDBACK[FALLBACK] as (typeof FEEDBACK)[string]);
 
 interface Bank {
   gap: { prompt: string; expected: string }[];
@@ -180,22 +206,33 @@ function field(block: string, name: string): string {
 
 function grade(prompt: string): GradeResult {
   const result: GradeResult = { items: [], spot: [], patterns: [], tomorrow: [], spellingErrors: [], ruleGaps: [] };
+  const wrongKeys: string[] = [];
   const [itemPart = '', spotPart = ''] = prompt.split('## Error-spotting paragraphs');
   for (const block of itemPart.split(/^### /m).slice(1)) {
     const ref = /^(b\d+\.i\d+)/.exec(block)?.[1];
     if (!ref || !block.includes('Learner answer:')) continue;
     const expected = field(block, 'Expected');
     const answer = field(block, 'Learner answer');
+    const topicKey = field(block, 'Topic key');
     const correct = answer.toLowerCase() === expected.toLowerCase();
+    // "one elephant" is good English that the articles rule does not cover: the one canned rule gap.
+    const gap = !correct && topicKey === 'articles' && answer.toLowerCase() === 'one elephant';
+    if (gap) {
+      result.ruleGaps.push({
+        ref, ruleTopicKey: topicKey, proposal: gapProposal(), explanation: 'Числительное one подчёркивает количество.',
+        sources: [{ title: 'Cambridge Dictionary', url: 'https://dictionary.cambridge.org/grammar/british-grammar/' }],
+      });
+    }
     result.items.push({
       ref,
-      verdict: correct ? 'correct' : 'wrong',
+      verdict: correct ? 'correct' : gap ? 'rule_gap' : 'wrong',
       fix: correct ? '' : expected,
       ruleSection: correct ? '' : field(block, 'Rule section'),
-      explanation: correct ? '' : 'Здесь действует правило из раздела о ловушках: сверьтесь с формулой.',
+      explanation: correct ? '' : gap ? 'Ответ грамматически верен, но в правиле нет случая с one.' : feedbackFor(topicKey).explanation,
       vocabularyNote: '',
       question: '',
     });
+    if (!correct && !gap) wrongKeys.push(topicKey);
   }
   for (const block of spotPart.split(/^### /m).slice(1)) {
     const head = /^(b\d+) paragraph (\d+)/.exec(block);
@@ -209,24 +246,25 @@ function grade(prompt: string): GradeResult {
       extra: [],
     });
   }
-  if (result.items.some((i) => i.verdict === 'wrong')) {
-    result.patterns = ['Форма глагола после if: настоящее время вместо будущего'];
-    result.tomorrow = ['if + настоящее время в условных предложениях'];
+  if (wrongKeys.length > 0) {
+    const fb = feedbackFor(wrongKeys[0] as string);
+    result.patterns = [fb.pattern];
+    result.tomorrow = [fb.tomorrow];
   }
   return result;
 }
 
-function ruleDraft(): RuleDraft {
-  return {
-    body: [
-      '## Формула', 'If + Present Simple, will + глагол.',
-      '## Примеры', '- If it rains, we will stay at home.',
-      '## Объяснение', 'В части с if будущее время не используется.',
-      '## Ловушки', 'Нельзя писать if she will come.',
-      '## Источники', '- British Council',
-    ].join('\n\n'),
-    sources: [{ title: 'British Council', url: 'https://learnenglish.britishcouncil.org/grammar' }],
-  };
+/** The seed rule of the requested topic, as if the model had drafted it. */
+function ruleDraft(prompt: string): RuleDraft {
+  const key = /^Topic key: (.+)$/m.exec(prompt)?.[1]?.trim() ?? FALLBACK;
+  const seed = MINI_RULES.find((r) => r.topicKey === key) ?? (MINI_RULES.find((r) => r.topicKey === FALLBACK) as (typeof MINI_RULES)[number]);
+  return { body: seed.body, sources: seed.sources };
+}
+
+/** The articles rule with one more example, as a proposed new version. */
+function gapProposal(): string {
+  const seed = MINI_RULES.find((r) => r.topicKey === 'articles') as (typeof MINI_RULES)[number];
+  return seed.body.replace('\n\n## Объяснение', '\n- I saw one elephant: one называет число, а не предмет.\n\n## Объяснение');
 }
 
 const dispute = (): DisputeReply => ({
@@ -243,7 +281,7 @@ export const previewLlm: Llm = {
       case 'generate_session': data = generate(req.userPrompt); break;
       case 'validate_session': data = validate(req.userPrompt); break;
       case 'grade': data = grade(req.userPrompt); break;
-      case 'rule_draft': data = ruleDraft(); break;
+      case 'rule_draft': data = ruleDraft(req.userPrompt); break;
       case 'dispute': data = dispute(); break;
     }
     return { ok: true, data, costUsd: 0, durationMs: 5, raw: JSON.stringify(data) };

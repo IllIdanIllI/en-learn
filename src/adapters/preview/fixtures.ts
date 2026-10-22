@@ -7,15 +7,34 @@ import { insertSeedRules, saveProgramme, type SeedRule } from '@/core/programme/
 import { generateSession } from '@/core/session/generate';
 import { gradeSession } from '@/core/grading/grade';
 import { listGradingItems, getSessionByDate } from '@/core/db/repos/sessions';
+import { findOrCreateSpellingWord } from '@/core/db/repos/spelling';
 import { FixedClock } from '@/adapters/test/fixedClock';
 import { createSqlJsDb } from './sqljsDb';
 import { previewLlm } from './previewLlm';
 import { MINI_PROGRAMME, MINI_RULES } from './miniSeed';
 
 export const PREVIEW_STATES = [
-  'empty', 'no_session', 'generated', 'questions', 'graded', 'rest', 'rule_missing', 'prereq_missing',
+  'empty', 'no_session', 'generated', 'questions', 'graded', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing',
 ] as const;
 export type PreviewState = (typeof PREVIEW_STATES)[number];
+
+/** Words the spelling block is built from: hints never contain the word. */
+const SPELLING_WORDS: [word: string, hint: string][] = [
+  ['necessary', 'Not optional'],
+  ['definitely', 'Without any doubt'],
+  ['accommodation', 'A place to stay'],
+  ['separate', 'Apart from the others'],
+];
+
+/**
+ * Canned answers of the graded fixture: one wrong, one right, and one the rulebook does not cover (a rule gap),
+ * matched by prompt. Other items alternate right and wrong.
+ */
+const ANSWERS: Record<string, string> = {
+  'She is an teacher at a local school.': 'the teacher',
+  'The sun rises in the east.': '✓',
+  'I saw a elephant at the zoo.': 'one elephant',
+};
 
 const TUESDAY = '2026-10-20';
 const WEDNESDAY = '2026-10-21';
@@ -72,8 +91,10 @@ export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
   if (state === 'empty') return core();
 
   await saveProgramme(deps.db, MINI_PROGRAMME);
-  const rules: SeedRule[] = state === 'rule_missing' ? MINI_RULES.filter((r) => r.topicKey !== 'articles') : MINI_RULES;
+  const without = state === 'rule_missing' ? 'articles' : state === 'spot_rule_missing' ? 'third-person-s' : null;
+  const rules: SeedRule[] = MINI_RULES.filter((r) => r.topicKey !== without);
   await insertSeedRules(deps.db, rules, clock.now());
+  for (const [word, hint] of SPELLING_WORDS) await findOrCreateSpellingWord(deps.db, word, hint, clock.now());
 
   if (state === 'generated' || state === 'questions' || state === 'graded') {
     requireOk(await generateSession(deps, { light: false }), 'generateSession');
@@ -90,7 +111,7 @@ export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
         if (it.format === 'spot' && it.paragraph !== null) {
           const key = `${it.blockId}:${it.paragraph}`;
           spot[key] = `${spot[key] ?? ''}${i % 2 === 0 ? `${it.prompt} → ${it.expected}` : ''}\n`;
-        } else if (it.format !== 'question') answers[it.id] = i % 2 === 0 ? it.expected : 'wrong answer';
+        } else if (it.format !== 'question') answers[it.id] = ANSWERS[it.prompt] ?? (i % 2 === 0 ? it.expected : 'wrong answer');
       });
     }
     const outcome = await gradeSession(deps, session.id, { items: answers, spot }, []);

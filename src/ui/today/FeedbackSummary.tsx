@@ -10,7 +10,7 @@ export function FeedbackSummary({ view, lang }: { view: SessionView; lang: Lang 
   const tomorrow = view.feedback?.tomorrow ?? [];
   return (
     <section aria-labelledby="feedback-title" className="mt-8">
-      <h2 id="feedback-title" tabIndex={-1} className="title outline-none">{t(lang, 'feedback.title')}</h2>
+      <h2 id="feedback-title" tabIndex={-1} className="title rounded-sm">{t(lang, 'feedback.title')}</h2>
       <ul className="mt-4 max-w-sm">
         {scored.map((b) => (
           <li key={b.id} className="label tabular flex justify-between gap-6 border-b border-border py-1.5">

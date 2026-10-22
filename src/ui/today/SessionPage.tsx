@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { recordSupport } from '@/core/grading/actions';
 import { gradeSession, type ClarificationAnswer, type GradeOutcome, type Question } from '@/core/grading/grade';
 import { t } from '@/core/i18n';
 import { loadSessionView, type SessionView } from '@/core/session/view';
@@ -14,11 +15,15 @@ import { SessionHeader } from './SessionHeader';
 import { SpellingRow } from './SpellingRow';
 import { SpotBlock } from './SpotBlock';
 import { Notice } from './chips';
+import { RulePanel, type RuleTarget } from './RulePanel';
+import { SessionActionsProvider, type SessionActions } from './sessionActions';
 
 type Failure = { message: string; retry: () => Promise<GradeOutcome> };
 
 /** Answers live in component state keyed by item id and `${blockId}:${paragraph}`; a reload loses them. */
-export function SessionPage({ sessionId }: { sessionId: number }) {
+export function SessionPage({ sessionId, rebuilding, onRebuild }: {
+  sessionId: number; rebuilding: boolean; onRebuild: (light: boolean) => void;
+}) {
   const { deps, lang } = useCore();
   const [view, setView] = useState<SessionView | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -29,6 +34,7 @@ export function SessionPage({ sessionId }: { sessionId: number }) {
   const [replies, setReplies] = useState<Record<number, Reply>>({});
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
+  const [panel, setPanel] = useState<RuleTarget | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const focusResults = useRef(false);
 
@@ -88,6 +94,17 @@ export function SessionPage({ sessionId }: { sessionId: number }) {
   };
   const graded = view?.status === 'graded';
 
+  const actions: SessionActions = {
+    openRule: (ref, opener) => {
+      setPanel({ ...ref, opener });
+      // Support (D19): reading the rule before submitting is recorded; after grading it is ignored by the core.
+      if (!graded && ref.topicId !== null) {
+        recordSupport(deps.db, sessionId, ref.topicId).catch((e: unknown) => console.error('recordSupport failed', e));
+      }
+    },
+    reload: () => setReload((n) => n + 1),
+  };
+
   useEffect(() => {
     if (graded) return;
     const onKey = (e: KeyboardEvent) => {
@@ -132,55 +149,58 @@ export function SessionPage({ sessionId }: { sessionId: number }) {
   };
 
   return (
-    <div ref={root}>
-      <SessionHeader view={view} lang={lang} />
-      {graded && <FeedbackSummary view={view} lang={lang} />}
-      {view.blocks.map((block, i) => (
-        <Block key={block.id} block={block} number={i + 1} lang={lang}>
-          {block.format === 'question' ? (
-            <QuestionBlock block={block} />
-          ) : block.format === 'spot' ? (
-            <SpotBlock
-              block={block}
-              lang={lang}
-              values={spot}
-              graded={graded}
-              onChange={(key, value) => setSpot((prev) => ({ ...prev, [key]: value }))}
-            />
-          ) : (
-            <ol className="flex flex-col gap-3">
-              {block.items.map((item, n) =>
-                graded ? (
-                  <GradedItem key={item.id} item={item} number={n + 1} lang={lang} />
-                ) : block.format === 'spelling' ? (
-                  <SpellingRow key={item.id} item={item} number={n + 1} lang={lang} value={items[item.id] ?? ''} onChange={(v) => setAnswer(item.id, v)}>
-                    {inline(item.id)}
-                  </SpellingRow>
-                ) : (
-                  <ItemRow key={item.id} item={item} number={n + 1} lang={lang} value={items[item.id] ?? ''} onChange={(v) => setAnswer(item.id, v)}>
-                    {inline(item.id)}
-                  </ItemRow>
-                ),
-              )}
-            </ol>
-          )}
-        </Block>
-      ))}
-      {!graded && (
-        <div className="mt-12">
-          {failure && (
-            <Notice className="mb-4">
-              <span>{t(lang, 'grade.error', { message: failure.message })}</span>
-              <Button variant="secondary" size="sm" disabled={busy} onClick={() => void run(failure.retry)}>
-                {t(lang, 'today.retry')}
-              </Button>
-            </Notice>
-          )}
-          <Button id="check-answers" disabled={busy} onClick={submit}>
-            {t(lang, busy ? 'today.checking' : 'today.check')}
-          </Button>
-        </div>
-      )}
-    </div>
+    <SessionActionsProvider value={actions}>
+      <div ref={root}>
+        <SessionHeader view={view} lang={lang} rebuilding={rebuilding} onRebuild={onRebuild} />
+        {graded && <FeedbackSummary view={view} lang={lang} />}
+        {view.blocks.map((block, i) => (
+          <Block key={block.id} block={block} number={i + 1} lang={lang}>
+            {block.format === 'question' ? (
+              <QuestionBlock block={block} />
+            ) : block.format === 'spot' ? (
+              <SpotBlock
+                block={block}
+                lang={lang}
+                values={spot}
+                graded={graded}
+                onChange={(key, value) => setSpot((prev) => ({ ...prev, [key]: value }))}
+              />
+            ) : (
+              <ol className="flex flex-col gap-3">
+                {block.items.map((item, n) =>
+                  graded ? (
+                    <GradedItem key={item.id} item={item} number={n + 1} lang={lang} />
+                  ) : block.format === 'spelling' ? (
+                    <SpellingRow key={item.id} item={item} number={n + 1} lang={lang} value={items[item.id] ?? ''} onChange={(v) => setAnswer(item.id, v)}>
+                      {inline(item.id)}
+                    </SpellingRow>
+                  ) : (
+                    <ItemRow key={item.id} item={item} number={n + 1} lang={lang} value={items[item.id] ?? ''} onChange={(v) => setAnswer(item.id, v)}>
+                      {inline(item.id)}
+                    </ItemRow>
+                  ),
+                )}
+              </ol>
+            )}
+          </Block>
+        ))}
+        {!graded && (
+          <div className="mt-12">
+            {failure && (
+              <Notice className="mb-4">
+                <span>{t(lang, 'grade.error', { message: failure.message })}</span>
+                <Button variant="secondary" size="sm" disabled={busy} onClick={() => void run(failure.retry)}>
+                  {t(lang, 'today.retry')}
+                </Button>
+              </Notice>
+            )}
+            <Button id="check-answers" disabled={busy} onClick={submit}>
+              {t(lang, busy ? 'today.checking' : 'today.check')}
+            </Button>
+          </div>
+        )}
+      </div>
+    <RulePanel target={panel} onClose={() => setPanel(null)} />
+    </SessionActionsProvider>
   );
 }

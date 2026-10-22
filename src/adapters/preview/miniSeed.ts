@@ -42,7 +42,10 @@ const rule = (topicKey: string, formula: string, examples: string[], explanation
 export const MINI_RULES: SeedRule[] = [
   rule(
     'articles',
-    'a / an + исчисляемое существительное в единственном числе; the для известного предмета.',
+    [
+      'a / an + исчисляемое существительное в единственном числе; the для известного предмета.',
+      '| Перед | Артикль | Пример |\n| --- | --- | --- |\n| согласным звуком | a | a car |\n| гласным звуком | an | an hour |',
+    ].join('\n\n'),
     ['She bought a car.', 'The car is red.', 'An hour passed.'],
     'Выбор a или an зависит от звука, а не от буквы.',
     'Перед словами с непроизносимой h ставится an: an hour.',

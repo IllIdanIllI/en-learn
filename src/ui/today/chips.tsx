@@ -15,8 +15,19 @@ export function VerdictChip({ ok, label }: { ok: boolean; label: string }) {
   );
 }
 
-export function RuleRef({ section }: { section: string }) {
-  return <span className="label shrink-0 rounded-sm bg-input px-1.5 py-0.5 text-muted-foreground">§ {section}</span>;
+/** `§ section` chip; with `onOpen` it is a button that opens the rule panel, passing the element for focus return. */
+export function RuleRef({ section, onOpen }: { section: string; onOpen?: (opener: HTMLElement) => void }) {
+  const style = 'label shrink-0 rounded-sm bg-input px-1.5 py-0.5 text-muted-foreground';
+  if (!onOpen) return <span className={style}>§ {section}</span>;
+  return (
+    <button
+      type="button"
+      onClick={(e) => onOpen(e.currentTarget)}
+      className={cn(style, 'transition-colors duration-150 hover:bg-secondary hover:text-foreground')}
+    >
+      § {section}
+    </button>
+  );
 }
 
 /** Dusk Note chip: "Not counted: …". */

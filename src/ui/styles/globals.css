@@ -114,6 +114,11 @@
   }
 }
 
+/* The rule panel is a non-modal side panel: the content column makes room for it instead of sitting under it. */
+html[data-rule-panel] main {
+  padding-right: 420px;
+}
+
 /* Typography roles (DESIGN.md section 3). */
 .headline {
   font-family: var(--font-serif);

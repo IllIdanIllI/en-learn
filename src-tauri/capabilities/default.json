@@ -342,7 +342,6 @@
         }
       ]
     },
-    "shell:allow-stdin-write",
     "shell:allow-kill",
     {
       "identifier": "fs:allow-read-text-file",

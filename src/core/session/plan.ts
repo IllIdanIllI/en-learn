@@ -3,7 +3,7 @@ import type { Deps } from '@/core/ports';
 import { addDays, isoWeekday } from '@/core/dates';
 import { dayPlan, errorSpottingTopics, weekNo } from '@/core/programme/calendar';
 import { getCurrentRules, getProgramme, getSlots, getTopics, type RuleRecord } from '@/core/db/repos/programme';
-import { getSessionByDate } from '@/core/db/repos/sessions';
+import { getLatestGeneratedBefore, getSessionByDate } from '@/core/db/repos/sessions';
 import { loadGradedFacts, type GradedFacts } from '@/core/progress/history';
 
 export type TodayState =
@@ -11,7 +11,9 @@ export type TodayState =
   | { kind: 'rest' }
   | { kind: 'rule_missing'; topics: Topic[] }
   | { kind: 'no_session'; plan: DayPlan; missingRuleTopics: Topic[] }
-  | { kind: 'session'; sessionId: number; status: Extract<SessionStatus, 'generated' | 'graded'> };
+  | { kind: 'session'; sessionId: number; status: Extract<SessionStatus, 'generated' | 'graded'> }
+  /** Nothing for today yet, but an ungraded session of an earlier day is waiting; `restDay` makes today's start a light one. */
+  | { kind: 'earlier_session'; sessionId: number; date: ISODate; restDay: boolean };
 
 export interface DayInfo {
   programme: Programme;
@@ -63,6 +65,8 @@ export async function getTodayState(deps: Deps): Promise<TodayState> {
   if (!info) return { kind: 'no_programme' };
   const existing = await getSessionByDate(deps.db, d);
   if (existing && existing.status !== 'draft') return { kind: 'session', sessionId: existing.id, status: existing.status };
+  const earlier = await getLatestGeneratedBefore(deps.db, d);
+  if (earlier) return { kind: 'earlier_session', sessionId: earlier.id, date: earlier.date, restDay: info.plan.kind === 'rest' };
   if (info.plan.kind === 'rest') return { kind: 'rest' };
   const topic = taskTopic(info);
   if (topic && !info.rules.has(topic.id)) return { kind: 'rule_missing', topics: [topic] };

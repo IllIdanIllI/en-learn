@@ -5,7 +5,7 @@ import { createTestDb } from '@/adapters/test/sqliteDb';
 import { FakeLlm } from '@/adapters/test/fakeLlm';
 import { FixedClock } from '@/adapters/test/fixedClock';
 import type { Db, Deps, LlmResult } from '@/core/ports';
-import { getRule, listRules, ruleHistory, saveRuleVersion } from '@/core/db/repos/rules';
+import { getRule, getRuleTopicTitle, listRules, ruleHistory, saveRuleVersion } from '@/core/db/repos/rules';
 import { draftRule, ruleSections } from '@/core/rules/rules';
 
 const promptsDir = path.resolve(import.meta.dirname, '../../../prompts');
@@ -165,6 +165,16 @@ describe('getRule and ruleHistory', () => {
       { version: 2, reason: 'manual edit', createdAt: '2026-10-21T10:00:00.000Z' },
       { version: 1, reason: 'seed', createdAt: '2026-10-20T10:00:00.000Z' },
     ]);
+  });
+});
+
+describe('getRuleTopicTitle', () => {
+  test('returns the topic title of the rule, empty for an unknown rule', async () => {
+    const db = await createTestDb();
+    const topicId = await insertTopic(db, 'articles', 'Articles', 1);
+    await saveRuleVersion(db, { topicId }, 'body', [], 'first', NOW);
+    expect(await getRuleTopicTitle(db, 1)).toBe('Articles');
+    expect(await getRuleTopicTitle(db, 99)).toBe('');
   });
 });
 

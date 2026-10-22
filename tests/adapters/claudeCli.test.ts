@@ -90,4 +90,34 @@ describe('ClaudeCli', () => {
       expect(r.message).toBe('bad flag');
     }
   });
+
+  const run = (res: { code: number | null; stdout: string; stderr: string }) =>
+    new ClaudeCli(new FakeRunner([{ ...res, timedOut: false }]), 'local', '/w', '/h').call(req(null));
+
+  test('a sign-in message on stderr with empty stdout maps to not_signed_in', async () => {
+    const r = await run({ code: 1, stdout: '', stderr: 'Not logged in · Please run /login' });
+    expect(r).toMatchObject({ ok: false, code: 'not_signed_in', message: 'Not logged in · Please run /login' });
+  });
+
+  test('a sign-in message on stdout (plain text, non-zero exit) maps to not_signed_in', async () => {
+    const r = await run({ code: 1, stdout: 'Invalid API key · Please run /login\n', stderr: '' });
+    expect(r).toMatchObject({ ok: false, code: 'not_signed_in' });
+  });
+
+  test('plain-text stdout with non-zero exit is cli_error and the message carries stderr and stdout', async () => {
+    const r = await run({ code: 2, stdout: 'partial output', stderr: 'segfault' });
+    expect(r).toMatchObject({ ok: false, code: 'cli_error' });
+    if (!r.ok) expect(r.message).toBe('segfault\npartial output');
+  });
+
+  test('non-zero exit without any output names the exit code', async () => {
+    const r = await run({ code: 3, stdout: '', stderr: '' });
+    expect(r).toMatchObject({ ok: false, code: 'cli_error', message: 'claude exited with code 3' });
+  });
+
+  test('a JSON envelope on stdout is read as an envelope even when the exit is non-zero', async () => {
+    const budget = readFileSync('tests/fixtures/cli/envelope-budget.json', 'utf8');
+    const r = await run({ code: 1, stdout: budget, stderr: 'Please run /login' });
+    expect(r).toMatchObject({ ok: false, code: 'budget' });
+  });
 });

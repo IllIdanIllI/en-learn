@@ -1,4 +1,4 @@
-import type { Deps } from '@/core/ports';
+import type { Deps, LlmErrorCode } from '@/core/ports';
 import type { GeneratedSession, ValidationResult } from '@/core/llm/types';
 import { callStructured } from '@/core/llm/call';
 import { formatTitleDate } from '@/core/dates';
@@ -10,13 +10,16 @@ import {
 import { listSpellingWords } from '@/core/db/repos/spelling';
 import { getSpellingStates } from '@/core/progress/history';
 import { selectSpellingWords } from '@/core/schedule/spelling';
+import { forgetAwaiting } from '@/core/grading/grade';
 import { buildGenerationContext, renderContext, type GenerationContext } from './context';
 import { writeBlocks } from './store';
 import { applyValidation, renderValidationInput, violations } from './validation';
 
 export { cleanupDrafts };
 
-export type GenerateResult = { ok: true; sessionId: number } | { ok: false; message: string };
+/** `code` lets the UI show its own text; without it the message is shown as is. */
+export type GenerateErrorCode = LlmErrorCode | 'session_exists';
+export type GenerateResult = { ok: true; sessionId: number } | { ok: false; message: string; code?: GenerateErrorCode };
 
 const MAX_ATTEMPTS = 2;
 /** Retrying cannot help with these. */
@@ -37,7 +40,7 @@ function title(lang: 'ru' | 'en', ctx: GenerationContext): string {
 export async function generateSession(deps: Deps, opts: { light: boolean }): Promise<GenerateResult> {
   const d = deps.clock.today();
   await cleanupDrafts(deps.db);
-  if (await getSessionByDate(deps.db, d)) return { ok: false, message: 'Session exists' };
+  if (await getSessionByDate(deps.db, d)) return { ok: false, message: 'Session exists', code: 'session_exists' };
 
   let ctx: GenerationContext;
   try {
@@ -53,6 +56,7 @@ export async function generateSession(deps: Deps, opts: { light: boolean }): Pro
   try {
     const base = renderContext(ctx);
     let problems: string[] = [];
+    let lastCode: LlmErrorCode | undefined;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const prompt = problems.length === 0 ? base : `${base}\n## Problems in the previous attempt (fix them)\n\n${problems.map((p) => `- ${p}`).join('\n')}\n`;
       const gen = await callStructured<GeneratedSession>(deps, 'generate_session', prompt, {
@@ -61,18 +65,21 @@ export async function generateSession(deps: Deps, opts: { light: boolean }): Pro
         check: (s) => violations(s, ctx).join('\n') || null,
       });
       if (!gen.ok) {
-        if (FATAL.has(gen.code)) return await fail(deps, sessionId, gen.message);
+        if (FATAL.has(gen.code)) return await fail(deps, sessionId, gen.message, gen.code);
         problems = [gen.message];
+        lastCode = gen.code;
         continue;
       }
       const val = await callStructured<ValidationResult>(deps, 'validate_session', renderValidationInput(gen.data, ctx.allowed), { sessionId, maxAttempts: 1 });
       if (!val.ok) {
-        if (FATAL.has(val.code)) return await fail(deps, sessionId, val.message);
+        if (FATAL.has(val.code)) return await fail(deps, sessionId, val.message, val.code);
         problems = [val.message];
+        lastCode = val.code;
         continue;
       }
       const { defects, remaining } = applyValidation(gen.data, val.data);
       problems = violations(remaining, ctx);
+      lastCode = undefined;
       if (problems.length > 0) continue;
 
       const words = await listSpellingWords(deps.db);
@@ -82,16 +89,16 @@ export async function generateSession(deps: Deps, opts: { light: boolean }): Pro
       await setSessionStatus(deps.db, sessionId, 'generated');
       return { ok: true, sessionId };
     }
-    return await fail(deps, sessionId, problems.join('\n'));
+    return await fail(deps, sessionId, problems.join('\n'), lastCode);
   } catch (e) {
     await deleteSession(deps.db, sessionId);
     throw e;
   }
 }
 
-async function fail(deps: Deps, sessionId: number, message: string): Promise<GenerateResult> {
+async function fail(deps: Deps, sessionId: number, message: string, code?: LlmErrorCode): Promise<GenerateResult> {
   await deleteSession(deps.db, sessionId);
-  return { ok: false, message };
+  return code === undefined ? { ok: false, message } : { ok: false, message, code };
 }
 
 /** Deletes an ungraded session (rows cascade) and builds a new one for today. */
@@ -101,6 +108,7 @@ export async function rebuildSession(deps: Deps, sessionId: number, opts: { ligh
   if (!row) throw new Error(`Session ${sessionId} not found`);
   if (row.status === 'graded') throw new Error('Cannot rebuild a graded session');
   if (row.date !== deps.clock.today()) throw new Error("Cannot rebuild a session of another day");
+  forgetAwaiting(sessionId);
   await deleteSession(deps.db, sessionId);
   return generateSession(deps, opts);
 }

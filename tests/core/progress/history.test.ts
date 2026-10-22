@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { createTestDb } from '@/adapters/test/sqliteDb';
 import type { Db } from '@/core/ports';
+import { listBlockTitles } from '@/core/db/repos/sessions';
 import { getSpellingStates, getTopicStates, loadGradedFacts, loadProgressLog } from '@/core/progress/history';
 
 async function seed(db: Db) {
@@ -94,5 +95,54 @@ describe('loadProgressLog', () => {
       { blockId: 1, correct: 1, counted: 3 },
       { blockId: 2, correct: 0, counted: 1 },
     ]);
+  });
+});
+
+describe('spelling facts use effective verdicts', () => {
+  async function spellingSession() {
+    const db = await createTestDb();
+    await db.execute("INSERT INTO session (date, title, is_light, status, created_at) VALUES ('2026-10-20','S',0,'graded','x')");
+    await db.execute("INSERT INTO block (session_id, ord, kind, format, title, instruction, minutes) VALUES (1,0,'spelling','spelling','Sp','i',2),(1,1,'task','gap','G','i',2)");
+    await db.execute("INSERT INTO spelling_word (word, created_at) VALUES ('w1','x'),('w2','x'),('w3','x'),('w4','x'),('w5','x'),('w6','x')");
+    await db.execute(
+      `INSERT INTO item (block_id, ord, prompt, expected, spelling_word_id, status) VALUES
+       (1,0,'p','w1',1,'active'),(1,1,'p','w2',2,'active'),(1,2,'p','w3',3,'active'),(1,3,'p','w4',4,'dropped'),(1,4,'p','w5',5,'active')`,
+    );
+    await db.execute(
+      `INSERT INTO answer (item_id, text, verdict, dispute_text, dispute_decision) VALUES
+       (1,'x','wrong',NULL,NULL),
+       (2,'x','wrong','it is fine','correct'),
+       (3,'x','wrong','not a word','drop'),
+       (4,'x','wrong',NULL,NULL),
+       (5,'w5','correct',NULL,NULL)`,
+    );
+    // w6 was reported by the grader inside a gap answer: no spelling item, the stored attempt stands.
+    await db.execute(
+      'INSERT INTO spelling_attempt (word_id, session_id, correct) VALUES (1,1,0),(2,1,0),(3,1,0),(4,1,0),(5,1,1),(6,1,0)',
+    );
+    return db;
+  }
+
+  test('a won dispute counts as correct; dropped items and disputes are skipped; reported words keep their stored result', async () => {
+    const db = await spellingSession();
+    const { spellingFacts } = await loadGradedFacts(db);
+    expect(spellingFacts.map((f) => [f.wordId, f.correct])).toEqual([[1, false], [2, true], [5, true], [6, false]]);
+  });
+
+  test('the word state follows the disputed outcome', async () => {
+    const db = await spellingSession();
+    const states = await getSpellingStates(db);
+    expect([...states.keys()].sort()).toEqual([1, 2, 5, 6]);
+    expect(states.get(2)).not.toEqual(states.get(1));
+  });
+});
+
+describe('listBlockTitles', () => {
+  test('titles of the blocks of the given sessions only', async () => {
+    const db = await createTestDb();
+    await seed(db);
+    expect([...(await listBlockTitles(db, [1]))]).toEqual([[1, 'B'], [2, 'C']]);
+    expect([...(await listBlockTitles(db, [1, 2]))]).toEqual([[1, 'B'], [2, 'C'], [3, 'D']]);
+    expect((await listBlockTitles(db, [])).size).toBe(0);
   });
 });

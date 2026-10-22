@@ -11,7 +11,7 @@ import Database from 'better-sqlite3';
 import type { Clock, Db, Llm, LlmRequest, LlmResult, ProcessRunner, PromptStore } from '@/core/ports';
 import type { LlmKind } from '@/core/domain';
 import { buildClaudeArgs } from '@/core/llm/claude';
-import { parseEnvelope } from '@/core/llm/envelope';
+import { failedRun, parseEnvelope } from '@/core/llm/envelope';
 import { runMigrations } from '@/core/db/migrate';
 import { setSetting } from '@/core/db/repos/settings';
 import { insertSeedRules, parseSeed, saveProgramme } from '@/core/programme/setup';
@@ -41,8 +41,9 @@ export class NodeClaudeCli implements Llm {
     const res = await processRunner.run('claude', buildClaudeArgs(req), { cwd: this.cwd, timeoutMs: req.timeoutMs });
     const durationMs = Date.now() - started;
     if (res.timedOut) return { ok: false, code: 'timeout', message: `Timed out after ${req.timeoutMs} ms`, costUsd: 0, durationMs, raw: res.stdout };
-    if (res.stdout.trim() === '' && res.code !== 0) {
-      return { ok: false, code: 'cli_error', message: res.stderr || `exit ${res.code}`, costUsd: 0, durationMs, raw: res.stdout };
+    const failed = failedRun(res);
+    if (failed) {
+      return { ok: false, code: failed.code, message: failed.message, costUsd: 0, durationMs, raw: res.stdout };
     }
     const p = parseEnvelope(res.stdout);
     return p.ok

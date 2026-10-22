@@ -8,6 +8,7 @@ import type {
   ItemStatus,
   Verdict,
 } from '@/core/domain';
+import { effectiveVerdict } from '@/core/verdict';
 
 export interface GradedAnswerRow {
   sessionId: number;
@@ -90,15 +91,36 @@ export async function listGradedAnswerRows(db: Db): Promise<GradedAnswerRow[]> {
   }));
 }
 
+/**
+ * One fact per stored attempt. An attempt that comes from a spelling-block item of its session takes the item's
+ * effective verdict (so a won dispute counts as correct, a dropped item or a lost dispute is skipped); a word the
+ * grader reported inside another answer has no such item and keeps the stored result.
+ */
 export async function listGradedSpellingAttempts(
   db: Db,
 ): Promise<{ wordId: number; sessionId: number; date: ISODate; correct: boolean }[]> {
-  const rows = await db.select<{ word_id: number; session_id: number; date: string; correct: number }>(
-    `SELECT sa.word_id AS word_id, sa.session_id AS session_id, s.date AS date, sa.correct AS correct
-     FROM spelling_attempt sa JOIN session s ON s.id = sa.session_id
+  const rows = await db.select<{
+    word_id: number; session_id: number; date: string; correct: number;
+    item_status: ItemStatus | null; verdict: Verdict | null; dispute_decision: DisputeDecision | null; gap_status: GapStatus | null;
+  }>(
+    `SELECT sa.word_id AS word_id, sa.session_id AS session_id, s.date AS date, sa.correct AS correct,
+            i.status AS item_status, a.verdict AS verdict, a.dispute_decision AS dispute_decision, g.status AS gap_status
+     FROM spelling_attempt sa
+     JOIN session s ON s.id = sa.session_id
+     LEFT JOIN block b ON b.session_id = sa.session_id AND b.format = 'spelling'
+     LEFT JOIN item i ON i.block_id = b.id AND i.spelling_word_id = sa.word_id
+     LEFT JOIN answer a ON a.item_id = i.id
+     LEFT JOIN rule_gap g ON g.item_id = i.id
      WHERE s.status = 'graded' ORDER BY s.date, s.id`,
   );
-  return rows.map((r) => ({ wordId: r.word_id, sessionId: r.session_id, date: r.date, correct: r.correct === 1 }));
+  return rows.flatMap((r) => {
+    const fact = (correct: boolean) => [{ wordId: r.word_id, sessionId: r.session_id, date: r.date, correct }];
+    if (r.item_status === null || (r.verdict === null && r.item_status === 'active')) return fact(r.correct === 1);
+    const effective = effectiveVerdict({
+      itemStatus: r.item_status, verdict: r.verdict ?? 'skipped', disputeDecision: r.dispute_decision, gapStatus: r.gap_status,
+    });
+    return effective === null ? [] : fact(effective === 'correct');
+  });
 }
 
 export interface AnswerWrite {

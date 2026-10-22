@@ -57,6 +57,15 @@ export async function getRule(
   return { body: r.body, sources: JSON.parse(r.sources) as Source[], version: r.version };
 }
 
+/** Title of the topic a rule belongs to; empty for an unknown rule. */
+export async function getRuleTopicTitle(db: Db, ruleId: number): Promise<string> {
+  const rows = await db.select<{ title: string }>(
+    'SELECT t.title AS title FROM rule r JOIN topic t ON t.id = r.topic_id WHERE r.id = ?',
+    [ruleId],
+  );
+  return rows[0]?.title ?? '';
+}
+
 export async function ruleHistory(db: Db, ruleId: number): Promise<{ version: number; reason: string; createdAt: string }[]> {
   const rows = await db.select<{ version: number; reason: string; created_at: string }>(
     'SELECT version, reason, created_at FROM rule_version WHERE rule_id = ? ORDER BY version DESC',

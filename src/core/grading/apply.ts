@@ -6,6 +6,7 @@ import {
   markItemDefect, upsertAnswer, upsertExtraFinding, upsertRuleGap, upsertSessionFeedback, upsertSpellingAttempt,
   upsertSpotAnswer,
 } from '@/core/db/repos/answers';
+import { deleteDraftAnswers } from '@/core/db/repos/drafts';
 import { findOrCreateSpellingWord } from '@/core/db/repos/spelling';
 import { buildRefs, matchingLine } from './input';
 
@@ -95,4 +96,5 @@ export async function applyGraded(db: Db, clock: Clock, items: GradingItem[], g:
   // Defect marks change item.status, which gates re-grading, so they are written last, right before 'graded'.
   for (const [id, note] of defects) await markItemDefect(db, id, note);
   await markSessionGraded(db, g.sessionId, clock.now());
+  await deleteDraftAnswers(db, g.sessionId);
 }

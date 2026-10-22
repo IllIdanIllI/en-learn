@@ -46,7 +46,7 @@ CREATE TABLE rule_version (
 );
 
 CREATE TABLE session (
-  id INTEGER PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   date TEXT NOT NULL UNIQUE,
   title TEXT NOT NULL,
   is_light INTEGER NOT NULL DEFAULT 0 CHECK (is_light IN (0,1)),
@@ -118,6 +118,15 @@ CREATE TABLE spot_answer (
   paragraph INTEGER NOT NULL,
   text TEXT NOT NULL,
   UNIQUE (block_id, paragraph)
+);
+
+-- Unsubmitted answers of an ungraded session, so a reload or a visit to another page keeps them.
+-- key = 'i:<itemId>' or 'p:<blockId>:<paragraph>'. Deleted when the session is graded.
+CREATE TABLE draft_answer (
+  session_id INTEGER NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+  key TEXT NOT NULL,
+  text TEXT NOT NULL,
+  PRIMARY KEY (session_id, key)
 );
 
 CREATE TABLE extra_finding (

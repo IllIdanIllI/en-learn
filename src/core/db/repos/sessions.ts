@@ -15,6 +15,16 @@ export async function listGradedSessions(db: Db): Promise<GradedSession[]> {
   return rows.map((r) => ({ id: r.id, date: r.date, title: r.title, isLight: r.is_light === 1 }));
 }
 
+/** Block titles of the given sessions, by block id. */
+export async function listBlockTitles(db: Db, sessionIds: number[]): Promise<Map<number, string>> {
+  if (sessionIds.length === 0) return new Map();
+  const rows = await db.select<{ id: number; title: string }>(
+    `SELECT id, title FROM block WHERE session_id IN (${sessionIds.map(() => '?').join(', ')})`,
+    sessionIds,
+  );
+  return new Map(rows.map((r) => [r.id, r.title]));
+}
+
 export async function sessionPatterns(db: Db): Promise<Map<number, string[]>> {
   const rows = await db.select<{ session_id: number; patterns: string }>('SELECT session_id, patterns FROM session_feedback');
   return new Map(rows.map((r) => [r.session_id, JSON.parse(r.patterns) as string[]]));
@@ -76,6 +86,15 @@ export interface NewItem {
 
 export async function getSessionByDate(db: Db, date: ISODate): Promise<{ id: number; status: SessionStatus } | null> {
   const rows = await db.select<{ id: number; status: SessionStatus }>('SELECT id, status FROM session WHERE date = ?', [date]);
+  return rows[0] ?? null;
+}
+
+/** The most recent generated (ungraded) session dated before `date`. */
+export async function getLatestGeneratedBefore(db: Db, date: ISODate): Promise<{ id: number; date: ISODate } | null> {
+  const rows = await db.select<{ id: number; date: string }>(
+    "SELECT id, date FROM session WHERE status = 'generated' AND date < ? ORDER BY date DESC LIMIT 1",
+    [date],
+  );
   return rows[0] ?? null;
 }
 

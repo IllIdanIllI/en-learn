@@ -1,6 +1,6 @@
 import type { Llm, LlmRequest, LlmResult, ProcessRunner, RunResult } from '@/core/ports';
 import { buildClaudeArgs, scopeName, type ClaudeLocation } from '@/core/llm/claude';
-import { parseEnvelope } from '@/core/llm/envelope';
+import { failedRun, parseEnvelope } from '@/core/llm/envelope';
 
 export class ClaudeCli implements Llm {
   constructor(
@@ -25,9 +25,8 @@ export class ClaudeCli implements Llm {
       return fail('spawn_failed', e instanceof Error ? e.message : String(e), '', started);
     }
     if (res.timedOut) return fail('timeout', `Timed out after ${req.timeoutMs} ms`, res.stdout, started);
-    if (res.stdout.trim() === '' && res.code !== 0) {
-      return fail('cli_error', res.stderr || `claude exited with code ${res.code}`, res.stdout, started);
-    }
+    const failed = failedRun(res);
+    if (failed) return fail(failed.code, failed.message, res.stdout, started);
     const parsed = parseEnvelope(res.stdout);
     const durationMs = Date.now() - started;
     if (parsed.ok) return { ok: true, data: parsed.data, costUsd: parsed.costUsd, durationMs, raw: res.stdout };
@@ -35,6 +34,6 @@ export class ClaudeCli implements Llm {
   }
 }
 
-function fail(code: 'spawn_failed' | 'timeout' | 'cli_error', message: string, raw: string, started: number): LlmResult<unknown> {
+function fail(code: 'spawn_failed' | 'timeout' | 'cli_error' | 'not_signed_in', message: string, raw: string, started: number): LlmResult<unknown> {
   return { ok: false, code, message, costUsd: 0, durationMs: Date.now() - started, raw };
 }

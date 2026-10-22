@@ -1,4 +1,5 @@
 import type { Deps } from '@/core/ports';
+import type { LlmErrorCode } from '@/core/ports';
 import type { GradeResult } from '@/core/llm/types';
 import { toneViolations } from '@/core/validate/tone';
 import { callStructured } from '@/core/llm/call';
@@ -10,14 +11,26 @@ import { precheckAnswers, type Question, type Submission } from './precheck';
 
 export type { Question, Submission } from './precheck';
 export interface ClarificationAnswer { itemId: number; skip?: boolean; shorthandMeansCorrect?: boolean; text?: string }
+/** `code` lets the UI show its own text: the LLM codes, or a problem with the session itself. */
+export type GradeErrorCode = LlmErrorCode | 'session_not_found' | 'session_not_ready';
 export type GradeOutcome =
   | { kind: 'questions'; questions: Question[] }
   | { kind: 'graded' }
-  | { kind: 'error'; message: string; retry: () => Promise<GradeOutcome> };
+  | { kind: 'error'; message: string; code?: GradeErrorCode; retry: () => Promise<GradeOutcome> };
 
-/** Partial result waiting for answers to `needs_clarification` questions. Lost on reload: the learner re-submits. */
-interface Awaiting { graded: Graded; questions: Map<number, string> }
+/**
+ * Partial result waiting for answers to `needs_clarification` questions, with the submission it was made from.
+ * Lost on reload: the learner re-submits. A different submission (edited answers) discards it.
+ */
+interface Awaiting { graded: Graded; questions: Map<number, string>; snapshot: string }
 const awaiting = new Map<number, Awaiting>();
+
+export const forgetAwaiting = (sessionId: number): void => void awaiting.delete(sessionId);
+export const hasAwaiting = (sessionId: number): boolean => awaiting.has(sessionId);
+
+const byKey = ([a]: [string, string], [b]: [string, string]) => (a < b ? -1 : a > b ? 1 : 0);
+const snapshotOf = (sub: Submission): string =>
+  JSON.stringify([Object.entries(sub.items).sort(byKey), Object.entries(sub.spot).sort(byKey)]);
 
 const emptyResult = (): GradeResult => ({ items: [], spot: [], patterns: [], tomorrow: [], spellingErrors: [], ruleGaps: [] });
 const union = (a: string[], b: string[]) => [...new Set([...a, ...b])];
@@ -33,7 +46,8 @@ function merge(a: GradeResult, b: GradeResult): GradeResult {
   };
 }
 
-const errorOutcome = (message: string, retry: () => Promise<GradeOutcome>): GradeOutcome => ({ kind: 'error', message, retry });
+const errorOutcome = (message: string, retry: () => Promise<GradeOutcome>, code?: GradeErrorCode): GradeOutcome =>
+  code === undefined ? { kind: 'error', message, retry } : { kind: 'error', message, code, retry };
 
 /** Spec 8.2 and 8.3: pre-check, spelling by code, one `grade` call, apply. */
 export async function gradeSession(
@@ -54,14 +68,26 @@ async function run(
   deps: Deps, sessionId: number, sub: Submission, clarifications: ClarificationAnswer[], again: () => Promise<GradeOutcome>,
 ): Promise<GradeOutcome> {
   const session = await getSession(deps.db, sessionId);
-  if (!session) return errorOutcome('Session not found', again);
-  if (session.status === 'graded') return { kind: 'graded' };
-  if (session.status !== 'generated') return errorOutcome('Session not ready', again);
+  if (!session) {
+    forgetAwaiting(sessionId);
+    return errorOutcome('Session not found', again, 'session_not_found');
+  }
+  if (session.status === 'graded') {
+    forgetAwaiting(sessionId);
+    return { kind: 'graded' };
+  }
+  if (session.status !== 'generated') return errorOutcome('Session not ready', again, 'session_not_ready');
 
   const all = await listGradingItems(deps.db, sessionId);
   const items = all.filter((i) => i.status === 'active');
   const settings = await getSettings(deps.db);
-  const prior = awaiting.get(sessionId);
+  const snapshot = snapshotOf(sub);
+  let prior = awaiting.get(sessionId);
+  if (prior && prior.snapshot !== snapshot) {
+    // The answers were edited after the partial result was made: they have to be graded as they are now.
+    forgetAwaiting(sessionId);
+    prior = undefined;
+  }
   const clarFor = (id: number) => clarifications.find((c) => c.itemId === id);
 
   let graded: Graded;
@@ -134,7 +160,7 @@ async function run(
         return toneViolations(proseOf(r)).join('; ') || null;
       },
     });
-    if (!res.ok) return errorOutcome(res.message, again);
+    if (!res.ok) return errorOutcome(res.message, again, res.code);
     fresh = res.data;
   }
 
@@ -147,10 +173,10 @@ async function run(
   graded = { ...graded, result: merge(graded.result, kept) };
 
   if (open.length > 0) {
-    awaiting.set(sessionId, { graded, questions: new Map(open.map((o) => [o.id, o.question])) });
+    awaiting.set(sessionId, { graded, questions: new Map(open.map((o) => [o.id, o.question])), snapshot });
     return { kind: 'questions', questions: open.map((o) => ({ itemId: o.id, kind: 'llm', text: o.question })) };
   }
-  awaiting.delete(sessionId);
+  forgetAwaiting(sessionId);
   return applyKept(deps, all, graded);
 }
 

@@ -6,6 +6,26 @@ export type EnvelopeResult =
 
 const NOT_SIGNED_IN = /not logged in|\blog ?in\b|authenticat|\/login/i;
 
+function isJsonObject(text: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A run that exited non-zero without a JSON envelope on stdout (the CLI printed plain text, or nothing). Sign-in
+ * problems are told apart by their wording in stdout and stderr; anything else is `cli_error` carrying both streams.
+ * Null when stdout is an envelope: `parseEnvelope` reads its own error then.
+ */
+export function failedRun(res: { code: number | null; stdout: string; stderr: string }): { code: 'not_signed_in' | 'cli_error'; message: string } | null {
+  if (res.code === 0 || isJsonObject(res.stdout)) return null;
+  const message = [res.stderr.trim(), res.stdout.trim()].filter(Boolean).join('\n') || `claude exited with code ${res.code}`;
+  return { code: NOT_SIGNED_IN.test(`${res.stdout}\n${res.stderr}`) ? 'not_signed_in' : 'cli_error', message };
+}
+
 export function parseEnvelope(stdout: string): EnvelopeResult {
   let env: Record<string, unknown>;
   try {

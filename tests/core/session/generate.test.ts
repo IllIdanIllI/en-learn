@@ -254,11 +254,26 @@ describe('generateSession', () => {
     expect(rows[5]).toEqual({ prompt: 'a apple', expected: 'an apple', paragraph: 1, is_check: 0 });
   });
 
+  const failed = (code: 'not_signed_in' | 'budget' | 'timeout'): LlmResult<unknown> => ({
+    ok: false, code, message: `llm said ${code}`, costUsd: 0, durationMs: 1, raw: '',
+  });
+
+  test.each(['not_signed_in', 'budget'] as const)('a %s failure carries its code and removes the draft', async (code) => {
+    const { db, deps } = await setup('2026-10-20', { generate_session: [failed(code)] });
+    expect(await generateSession(deps, { light: false })).toEqual({ ok: false, message: `llm said ${code}`, code });
+    expect(await count(db, 'session')).toBe(0);
+  });
+
+  test('a timeout that repeats carries the timeout code', async () => {
+    const { deps } = await setup('2026-10-20', { generate_session: [failed('timeout'), failed('timeout')] });
+    expect(await generateSession(deps, { light: false })).toMatchObject({ ok: false, code: 'timeout' });
+  });
+
   test('refuses when a non-draft session exists; drafts are cleaned', async () => {
     const gen = taskDay();
     const { db, deps } = await setup('2026-10-20', { generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
     await generateSession(deps, { light: false });
-    expect(await generateSession(deps, { light: false })).toEqual({ ok: false, message: 'Session exists' });
+    expect(await generateSession(deps, { light: false })).toEqual({ ok: false, message: 'Session exists', code: 'session_exists' });
     await db.execute("UPDATE session SET status = 'draft'");
     await cleanupDrafts(db);
     expect(await count(db, 'session')).toBe(0);
@@ -271,11 +286,11 @@ describe('generateSession', () => {
     });
     await generateSession(deps, { light: false });
     const res = await rebuildSession(deps, 1, { light: false });
-    expect(res.ok).toBe(true);
+    expect(res).toEqual({ ok: true, sessionId: 2 }); // ids are not reused
     expect(await count(db, 'session')).toBe(1);
     expect(await count(db, 'block')).toBe(2);
     await db.execute("UPDATE session SET status = 'graded'");
-    await expect(rebuildSession(deps, 1, { light: false })).rejects.toThrow('graded');
+    await expect(rebuildSession(deps, 2, { light: false })).rejects.toThrow('graded');
   });
 
   test('rebuildSession refuses a session of another day', async () => {
@@ -355,5 +370,29 @@ describe('getTodayState', () => {
     const { deps } = await setup('2026-10-20', { generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
     await generateSession(deps, { light: false });
     expect(await getTodayState(deps)).toEqual({ kind: 'session', sessionId: 1, status: 'generated' });
+  });
+
+  test('an earlier generated session is shown when there is none for today', async () => {
+    const gen = taskDay();
+    const { db, deps } = await setup('2026-10-20', { generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
+    await generateSession(deps, { light: false });
+    const next = { ...deps, clock: new FixedClock('2026-10-22') };
+    expect(await getTodayState(next)).toEqual({ kind: 'earlier_session', sessionId: 1, date: '2026-10-20', restDay: false });
+    // Wednesday is a rest day: starting today's session there must be light.
+    expect(await getTodayState({ ...deps, clock: new FixedClock('2026-10-21') })).toMatchObject({ kind: 'earlier_session', restDay: true });
+    // The most recent one wins.
+    await db.execute("INSERT INTO session (date, title, is_light, status, created_at) VALUES ('2026-10-21','n',0,'generated','x')");
+    expect(await getTodayState(next)).toMatchObject({ kind: 'earlier_session', date: '2026-10-21' });
+  });
+
+  test('earlier graded sessions and drafts do not count; today wins over an earlier one', async () => {
+    const { db, deps } = await setup('2026-10-20', {});
+    await gradeWrong(db, '2026-10-19');
+    await db.execute("INSERT INTO session (date, title, is_light, status, created_at) VALUES ('2026-10-18','d',0,'draft','x')");
+    expect((await getTodayState(deps)).kind).toBe('no_session');
+    await db.execute("INSERT INTO session (date, title, is_light, status, created_at) VALUES ('2026-10-17','g',0,'generated','x')");
+    expect((await getTodayState(deps)).kind).toBe('earlier_session');
+    await db.execute("INSERT INTO session (date, title, is_light, status, created_at) VALUES ('2026-10-20','t',0,'generated','x')");
+    expect((await getTodayState(deps)).kind).toBe('session');
   });
 });

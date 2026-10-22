@@ -7,7 +7,9 @@ import { FixedClock } from '@/adapters/test/fixedClock';
 import { insertSeedRules, parseSeed, saveProgramme } from '@/core/programme/setup';
 import { getSettings, setSetting } from '@/core/db/repos/settings';
 import { insertBlock, insertDraftSession, insertItem, setSessionStatus, type NewItem } from '@/core/db/repos/sessions';
-import { gradeSession } from '@/core/grading/grade';
+import { itemDraftKey, loadDraftAnswers, saveDraftAnswer } from '@/core/db/repos/drafts';
+import { rebuildSession } from '@/core/session/generate';
+import { gradeSession, hasAwaiting } from '@/core/grading/grade';
 import type { Submission } from '@/core/grading/precheck';
 import { blockScores } from '@/core/progress/derive';
 import { loadGradedFacts, getTopicStates } from '@/core/progress/history';
@@ -120,6 +122,16 @@ describe('gradeSession', () => {
     expect((await rows<{ n: number }>(db, 'SELECT COUNT(*) AS n FROM llm_call WHERE session_id = ?', [sid]))[0]!.n).toBe(1);
   });
 
+  test('drafts of the session are deleted when it is graded, not when grading fails', async () => {
+    const { db, deps, sid, failure } = await setup('2026-10-20', '2026-10-20', [ok(fullResult()), ok(fullResult())]);
+    await saveDraftAnswer(db, sid, itemDraftKey(2), 'necessary');
+    failure.pending = /INSERT INTO answer/;
+    expect((await gradeSession(deps, sid, subm(), [])).kind).toBe('error');
+    expect((await loadDraftAnswers(db, sid)).size).toBe(1);
+    expect(await gradeSession(deps, sid, subm(), [])).toEqual({ kind: 'graded' });
+    expect((await loadDraftAnswers(db, sid)).size).toBe(0);
+  });
+
   test('grade message carries labelled items, rule body of the stored version, spot lines and settings', async () => {
     const { llm, deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(fullResult())]);
     await gradeSession(deps, sid, subm(), []);
@@ -155,7 +167,7 @@ describe('gradeSession', () => {
 
   test('a draft session is not gradable', async () => {
     const { llm, deps, sid } = await setup('2026-10-20', '2026-10-20', [], 'draft');
-    expect(await gradeSession(deps, sid, subm(), [])).toMatchObject({ kind: 'error', message: 'Session not ready' });
+    expect(await gradeSession(deps, sid, subm(), [])).toMatchObject({ kind: 'error', message: 'Session not ready', code: 'session_not_ready' });
     expect(llm.calls).toHaveLength(0);
   });
 
@@ -236,6 +248,18 @@ describe('gradeSession', () => {
     expect(llm.calls).toHaveLength(2);
     expect(await answerCount(db)).toBe(0);
     expect((await sessionRow(db)).status).toBe('generated');
+  });
+
+  test('a missing session carries its code', async () => {
+    const { deps } = await setup('2026-10-20', '2026-10-20', []);
+    expect(await gradeSession(deps, 99, subm(), [])).toMatchObject({ kind: 'error', code: 'session_not_found' });
+  });
+
+  test.each(['not_signed_in', 'budget'] as const)('a %s failure of the grade call carries its code', async (code) => {
+    const failed: LlmResult<unknown> = { ok: false, code, message: `llm said ${code}`, costUsd: 0, durationMs: 1, raw: '' };
+    const { llm, deps, sid } = await setup('2026-10-20', '2026-10-20', [failed]);
+    expect(await gradeSession(deps, sid, subm(), [])).toMatchObject({ kind: 'error', message: `llm said ${code}`, code });
+    expect(llm.calls).toHaveLength(1);
   });
 
   test('an omitted item is an invalid response and is retried', async () => {
@@ -324,6 +348,37 @@ describe('gradeSession', () => {
     expect(await rows(db, "SELECT id FROM item WHERE status = 'defect'")).toEqual([{ id: 2 }]);
   });
 
+  const clarify = () =>
+    fullResult({ items: [entry('b1.i0', 'correct'), entry('b1.i1', 'needs_clarification', { question: 'Which?' }), entry('b1.i2', 'correct'), ...spotEntries([0, 1])] });
+
+  test('answers edited while a question is open are graded afresh, not replaced by the kept partial result', async () => {
+    const { db, llm, deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(clarify()), ok(fullResult())]);
+    const q = await gradeSession(deps, sid, subm({ items: { 3: 'a/an' } }), []);
+    expect(q.kind).toBe('questions');
+    expect(hasAwaiting(sid)).toBe(true);
+    // The learner edits item 3 instead of answering the question, then submits.
+    expect(await gradeSession(deps, sid, subm({ items: { 3: 'an' } }), [])).toEqual({ kind: 'graded' });
+    expect(hasAwaiting(sid)).toBe(false);
+    expect(llm.calls).toHaveLength(2);
+    expect(userPrompt(llm, 1).match(/^### b\d+\.i\d+/gm)).toContain('### b1.i0');
+    expect(userPrompt(llm, 1)).toContain('Learner answer: an');
+    expect((await rows<{ text: string }>(db, 'SELECT text FROM answer WHERE item_id = 3'))[0]!.text).toBe('an');
+  });
+
+  test('the kept partial result is dropped when its session is rebuilt, and when the session is graded', async () => {
+    const { deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(clarify())]);
+    await gradeSession(deps, sid, subm({ items: { 3: 'a/an' } }), []);
+    expect(hasAwaiting(sid)).toBe(true);
+    await expect(rebuildSession(deps, sid, { light: false })).rejects.toThrow(); // no scripted generate result; the old session is gone
+    expect(hasAwaiting(sid)).toBe(false);
+
+    const other = await setup('2026-10-20', '2026-10-20', [ok(clarify())]);
+    await gradeSession(other.deps, other.sid, subm({ items: { 3: 'a/an' } }), []);
+    await other.db.execute("UPDATE session SET status = 'graded'");
+    expect(await gradeSession(other.deps, other.sid, subm(), [])).toEqual({ kind: 'graded' });
+    expect(hasAwaiting(other.sid)).toBe(false);
+  });
+
   test('retry after an LLM error that then yields questions returns the questions', async () => {
     const bad = fullResult({ patterns: ['again'] });
     const clar = fullResult({ items: [entry('b1.i0', 'correct'), entry('b1.i1', 'needs_clarification', { question: 'Which?' }), entry('b1.i2', 'correct'), ...spotEntries([0, 1])] });
@@ -332,7 +387,7 @@ describe('gradeSession', () => {
     expect(res.kind).toBe('error');
     if (res.kind !== 'error') return;
     expect(await res.retry()).toEqual({ kind: 'questions', questions: [{ itemId: 3, kind: 'llm', text: 'Which?' }] });
-    expect(await gradeSession(deps, sid, subm(), [{ itemId: 3, text: 'an' }])).toEqual({ kind: 'graded' });
+    expect(await gradeSession(deps, sid, subm({ items: { 3: 'a/an' } }), [{ itemId: 3, text: 'an' }])).toEqual({ kind: 'graded' });
   });
 
   test('a rule_gap verdict without a ruleGaps entry is an invalid response and is retried', async () => {

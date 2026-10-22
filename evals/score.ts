@@ -1,10 +1,10 @@
 /** Pure scoring of the grading suite: what the model said per case, against the learner-reviewed labels. */
 
-export type ExpectedVerdict = 'correct' | 'wrong' | 'rule_gap' | 'needs_clarification';
+export type ExpectedVerdict = 'correct' | 'wrong' | 'rule_gap' | 'needs_clarification' | 'defect';
 /** What the model returned; 'error' = the call failed or the item was not in the answer. */
-export type GotVerdict = ExpectedVerdict | 'defect' | 'error';
+export type GotVerdict = ExpectedVerdict | 'error';
 
-export const EXPECTED_VERDICTS: readonly ExpectedVerdict[] = ['correct', 'wrong', 'rule_gap', 'needs_clarification'];
+export const EXPECTED_VERDICTS: readonly ExpectedVerdict[] = ['correct', 'wrong', 'rule_gap', 'needs_clarification', 'defect'];
 
 export interface GradeCase {
   id: string;
@@ -45,6 +45,7 @@ export interface VerdictStats {
 }
 
 export interface EvalScore {
+  /** Model-graded cases only. */
   total: number;
   correct: number;
   accuracy: number | null;
@@ -52,9 +53,18 @@ export interface EvalScore {
   fix: { checked: number; matched: number; accuracy: number | null };
   tone: { items: number; itemsWithViolations: number; violations: number };
   spelling: { checked: number; flagged: number };
+  /** Cases graded by code (format spelling): not part of any figure above. */
+  codeGraded: { total: number; correct: number };
   errors: number;
   missing: string[];
   mismatches: { id: string; expected: ExpectedVerdict; got: GotVerdict; expectedFix?: string[]; gotFix?: string }[];
+}
+
+/** The label fix, or the model's fix ending with it ("have written" inside "I have written"). */
+function fixMatches(label: string, got: string): boolean {
+  const l = normaliseFix(label);
+  const g = normaliseFix(got);
+  return g === l || g.endsWith(` ${l}`);
 }
 
 export function normaliseFix(s: string): string {
@@ -72,10 +82,11 @@ export function scoreEval(results: CaseResult[], cases: GradeCase[]): EvalScore 
     EXPECTED_VERDICTS.map((v) => [v, { total: 0, correct: 0, accuracy: null, got: {} } as VerdictStats]),
   ) as Record<ExpectedVerdict, VerdictStats>;
   const out: EvalScore = {
-    total: cases.length, correct: 0, accuracy: null, perVerdict,
+    total: 0, correct: 0, accuracy: null, perVerdict,
     fix: { checked: 0, matched: 0, accuracy: null },
-    tone: { items: cases.length, itemsWithViolations: 0, violations: 0 },
+    tone: { items: 0, itemsWithViolations: 0, violations: 0 },
     spelling: { checked: 0, flagged: 0 },
+    codeGraded: { total: 0, correct: 0 },
     errors: 0, missing: [], mismatches: [],
   };
 
@@ -84,6 +95,15 @@ export function scoreEval(results: CaseResult[], cases: GradeCase[]): EvalScore 
     if (!r) out.missing.push(c.id);
     const got: GotVerdict = r?.verdict ?? 'error';
     const expected = c.label.verdict;
+    if (c.format === 'spelling') {
+      out.codeGraded.total++;
+      if (got === expected) out.codeGraded.correct++;
+      else out.mismatches.push({ id: c.id, expected, got });
+      if (got === 'error') out.errors++;
+      continue;
+    }
+    out.total++;
+    out.tone.items++;
     const stats = perVerdict[expected];
     stats.total++;
     stats.got[got] = (stats.got[got] ?? 0) + 1;
@@ -96,7 +116,7 @@ export function scoreEval(results: CaseResult[], cases: GradeCase[]): EvalScore 
     }
     if (expected === 'wrong' && c.label.fix && got === 'wrong' && r) {
       out.fix.checked++;
-      if (c.label.fix.some((f) => normaliseFix(f) === normaliseFix(r.fix))) out.fix.matched++;
+      if (c.label.fix.some((f) => fixMatches(f, r.fix))) out.fix.matched++;
     }
     if (r && r.toneViolations > 0) {
       out.tone.itemsWithViolations++;

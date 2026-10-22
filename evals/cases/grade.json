@@ -71,11 +71,11 @@
       "expected": "an apple",
       "ruleSection": "Формула",
       "answer": "apples",
-      "category": "alt_correct_fix",
+      "category": "defective_item",
       "label": {
-        "verdict": "correct"
+        "verdict": "defect"
       },
-      "why": "TD-7: a plural without an article is also covered by the Formula table (plural, general sense), so a different fix than the key is still correct. The item itself has two valid answers; the grade prompt calls such an item a defect, so this case also probes that tension."
+      "why": "Item defect: under the Formula table both \"an apple\" and \"apples\" are correct, and nothing in the prompt says which is wanted (TD-2). The grader should flag the item, not grade the learner."
     },
     {
       "id": "art-06",
@@ -249,6 +249,20 @@
       "why": "\"could\" in the main part is natural English, but the rule only describes would + infinitive for the second conditional."
     },
     {
+      "id": "cond-09",
+      "topic": "conditionals",
+      "format": "fix",
+      "prompt": "If you will heat ice, it melts.",
+      "expected": "heat",
+      "ruleSection": "Формула",
+      "answer": "When you heat",
+      "category": "alt_correct_fix",
+      "label": {
+        "verdict": "correct"
+      },
+      "why": "TD-7: the Formula table gives \"if / when + Present Simple\" for the zero conditional, so \"When you heat\" removes the wrong will and is a different, rule-covered fix than the key (\"heat\")."
+    },
+    {
       "id": "pp-01",
       "topic": "present-perfect-past-simple",
       "format": "gap",
@@ -364,7 +378,7 @@
       "prompt": "I didn't pay yet.",
       "expected": "haven't paid",
       "ruleSection": "Ловушки",
-      "answer": "haven't payed",
+      "answer": "haven't piad",
       "category": "misspelled_correct",
       "label": {
         "verdict": "correct",
@@ -372,7 +386,24 @@
           "paid"
         ]
       },
-      "why": "The fix applies the rule (haven't paid); \"payed\" is a misspelling of \"paid\", which goes to spellingErrors and does not change the verdict."
+      "why": "The fix applies the rule (haven't paid); \"piad\" is a typo (transposed letters) that goes to spellingErrors and does not change the verdict."
+    },
+    {
+      "id": "pp-09",
+      "topic": "present-perfect-past-simple",
+      "format": "fix",
+      "prompt": "I didn't pay yet.",
+      "expected": "haven't paid",
+      "ruleSection": "Ловушки",
+      "answer": "haven't payed",
+      "category": "morphology_slip",
+      "label": {
+        "verdict": "wrong",
+        "fix": [
+          "haven't paid"
+        ]
+      },
+      "why": "\"payed\" is a wrong form of the past participle of pay, inside the tested verb form: a grammar error, not a typo."
     },
     {
       "id": "tps-01",

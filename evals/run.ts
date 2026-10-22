@@ -23,7 +23,7 @@ const GRADE_DATE = '2026-12-01';
 
 interface GenContext { id: string; description: string; date: string; light?: boolean; noticeWeek?: number; history?: HistorySession[] }
 interface GenResult {
-  id: string; description: string; ok: boolean; message: string; attempts: number; firstAttempt: string[];
+  id: string; description: string; ok: boolean; message: string; attempts: number; firstAttempt: string[]; firstError: string;
   defects: number | null; costUsd: number; durationMs: number;
 }
 interface BatchInfo { name: string; items: number; gradeCalls: number; firstResponseToneViolations: number; costUsd: number; durationMs: number; note: string }
@@ -74,8 +74,10 @@ async function runGenerate(model: string): Promise<GenResult[]> {
     const calls = await db.select<{ kind: string; ok: number; error: string | null; cost_usd: number }>('SELECT kind, ok, error, cost_usd FROM llm_call ORDER BY id');
     const gens = calls.filter((x) => x.kind === 'generate_session');
     const first = gens[0];
-    // The error of a failed call is "check: <violations joined by newlines>", the app's own check on that attempt.
-    const firstAttempt = !first || first.ok === 1 ? [] : (first.error ?? 'unknown').replace(/^check: /, '').split('\n');
+    // The error of a call that failed the app's check is "check: <violations joined by newlines>"; any other code is an error, not a violation.
+    const failure = !first || first.ok === 1 ? '' : (first.error ?? 'unknown');
+    const firstAttempt = failure.startsWith('check: ') ? failure.slice('check: '.length).split('\n') : [];
+    const firstError = failure !== '' && !failure.startsWith('check: ') ? failure : '';
     let defects: number | null = null;
     if (res.ok) {
       const rows = await db.select<{ n: number }>(
@@ -84,7 +86,7 @@ async function runGenerate(model: string): Promise<GenResult[]> {
       defects = rows[0]?.n ?? 0;
     }
     const r: GenResult = {
-      id: c.id, description: c.description, ok: res.ok, message: res.ok ? '' : res.message, attempts: gens.length, firstAttempt, defects,
+      id: c.id, description: c.description, ok: res.ok, message: res.ok ? '' : res.message, attempts: gens.length, firstAttempt, firstError, defects,
       costUsd: sum(calls.map((x) => x.cost_usd)), durationMs,
     };
     out.push(r);
@@ -193,15 +195,16 @@ function generateSection(rs: GenResult[]): string[] {
     `- Stored on the first attempt (no retry): ${clean}/${rs.length}`,
     `- validate_session defects across stored sessions: ${sum(rs.map((r) => r.defects ?? 0))}`,
     `- Cost ${usd(sum(rs.map((r) => r.costUsd)))}, mean ${secs(sum(rs.map((r) => r.durationMs)) / Math.max(rs.length, 1))} per context`, '',
-    '| context | stored | attempts | first-call check violations | defects | cost | time |', '| --- | --- | --- | --- | --- | --- | --- |',
-    ...rs.map((r) => `| ${r.id} | ${r.ok ? 'yes' : 'NO'} | ${r.attempts} | ${r.firstAttempt.length} | ${r.defects ?? '-'} | ${usd(r.costUsd)} | ${secs(r.durationMs)} |`),
+    '| context | stored | attempts | first-call check violations | first-call error | defects | cost | time |', '| --- | --- | --- | --- | --- | --- | --- | --- |',
+    ...rs.map((r) => `| ${r.id} | ${r.ok ? 'yes' : 'NO'} | ${r.attempts} | ${r.firstAttempt.length} | ${r.firstError === '' ? '-' : 'yes'} | ${r.defects ?? '-'} | ${usd(r.costUsd)} | ${secs(r.durationMs)} |`),
   ];
-  const detail = rs.filter((r) => r.firstAttempt.length > 0 || !r.ok);
+  const detail = rs.filter((r) => r.firstAttempt.length > 0 || r.firstError !== '' || !r.ok);
   if (detail.length > 0) {
     out.push('', '### Violations and failures', '');
     for (const r of detail) {
       out.push(`- **${r.id}** (${esc(r.description)})`);
-      for (const v of r.firstAttempt) out.push(`  - first attempt: ${esc(v)}`);
+      for (const v of r.firstAttempt) out.push(`  - first call, check violation: ${esc(v)}`);
+      if (r.firstError !== '') out.push(`  - first call, error: ${esc(r.firstError)}`);
       if (!r.ok) out.push(`  - final failure: ${esc(r.message)}`);
     }
   }
@@ -213,11 +216,12 @@ function gradeSection(run: GradeRun): string[] {
   const byId = new Map(run.cases.map((c) => [c.id, c]));
   const out = [
     '## Grading suite', '',
-    `${s.total} labelled cases, batched per topic through the app's \`gradeSession\`. **Labels are unreviewed by the learner: treat the scores as provisional.**`, '',
+    `${s.total} model-graded cases, batched per topic through the app's \`gradeSession\`, plus ${s.codeGraded.total} spelling cases graded by code (reported below, not in any model figure). **Labels are unreviewed by the learner: treat the scores as provisional.**`, '',
     `- Verdict accuracy: **${s.correct}/${s.total}** (${pct(s.accuracy)})`,
     `- Fix matches the label (items graded wrong that have a labelled fix): ${s.fix.matched}/${s.fix.checked} (${pct(s.fix.accuracy)})`,
     `- Tone: ${s.tone.violations} violation(s) in the first response, on ${s.tone.itemsWithViolations}/${s.tone.items} items; ${run.batches.filter((b) => b.firstResponseToneViolations > 0).length}/${run.batches.length} batches had a violation anywhere in the first response (the app retries those)`,
     `- Misspelled correct fixes listed in spellingErrors: ${s.spelling.flagged}/${s.spelling.checked}`,
+    `- Spelling cases graded by code (code path check only): ${s.codeGraded.correct}/${s.codeGraded.total}`,
     `- Errors (call failed or item missing): ${s.errors}`,
     `- Cost ${usd(sum(run.batches.map((b) => b.costUsd)))}`, '',
     '| expected | cases | correct | accuracy | got |', '| --- | --- | --- | --- | --- |',

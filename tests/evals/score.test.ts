@@ -59,7 +59,7 @@ describe('scoreEval', () => {
   test('fix accuracy counts only labelled fixes on items graded wrong, and accepts any listed alternative', () => {
     const cs = [mk('a', 'wrong', { fix: ['an', 'an engineer'] }), mk('b', 'wrong', { fix: ['films'] }), mk('c', 'wrong', { fix: ['x'] }), mk('d', 'wrong')];
     const s = scoreEval(
-      [res('a', 'wrong', { fix: 'An engineer.' }), res('b', 'wrong', { fix: 'the films' }), res('c', 'correct'), res('d', 'wrong', { fix: 'anything' })],
+      [res('a', 'wrong', { fix: 'An engineer.' }), res('b', 'wrong', { fix: 'film' }), res('c', 'correct'), res('d', 'wrong', { fix: 'anything' })],
       cs,
     );
     expect(s.fix).toEqual({ checked: 2, matched: 1, accuracy: 0.5 });
@@ -77,6 +77,31 @@ describe('scoreEval', () => {
     const cs = [mk('a', 'correct', { spellingErrors: ['engineer'] }), mk('b', 'correct', { spellingErrors: ['paid'] }), mk('c', 'correct')];
     const s = scoreEval([res('a', 'correct', { spellingFlagged: true }), res('b', 'correct', { spellingFlagged: false }), res('c', 'correct')], cs);
     expect(s.spelling).toEqual({ checked: 2, flagged: 1 });
+  });
+
+  test('defect is an expected verdict of its own', () => {
+    const s = scoreEval([res('a', 'defect'), res('b', 'correct')], [mk('a', 'defect'), mk('b', 'defect')]);
+    expect(s.perVerdict.defect).toEqual({ total: 2, correct: 1, accuracy: 0.5, got: { defect: 1, correct: 1 } });
+  });
+
+  test('a label fix may be the ending of the model fix', () => {
+    const s = scoreEval([res('a', 'wrong', { fix: 'I have written' }), res('b', 'wrong', { fix: 'unhave written' })], [mk('a', 'wrong', { fix: ['have written'] }), mk('b', 'wrong', { fix: ['have written'] })]);
+    expect(s.fix).toEqual({ checked: 2, matched: 1, accuracy: 0.5 });
+  });
+
+  test('code-graded spelling cases are reported apart from model accuracy, per-verdict and tone', () => {
+    const sp = { ...mk('s1', 'wrong'), format: 'spelling' as const, topic: null };
+    const sp2 = { ...mk('s2', 'correct'), format: 'spelling' as const, topic: null };
+    const s = scoreEval(
+      [res('a', 'correct'), res('s1', 'wrong', { toneViolations: 3 }), res('s2', 'wrong')],
+      [mk('a', 'correct'), sp, sp2],
+    );
+    expect(s.total).toBe(1);
+    expect(s.accuracy).toBe(1);
+    expect(s.perVerdict.wrong.total).toBe(0);
+    expect(s.tone).toEqual({ items: 1, itemsWithViolations: 0, violations: 0 });
+    expect(s.codeGraded).toEqual({ total: 2, correct: 1 });
+    expect(s.mismatches.map((m) => m.id)).toEqual(['s2']);
   });
 
   test('empty input gives null accuracy', () => {

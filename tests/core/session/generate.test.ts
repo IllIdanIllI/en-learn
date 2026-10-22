@@ -298,6 +298,15 @@ describe('context', () => {
     expect(text).toContain('Use "a" before a consonant sound and "an" before a vowel sound.');
     expect(text).toContain('learner answer: a');
   });
+
+  test('lists the allowed rule section headings verbatim for the topic', async () => {
+    const { deps } = await setup('2026-10-20', {});
+    const ctx = await buildGenerationContext(deps, '2026-10-20', false);
+    const headings = [...ctx.taskTopic!.body.matchAll(/^##[ \t]+(.*\S)[ \t]*$/gm)].map((m) => m[1]);
+    expect(headings.length).toBeGreaterThan(0);
+    const line = `Allowed rule sections (copy one verbatim): ${headings.map((h) => `"${h}"`).join(', ')}`;
+    expect(renderContext(ctx)).toContain(line);
+  });
 });
 
 describe('spelling in review', () => {

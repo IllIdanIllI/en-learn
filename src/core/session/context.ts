@@ -102,15 +102,17 @@ export async function buildGenerationContext(deps: Deps, d: ISODate, light: bool
   };
 }
 
+const allowedSections = (r: RuleRef): string => `Allowed rule sections (copy one verbatim): ${ruleSections(r.body).map((h) => `"${h}"`).join(', ')}`;
+
 function ruleText(r: RuleRef): string {
-  return `### ${r.topic.key} (${r.topic.title}, ${r.topic.kind}, rule version ${r.version})\n\n~~~~markdown\n${r.body}\n~~~~`;
+  return `### ${r.topic.key} (${r.topic.title}, ${r.topic.kind}, rule version ${r.version})\n\n${allowedSections(r)}\n\n~~~~markdown\n${r.body}\n~~~~`;
 }
 
 function renderRules(refs: RuleRef[], printed: Set<string>): string {
   if (refs.length === 0) return 'None.';
   return refs
     .map((r) => {
-      if (printed.has(r.topic.key)) return `### ${r.topic.key} (${r.topic.title})\n\nRule printed above.`;
+      if (printed.has(r.topic.key)) return `### ${r.topic.key} (${r.topic.title})\n\nRule printed above.\n\n${allowedSections(r)}`;
       printed.add(r.topic.key);
       return ruleText(r);
     })

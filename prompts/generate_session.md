@@ -35,7 +35,7 @@ TD-8. Error-spotting texts are plain paragraphs: no lists, no headings, no line 
 
 # Content rules
 
-- Rule links: every item and every hidden error has topicKey (copied from the context) and ruleSection (the heading text of the rule section that decides it, exactly as in the rule but without the leading ## and without surrounding spaces, for example "Formula"). Never invent a topic key or a section heading.
+- Rule links: every item and every hidden error has topicKey (copied from the context) and ruleSection (the heading text of the rule section that decides it, copied exactly from the heading text in the rule you were given, without the leading ## and without surrounding spaces, in whatever language the rule is written; the context lists the allowed headings for every topic under "Allowed rule sections"). Never invent a topic key or a section heading.
 - Review block: build the items from the review input (the learner's counted wrong answers) and from the due re-check topics. Re-test the same mechanism with fresh sentences; do not copy the old sentence unchanged. Rules describe general mechanisms: test the mechanism, not the learner's individual slip.
 - Task block: follow the task topic and slot given in the context. For a "learn" topic use gap or fix on its rule. For a "notice" topic and for error-spotting days use "spot" over the listed error-spotting topics, and put in some of the learner's recent inattention errors (careless slips) as hidden errors when they fit the topics.
 - Second set: if the context says it is a second set, use fresh sentences on the same topic.

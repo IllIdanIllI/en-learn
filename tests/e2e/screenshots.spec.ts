@@ -44,6 +44,11 @@ test('setup is prefilled from the seed and rejects an end date before the start'
   await expect(page.locator('[data-testid="week-row"]')).toHaveCount(3);
   await expect(page.locator('#setup-title')).toHaveValue('Preview programme');
 
+  await expect(page.locator('[data-testid="week-row"] [data-move="up"]')).toHaveCount(3);
+  await expect(page.locator('[data-testid="week-row"] [data-move="down"]')).toHaveCount(3);
+  await expect(page.locator('[data-testid="week-row"] [data-move="up"]').first()).toBeDisabled();
+  await page.locator('[data-testid="week-row"] [data-move="down"]').first().click();
+  await expect(page.locator('[data-testid="week-row"] input').first()).toHaveValue('Conditionals');
   await page.locator('#setup-end').fill('2026-10-01');
   await page.locator('#setup-save').click();
   const alert = page.getByRole('alert');

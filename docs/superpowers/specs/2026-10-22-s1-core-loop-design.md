@@ -260,7 +260,7 @@ The user prompt is the last argument after `--`, not stdin: `claude -p` waits fo
 
 - Shell scope: one entry per location — `$HOME/.local/bin/claude`, `$HOME/.claude/local/claude`, `/opt/homebrew/bin/claude`, `/usr/local/bin/claude` — each allowing three argument shapes: `--version`; `auth status --json`; the call in 10.1 (fixed flags + regex validators for the schema, prompt, model and budget values).
 - Startup check: at each location run `--version`, then `auth status --json`; the first that is installed and signed in is used.
-- If none: setup page lists the locations checked and the fix: official installer, or `ln -s "$(which claude)" ~/.local/bin/claude`, then run `claude` and sign in; **Check again** button.
+- If none: setup page lists the locations checked and the fix: official installer, or `ln -s "$(which claude)" ~/.local/bin/claude`, then run `claude` and sign in; **Check now** button.
 
 ### 10.3 Spike (first implementation task)
 

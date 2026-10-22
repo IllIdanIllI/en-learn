@@ -1,11 +1,11 @@
-import { Plus, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react';
 import { t, type Lang } from '@/core/i18n';
 import type { TopicKind } from '@/core/domain';
 import { Button } from '@/ui/components/ui/button';
 import { FieldInput } from '@/ui/components/ui/field-input';
 import { FieldError } from '@/ui/components/FieldError';
 import { Segmented } from '@/ui/components/Segmented';
-import { rowKey, type SetupErrors, type TopicRow } from './form';
+import { moveRow, rowKey, type SetupErrors, type TopicRow } from './form';
 
 export function TopicList({
   lang,
@@ -62,6 +62,20 @@ export function TopicList({
                   onChange={(e) => update(row.uid, { keyOverride: e.target.value })}
                   className="w-32 shrink-0"
                 />
+                {([-1, 1] as const).map((delta) => (
+                  <Button
+                    key={delta}
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    data-move={delta === -1 ? 'up' : 'down'}
+                    aria-label={`${t(lang, delta === -1 ? 'setup.moveUp' : 'setup.moveDown')}, ${name}`}
+                    disabled={i + delta < 0 || i + delta >= rows.length}
+                    onClick={() => onChange(moveRow(rows, row.uid, delta))}
+                  >
+                    {delta === -1 ? <ArrowUp strokeWidth={1.5} aria-hidden /> : <ArrowDown strokeWidth={1.5} aria-hidden />}
+                  </Button>
+                ))}
                 <Button
                   type="button"
                   variant="ghost"

@@ -31,7 +31,7 @@ function Row({ label, htmlFor, hint, children }: { label: string; htmlFor?: stri
 const parseBudget = (raw: string): number | null | 'invalid' => {
   const text = raw.trim();
   if (text === '') return null;
-  const n = Number(text);
+  const n = Number(text.replace(',', '.'));
   return Number.isFinite(n) && n > 0 ? n : 'invalid';
 };
 

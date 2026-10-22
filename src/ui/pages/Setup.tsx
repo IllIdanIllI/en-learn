@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { t, type Lang } from '@/core/i18n';
 import { getProgramme, getSlots, getTopics } from '@/core/db/repos/programme';
-import { insertSeedRules, replaceProgramme, saveProgramme, type SeedRule } from '@/core/programme/setup';
+import type { SeedRule } from '@/core/programme/setup';
 import { Button } from '@/ui/components/ui/button';
 import { FieldInput } from '@/ui/components/ui/field-input';
 import { FieldError } from '@/ui/components/FieldError';
 import { useCore } from '@/ui/app/CoreProvider';
+import { saveSetup } from '@/ui/setup/save';
 import { SlotPicker } from '@/ui/setup/SlotPicker';
 import { TopicList } from '@/ui/setup/TopicList';
 import {
@@ -106,12 +107,7 @@ function SetupFormView({ loaded, lang }: { loaded: Loaded; lang: Lang }) {
     setSaveError(null);
     try {
       const input = toInput(form);
-      if (loaded.exists) {
-        await replaceProgramme(deps.db, input);
-      } else {
-        await saveProgramme(deps.db, input);
-        await insertSeedRules(deps.db, loaded.seedRules, deps.clock.now());
-      }
+      await saveSetup(deps, input, loaded.seedRules);
       refresh();
       navigate('/today');
     } catch (e) {

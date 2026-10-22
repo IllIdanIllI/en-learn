@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Deps, Llm, ProcessRunner } from '@/core/ports';
 import type { Lang } from '@/core/i18n';
-import { checkPrerequisites, type PrereqResult } from '@/core/prereq';
+import type { PrereqResult } from '@/core/prereq';
+import { recheck } from './recheck';
 import type { ClaudeLocation } from '@/core/llm/claude';
 import type { ProgrammeInput, SeedRule } from '@/core/programme/setup';
 import { getSettings, type Settings } from '@/core/db/repos/settings';
@@ -77,11 +78,11 @@ export function CoreProvider({ init, children }: { init: CoreInit; children: Rea
 
   const recheckPrerequisites = useCallback(async () => {
     if (!makeLlm) return prereq;
-    const result = await checkPrerequisites(runner);
-    if (result.ok) setDeps((d) => ({ ...d, llm: makeLlm(result.location) }));
-    setPrereq(result);
-    return result;
-  }, [makeLlm, prereq, runner]);
+    const next = await recheck(runner, deps, makeLlm);
+    setDeps(next.deps);
+    setPrereq(next.prereq);
+    return next.prereq;
+  }, [makeLlm, prereq, runner, deps]);
 
   useTheme(settings.theme);
   useEffect(() => {

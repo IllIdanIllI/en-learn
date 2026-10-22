@@ -26,6 +26,17 @@ export interface SetupForm {
   slots: Record<Weekday, Slot | ''>;
 }
 
+const KEY_FORMAT = /^[a-z0-9-]+$/;
+
+export function moveRow(rows: TopicRow[], uid: string, delta: -1 | 1): TopicRow[] {
+  const i = rows.findIndex((r) => r.uid === uid);
+  const j = i + delta;
+  if (i < 0 || j < 0 || j >= rows.length) return rows;
+  const next = [...rows];
+  [next[i], next[j]] = [next[j] as TopicRow, next[i] as TopicRow];
+  return next;
+}
+
 export function slugify(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
@@ -116,7 +127,7 @@ export function validate(f: SetupForm): Validation {
     const rowErrors: { title?: MessageKey; key?: MessageKey } = {};
     if (row.title.trim() === '') rowErrors.title = 'setup.err.topicTitle';
     const key = rowKey(row);
-    if (key === '') rowErrors.key = 'setup.err.keyEmpty';
+    if (!KEY_FORMAT.test(key)) rowErrors.key = 'setup.err.keyFormat';
     else if (seen.has(key)) rowErrors.key = 'setup.err.keyDuplicate';
     seen.add(key);
     if (rowErrors.title || rowErrors.key) errors.rows[row.uid] = rowErrors;

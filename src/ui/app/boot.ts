@@ -47,11 +47,13 @@ export async function bootTauri(): Promise<CoreInit> {
 
 /** Browser preview: sql.js, canned LLM, fixed clock; `?state=` picks the fixture. */
 export async function bootPreview(search: string): Promise<CoreInit> {
-  const { buildPreview, parsePreviewState } = await import('@/adapters/preview/fixtures');
+  const { buildPreview, parsePreviewState, parsePreviewDelay, withDelay } = await import('@/adapters/preview/fixtures');
   const { MINI_PROGRAMME, MINI_RULES } = await import('@/adapters/preview/miniSeed');
   const core = await buildPreview(parsePreviewState(search));
+  const deps = { ...core.deps, llm: withDelay(core.deps.llm, parsePreviewDelay(search)) };
   return {
     ...core,
+    deps,
     settings: await getSettings(core.deps.db),
     loadSeedInput: () => ({ programme: MINI_PROGRAMME, rules: MINI_RULES }),
     promptsDir: '~/Library/Application Support/English Exam Coach/prompts',

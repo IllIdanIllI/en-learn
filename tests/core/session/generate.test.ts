@@ -107,6 +107,8 @@ describe('generateSession', () => {
     expect(s).toMatchObject({ status: 'generated', title: 'Week 1, Tue 20 Oct · Articles', is_light: 0 });
     const blocks = await db.select<{ kind: string; format: string }>('SELECT kind, format FROM block ORDER BY ord');
     expect(blocks.map((b) => b.kind)).toEqual(['task', 'speaking']);
+    const passages = await db.select<{ passage: string | null }>("SELECT passage FROM block WHERE kind = 'speaking'");
+    expect(passages).toEqual([{ passage: 'Describe a time when you helped someone.' }]);
     const items = await db.select<{ expected: string; topic_id: number; rule_id: number; rule_version: number; rule_section: string; status: string }>(
       'SELECT * FROM item ORDER BY id',
     );

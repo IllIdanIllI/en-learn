@@ -1,4 +1,4 @@
-import type { Deps, ProcessRunner } from '@/core/ports';
+import type { Deps, Llm, ProcessRunner } from '@/core/ports';
 import type { PrereqResult } from '@/core/prereq';
 import { CLAUDE_LOCATIONS } from '@/core/llm/claude';
 import { bundledPrompts } from '@/core/llm/bundledPrompts';
@@ -23,6 +23,22 @@ const WEDNESDAY = '2026-10-21';
 export function parsePreviewState(search: string): PreviewState {
   const value = new URLSearchParams(search).get('state');
   return PREVIEW_STATES.find((s) => s === value) ?? 'no_session';
+}
+
+/** `?delay=ms` slows every LLM call so the "generating" state can be seen and screenshotted. */
+export function parsePreviewDelay(search: string): number {
+  const ms = Number(new URLSearchParams(search).get('delay'));
+  return Number.isFinite(ms) && ms > 0 ? Math.min(ms, 60_000) : 0;
+}
+
+export function withDelay(llm: Llm, ms: number): Llm {
+  if (ms === 0) return llm;
+  return {
+    async call(req) {
+      await new Promise((resolve) => setTimeout(resolve, ms));
+      return llm.call(req);
+    },
+  };
 }
 
 /** Preview has no real `claude`: every probe reports "not found". */

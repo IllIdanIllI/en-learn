@@ -63,7 +63,8 @@ export async function writeBlocks(
       title: b.title,
       instruction: b.instruction,
       formatExample: b.formatExample === '' ? null : b.formatExample,
-      passage: b.format === 'spot' ? JSON.stringify(b.paragraphs.map((p) => p.text)) : null,
+      // A speaking block keeps its question text here; a spot block keeps its paragraphs as a JSON array.
+      passage: b.format === 'spot' ? JSON.stringify(b.paragraphs.map((p) => p.text)) : b.format === 'question' ? b.question : null,
       minutes: b.minutes,
     });
     let i = 0;

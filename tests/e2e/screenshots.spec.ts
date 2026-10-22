@@ -93,3 +93,72 @@ test('prerequisites lists the four checked locations', async ({ page }) => {
   await expect(page.locator('#prereq-check')).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/prerequisites-missing.png`, fullPage: true });
 });
+
+test.describe('today session', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 1400 });
+  });
+
+  test('no_session offers Start session and a light day toggle', async ({ page }) => {
+    await page.goto('/?state=no_session#/today');
+    await expect(page.getByRole('button', { name: 'Начать сессию' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Лёгкий день' })).toBeVisible();
+    await page.screenshot({ path: `${SHOTS}/today-no_session.png` });
+  });
+
+  test('generating keeps the skeleton until the session is built, then shows it', async ({ page }) => {
+    await page.goto('/?state=no_session&delay=1500#/today');
+    await page.getByRole('button', { name: 'Начать сессию' }).click();
+    await expect(page.getByText('Собираю сессию на сегодня…')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Начать сессию' })).toBeDisabled();
+    await page.screenshot({ path: `${SHOTS}/today-generating.png` });
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
+  });
+
+  test('generated session keeps the answer key out of the DOM', async ({ page }) => {
+    await page.goto('/?state=generated#/today');
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible();
+    await expect(page.getByText('I saw a elephant at the zoo.')).toBeVisible();
+    const html = await page.content();
+    expect(html).not.toContain('an elephant');
+    expect(html).not.toContain('a teacher');
+    const input = page.getByPlaceholder('✓ или исправленный фрагмент').first();
+    await expect(input).toHaveAttribute('spellcheck', 'false');
+    await expect(input).toHaveAttribute('autocorrect', 'off');
+    await expect(input).toHaveAttribute('autocapitalize', 'off');
+    await page.screenshot({ path: `${SHOTS}/today-generated.png`, fullPage: true });
+  });
+
+  test('blank and shorthand answers raise inline questions', async ({ page }) => {
+    await page.goto('/?state=questions#/today');
+    const inputs = page.getByPlaceholder('✓ или исправленный фрагмент');
+    await inputs.nth(1).fill('+');
+    await page.getByRole('button', { name: 'Проверить ответы' }).click();
+    await expect(page.getByText('Пропустить это задание?').first()).toBeVisible();
+    await expect(page.getByText('Значит ли', { exact: false })).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await page.screenshot({ path: `${SHOTS}/today-questions.png`, fullPage: true });
+    // Skipping the blanks and accepting the shorthand lets grading finish.
+    for (const yes of await page.getByRole('radio', { name: 'Да' }).all()) await yes.click();
+    await page.getByRole('button', { name: 'Проверить ответы' }).click();
+    await expect(page.getByText('Итоги')).toBeVisible({ timeout: 15_000 });
+  });
+
+  test('graded session shows the feedback summary and verdicts with a mark, not only colour', async ({ page }) => {
+    await page.goto('/?state=graded#/today');
+    await expect(page.getByRole('heading', { name: 'Исправить' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Что повторить завтра' })).toBeVisible();
+    await expect(page.getByText('✗').first()).toBeVisible();
+    await expect(page.getByText('✓', { exact: false }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toHaveCount(0);
+    expect(await page.content()).toContain('a teacher');
+    await page.screenshot({ path: `${SHOTS}/today-graded.png`, fullPage: true });
+  });
+
+  test('Ctrl+Enter submits from anywhere on the page', async ({ page }) => {
+    await page.goto('/?state=generated#/today');
+    await page.getByRole('button', { name: 'Проверить ответы' }).waitFor();
+    await page.keyboard.press('Control+Enter');
+    await expect(page.getByText('Пропустить это задание?').first()).toBeVisible();
+  });
+});

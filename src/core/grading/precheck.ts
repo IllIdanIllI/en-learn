@@ -18,6 +18,9 @@ export function parseSpotLines(text: string): { wrong: string; right: string }[]
 export type Submission = { items: Record<number, string>; spot: Record<string, string> };
 export type Question = { itemId: number; kind: 'blank' | 'shorthand' | 'llm'; symbol?: string; text?: string };
 
+/** Always accepted for "correct as it is" and never asked about. */
+export const BUILTIN_SHORTHANDS = ['✓', '+'];
+
 const ONLY_SYMBOLS = /^[^\p{L}\p{N}\s]+$/u;
 
 /** Spec 8.2. Spot items have no per-item input (their paragraph text is the answer), so they are not checked here. */
@@ -31,7 +34,7 @@ export function precheckAnswers(
     if (it.format === 'spot' || it.format === 'question') continue;
     const answer = (sub.items[it.id] ?? '').trim();
     if (answer === '') out.push({ itemId: it.id, kind: 'blank' });
-    else if (ONLY_SYMBOLS.test(answer) && !shorthands.includes(answer)) out.push({ itemId: it.id, kind: 'shorthand', symbol: answer });
+    else if (ONLY_SYMBOLS.test(answer) && !shorthands.includes(answer) && !BUILTIN_SHORTHANDS.includes(answer)) out.push({ itemId: it.id, kind: 'shorthand', symbol: answer });
   }
   return out;
 }

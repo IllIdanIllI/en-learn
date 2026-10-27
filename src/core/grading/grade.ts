@@ -7,7 +7,8 @@ import { getSettings, setSetting } from '@/core/db/repos/settings';
 import { getSession, listGradingItems, type GradingItem } from '@/core/db/repos/sessions';
 import { applyGraded, type Graded } from './apply';
 import { buildRefs, missingRefs, proseOf, renderGradeInput, spotParagraphs, type GradeBatch } from './input';
-import { precheckAnswers, type Question, type Submission } from './precheck';
+import { autoCorrect, autoSpot } from './autocheck';
+import { BUILTIN_SHORTHANDS, precheckAnswers, type Question, type Submission } from './precheck';
 
 export type { Question, Submission } from './precheck';
 export interface ClarificationAnswer { itemId: number; skip?: boolean; shorthandMeansCorrect?: boolean; text?: string }
@@ -132,19 +133,31 @@ async function run(
     for (const it of open) {
       if (it.format === 'spot' || it.format === 'question') continue;
       const a = (answers[it.id] ?? '').trim();
-      texts.set(it.id, shorthands.includes(a) ? '✓' : a);
+      texts.set(it.id, shorthands.includes(a) || BUILTIN_SHORTHANDS.includes(a) ? '✓' : a);
     }
     const spots = spotParagraphs(items, sub.spot);
+    const result = emptyResult();
+    const gradable = open.filter((i): i is typeof i & { format: 'gap' | 'fix' } => i.format === 'gap' || i.format === 'fix');
+    const auto = new Set(gradable.filter((i) => autoCorrect(i, texts.get(i.id) ?? '')).map((i) => i.id));
+    for (const it of gradable) {
+      if (auto.has(it.id)) {
+        result.items.push({ ref: refs.refOf.get(it.id)!, verdict: 'correct', fix: '', ruleSection: it.ruleSection ?? '', explanation: '', vocabularyNote: '', question: '' });
+      }
+    }
+    const llmSpots = spots.filter((s) => {
+      const code = autoSpot(s.passageText, s.errors, s.learnerText);
+      if (!code) return true;
+      result.spot.push({ blockRef: `b${s.blockOrd}`, paragraph: s.paragraph, found: code.found.map((id) => refs.refOf.get(id)!), extra: [] });
+      return false;
+    });
     graded = {
       sessionId, texts, skipped,
       spot: new Map(spots.map((s) => [`${s.blockId}:${s.paragraph}`, s.learnerText])),
-      result: emptyResult(),
+      result,
     };
     batch = {
-      items: open
-        .filter((i) => i.format === 'gap' || i.format === 'fix')
-        .map((item) => ({ item, answer: texts.get(item.id) ?? '' })),
-      spots: spots.filter((s) => s.learnerText.trim() !== ''),
+      items: gradable.filter((i) => !auto.has(i.id)).map((item) => ({ item, answer: texts.get(item.id) ?? '' })),
+      spots: llmSpots,
     };
   }
 

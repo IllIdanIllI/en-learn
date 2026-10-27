@@ -134,7 +134,7 @@ describe('gradeSession', () => {
 
   test('grade message carries labelled items, rule body of the stored version, spot lines and settings', async () => {
     const { llm, deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(fullResult())]);
-    await gradeSession(deps, sid, subm(), []);
+    await gradeSession(deps, sid, subm({ spot: 'a apple → an apple\na hour → an hour\nthe cat → a cat' }), []);
     const p = userPrompt(llm);
     expect(p).toContain('### b1.i2');
     expect(p).toContain('Prompt: It is a hour long.');
@@ -187,21 +187,44 @@ describe('gradeSession', () => {
     expect(await rows(db, 'SELECT correct FROM spelling_attempt')).toEqual([{ correct: 1 }]);
   });
 
-  test('+ confirmed as correct is stored in acceptedShorthands and sent as ✓', async () => {
-    const { db, llm, deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(fullResult())]);
-    const sub = subm({ items: { 3: '+' } });
-    const first = await gradeSession(deps, sid, sub, []);
-    expect(first).toEqual({ kind: 'questions', questions: [{ itemId: 3, kind: 'shorthand', symbol: '+' }] });
+  test('everything matching is graded in code without calling the LLM', async () => {
+    const { db, llm, deps, sid } = await setup('2026-10-20', '2026-10-20', []);
+    expect(await gradeSession(deps, sid, subm({ items: { 4: 'an' } }), [])).toEqual({ kind: 'graded' });
     expect(llm.calls).toHaveLength(0);
-    expect(await gradeSession(deps, sid, sub, [{ itemId: 3, shorthandMeansCorrect: true }])).toEqual({ kind: 'graded' });
-    expect((await getSettings(db)).acceptedShorthands).toEqual(['✓', '+']);
-    expect(userPrompt(llm)).toMatch(/b1\.i1[\s\S]*?Learner answer: ✓/);
-    expect(userPrompt(llm)).not.toContain('Learner answer: +');
+    expect(await sessionRow(db)).toMatchObject({ status: 'graded' });
+    expect(await verdicts(db)).toEqual({ 1: 'correct', 2: 'correct', 3: 'correct', 4: 'correct', 5: 'correct', 6: 'correct', 7: 'wrong', 8: 'wrong', 9: 'wrong' });
   });
 
-  test('+ not meaning correct needs text', async () => {
+  test('only the items that do not match are sent to the LLM', async () => {
+    const r = result({ items: [entry('b1.i2', 'wrong', { fix: 'an', ruleSection: 'Basics', explanation: 'Use an.' })] });
+    const { db, llm, deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(r)]);
+    expect(await gradeSession(deps, sid, subm(), [])).toEqual({ kind: 'graded' });
+    expect(userPrompt(llm).match(/^### b\d.*$/gm)).toEqual(['### b1.i2']);
+    expect(await verdicts(db)).toMatchObject({ 2: 'correct', 3: 'correct', 4: 'wrong', 5: 'correct', 6: 'correct' });
+  });
+
+  test('+ on a ✓ item is correct and nothing is asked', async () => {
+    const { db, llm, deps, sid } = await setup('2026-10-20', '2026-10-20', []);
+    expect(await gradeSession(deps, sid, subm({ items: { 3: '+', 4: 'an' } }), [])).toEqual({ kind: 'graded' });
+    expect(llm.calls).toHaveLength(0);
+    expect((await verdicts(db))[3]).toBe('correct');
+  });
+
+  test('~ confirmed as correct is stored in acceptedShorthands and graded as ✓', async () => {
+    const { db, llm, deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(fullResult())]);
+    const sub = subm({ items: { 3: '~' } });
+    const first = await gradeSession(deps, sid, sub, []);
+    expect(first).toEqual({ kind: 'questions', questions: [{ itemId: 3, kind: 'shorthand', symbol: '~' }] });
+    expect(llm.calls).toHaveLength(0);
+    expect(await gradeSession(deps, sid, sub, [{ itemId: 3, shorthandMeansCorrect: true }])).toEqual({ kind: 'graded' });
+    expect((await getSettings(db)).acceptedShorthands).toEqual(['✓', '~']);
+    expect(userPrompt(llm)).not.toContain('Learner answer: ~');
+    expect((await rows<{ text: string }>(db, 'SELECT text FROM answer WHERE item_id = 3'))[0]!.text).toBe('✓');
+  });
+
+  test('~ not meaning correct needs text', async () => {
     const { deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(fullResult())]);
-    const sub = subm({ items: { 3: '+' } });
+    const sub = subm({ items: { 3: '~' } });
     const again = await gradeSession(deps, sid, sub, [{ itemId: 3, shorthandMeansCorrect: false }]);
     expect(again).toMatchObject({ kind: 'questions', questions: [{ itemId: 3, kind: 'shorthand' }] });
     expect(await gradeSession(deps, sid, sub, [{ itemId: 3, shorthandMeansCorrect: false, text: 'an' }])).toEqual({ kind: 'graded' });
@@ -360,7 +383,7 @@ describe('gradeSession', () => {
     expect(await gradeSession(deps, sid, subm({ items: { 3: 'an' } }), [])).toEqual({ kind: 'graded' });
     expect(hasAwaiting(sid)).toBe(false);
     expect(llm.calls).toHaveLength(2);
-    expect(userPrompt(llm, 1).match(/^### b\d+\.i\d+/gm)).toContain('### b1.i0');
+    expect(userPrompt(llm, 1).match(/^### b\d+\.i\d+/gm)).toContain('### b1.i1');
     expect(userPrompt(llm, 1)).toContain('Learner answer: an');
     expect((await rows<{ text: string }>(db, 'SELECT text FROM answer WHERE item_id = 3'))[0]!.text).toBe('an');
   });

@@ -1,7 +1,7 @@
 import type { GradingItem } from '@/core/db/repos/sessions';
 import type { Settings } from '@/core/db/repos/settings';
 import type { GradeResult } from '@/core/llm/types';
-import { parseSpotLines } from './precheck';
+import { BUILTIN_SHORTHANDS, parseSpotLines } from './precheck';
 
 export interface SpotParagraph {
   blockId: number;
@@ -88,7 +88,7 @@ export function renderGradeInput(batch: GradeBatch, refs: Refs, settings: Settin
   const out: string[] = [
     '## Learner settings',
     `Spelling variant: ${settings.spellingVariant}`,
-    `Accepted shorthands for "correct as it is": ${settings.acceptedShorthands.join(' ')} (an answer made only of one of these means the item is correct as written)`,
+    `Accepted shorthands for "correct as it is": ${[...new Set([...BUILTIN_SHORTHANDS, ...settings.acceptedShorthands])].join(' ')} (an answer made only of one of these means the item is correct as written)`,
     '',
     '## Rules (the full current body of each topic, with its version)',
   ];

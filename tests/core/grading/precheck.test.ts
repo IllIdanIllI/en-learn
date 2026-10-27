@@ -10,7 +10,10 @@ describe('precheckAnswers', () => {
     expect(precheckAnswers({ items: {}, spot: {} }, items, ['✓'])).toEqual([{ itemId: 1, kind: 'blank' }]);
   });
   test('unknown symbol asks about shorthand', () => {
-    expect(run('+')).toEqual([{ itemId: 1, kind: 'shorthand', symbol: '+' }]);
+    expect(run('~')).toEqual([{ itemId: 1, kind: 'shorthand', symbol: '~' }]);
+  });
+  test('built-in + and ✓ are never asked about', () => {
+    expect(precheckAnswers({ items: { 1: '+' }, spot: {} }, items, [])).toEqual([]);
   });
   test('accepted shorthand passes', () => {
     expect(run('✓')).toEqual([]);

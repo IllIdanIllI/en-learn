@@ -14,3 +14,10 @@ export async function findOrCreateSpellingWord(db: Db, word: string, hint: strin
   await db.execute('INSERT INTO spelling_word (word, hint, created_at) VALUES (?, ?, ?) ON CONFLICT(word) DO NOTHING', [word, hint, createdAt]);
   return (await find())[0]!.id;
 }
+
+/** Words with a learner's mnemonic. */
+export async function listSpellingMnemonics(db: Db): Promise<{ word: string; mnemonic: string }[]> {
+  return db.select<{ word: string; mnemonic: string }>(
+    "SELECT word, mnemonic FROM spelling_word WHERE mnemonic IS NOT NULL AND trim(mnemonic) <> '' ORDER BY id",
+  );
+}

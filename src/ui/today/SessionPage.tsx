@@ -12,6 +12,7 @@ import { ErrorNotice } from './ErrorNotice';
 import { FeedbackSummary } from './FeedbackSummary';
 import { GradedItem } from './GradedItem';
 import { ItemRow } from './ItemRow';
+import { GRADING_STAGES, Loader } from './Loader';
 import { QuestionBlock } from './QuestionBlock';
 import { Questions, type Reply } from './Questions';
 import { SessionHeader } from './SessionHeader';
@@ -20,6 +21,7 @@ import { SpotBlock } from './SpotBlock';
 import { Notice } from './chips';
 import { RulePanel, type RuleTarget } from './RulePanel';
 import { SessionActionsProvider, type SessionActions } from './sessionActions';
+import { GRADING_KINDS, useWaitInfo } from './useWaitInfo';
 
 type Failure = { message: string; code?: string; retry: () => Promise<GradeOutcome> };
 
@@ -45,6 +47,7 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded, onClos
   const [replies, setReplies] = useState<Record<number, Reply>>({});
   const [finish, setFinish] = useState(false);
   const [busy, setBusy] = useState(false);
+  const waiting = useWaitInfo(GRADING_KINDS, busy);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [disputes, setDisputes] = useState<Record<number, string>>({});
   const [disputeBusy, setDisputeBusy] = useState(false);
@@ -312,6 +315,7 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded, onClos
         {(answerable || unsent.length > 0) && (
           <>
             <div className="h-12" />
+            {busy && <Loader lang={lang} stages={GRADING_STAGES} current="grading" attempt={1} {...waiting} />}
             {disputeError !== null && <Notice className="mb-2">{t(lang, 'dispute.error', { message: disputeError })}</Notice>}
             {answerable && failure && (
               <ErrorNotice

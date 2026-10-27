@@ -106,10 +106,10 @@ test.describe('today session', () => {
     await page.screenshot({ path: `${SHOTS}/today-no_session.png` });
   });
 
-  test('generating keeps the skeleton until the session is built, then shows it', async ({ page }) => {
+  test('generating shows the loader until the session is built, then shows it', async ({ page }) => {
     await page.goto('/?state=no_session&delay=1500#/today');
     await page.getByRole('button', { name: 'Начать сессию' }).click();
-    await expect(page.getByText('Собираю сессию на сегодня…')).toBeVisible();
+    await expect(page.getByText('Составляю задания', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Начать сессию' })).toBeDisabled();
     await page.screenshot({ path: `${SHOTS}/today-generating.png` });
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
@@ -185,7 +185,7 @@ test.describe('today session', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Урок завершён' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Добавить вопросы' }).click();
-    await expect(page.getByText('Добавляю вопросы…')).toBeVisible();
+    await expect(page.getByText('Составляю задания', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('My sister is an nurse')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Закрыть урок' })).toHaveCount(0);

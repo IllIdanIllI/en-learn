@@ -20,3 +20,12 @@ export async function insertLlmCall(db: Db, r: LlmCallRecord): Promise<number> {
   );
   return res.lastInsertId;
 }
+
+/** Durations of the latest successful calls of a kind, newest first. */
+export async function recentOkDurations(db: Db, kind: LlmKind, limit: number): Promise<number[]> {
+  const rows = await db.select<{ duration_ms: number }>(
+    'SELECT duration_ms FROM llm_call WHERE kind = ? AND ok = 1 ORDER BY created_at DESC, id DESC LIMIT ?',
+    [kind, limit],
+  );
+  return rows.map((r) => r.duration_ms);
+}

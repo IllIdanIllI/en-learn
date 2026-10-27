@@ -1,11 +1,12 @@
 import { t, type Lang } from '@/core/i18n';
 import { Button } from '@/ui/components/ui/button';
-import { Skeleton } from './StartSession';
+import { Loader, type LoaderView } from './Loader';
 
 /** Today after the lesson is closed: what the learner can do next. */
-export function LessonClosed({ lang, adding, showingResults, onToggleResults, onAddMore }: {
-  lang: Lang; adding: boolean; showingResults: boolean; onToggleResults: () => void; onAddMore: () => void;
+export function LessonClosed({ lang, loader, showingResults, onToggleResults, onAddMore }: {
+  lang: Lang; loader: LoaderView | null; showingResults: boolean; onToggleResults: () => void; onAddMore: () => void;
 }) {
+  const adding = loader !== null;
   return (
     <section>
       <h1 className="headline">{t(lang, 'today.closed')}</h1>
@@ -15,14 +16,7 @@ export function LessonClosed({ lang, adding, showingResults, onToggleResults, on
         </Button>
         <Button disabled={adding} onClick={onAddMore}>{t(lang, 'today.addMore')}</Button>
       </div>
-      <div role="status">
-        {adding && (
-          <>
-            <Skeleton />
-            <p className="mt-4 text-muted-foreground">{t(lang, 'today.addingMore')}</p>
-          </>
-        )}
-      </div>
+      {loader !== null && <Loader lang={lang} {...loader} />}
     </section>
   );
 }

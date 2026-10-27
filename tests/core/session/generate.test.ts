@@ -131,6 +131,17 @@ describe('generateSession', () => {
     expect(rounds.every((r) => r.round === 1)).toBe(true);
   });
 
+  test('reports the stages with the attempt number, a second attempt starting at writing', async () => {
+    const bad: GeneratedSession = { blocks: [{ ...fixBlock('task'), items: fixBlock('task').items.slice(0, 2) }, speaking] };
+    const good = taskDay();
+    const { deps } = await setup('2026-10-20', {
+      generate_session: [ok(bad), ok(good)], validate_session: [ok(allOk(good))],
+    });
+    const stages: [string, number][] = [];
+    expect((await generateSession(deps, { light: false }, (stage, attempt) => stages.push([stage, attempt]))).ok).toBe(true);
+    expect(stages).toEqual([['writing', 1], ['writing', 2], ['checking', 2], ['saving', 2]]);
+  });
+
   test('an item marked defect is stored as defect and keeps its reason', async () => {
     const gen = { blocks: [{ ...fixBlock('task'), items: [...fixBlock('task').items, item(4, { expected: '✓' }), item(5, { expected: '✓' })] }, speaking] };
     const val = allOk(gen);

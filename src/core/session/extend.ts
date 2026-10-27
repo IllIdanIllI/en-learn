@@ -4,7 +4,7 @@ import { getSettings } from '@/core/db/repos/settings';
 import { deleteRound, getSession, hasOpenItems, reopenSession } from '@/core/db/repos/sessions';
 import { listGradedAnswerRows } from '@/core/db/repos/answers';
 import { buildGenerationContext, type GenerationContext, type RuleRef } from './context';
-import { produce, type GenerateResult, type GenStage } from './generate';
+import { produce, type GenerateResult, type OnStage } from './generate';
 import { loadDayInfo } from './plan';
 import { writeBlocks } from './store';
 
@@ -31,7 +31,7 @@ async function wrongTopic(deps: Deps, sessionId: number, d: GenerationContext['d
  * "Add more questions": one more task block (6 to 8 gap or fix items) for today's graded session, as round max + 1.
  * The session stays graded; the new block is open until it is answered.
  */
-export async function extendSession(deps: Deps, sessionId: number, onStage?: (s: GenStage) => void): Promise<GenerateResult> {
+export async function extendSession(deps: Deps, sessionId: number, onStage?: OnStage): Promise<GenerateResult> {
   const d = deps.clock.today();
   const session = await getSession(deps.db, sessionId);
   if (!session) return { ok: false, message: 'Session not found' };

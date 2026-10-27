@@ -21,6 +21,8 @@ export { cleanupDrafts };
 export type GenerateErrorCode = LlmErrorCode | 'session_exists';
 /** Where a generation run is: the model writes, the code and a reviewer check, the result is saved. */
 export type GenStage = 'writing' | 'checking' | 'saving';
+/** Reports the stage and the attempt number (1 or 2) a run is in. */
+export type OnStage = (stage: GenStage, attempt: number) => void;
 export type GenerateResult = { ok: true; sessionId: number } | { ok: false; message: string; code?: GenerateErrorCode };
 
 const MAX_ATTEMPTS = 2;
@@ -39,7 +41,7 @@ function title(lang: 'ru' | 'en', ctx: GenerationContext): string {
  * Spec 6.2 steps 2-5. The draft row is inserted before the LLM calls so their llm_call rows carry its id
  * (they become unlinked if the draft is deleted on failure). The status flips to 'generated' as the last write.
  */
-export async function generateSession(deps: Deps, opts: { light: boolean }): Promise<GenerateResult> {
+export async function generateSession(deps: Deps, opts: { light: boolean }, onStage?: OnStage): Promise<GenerateResult> {
   const d = deps.clock.today();
   await cleanupDrafts(deps.db);
   if (await getSessionByDate(deps.db, d)) return { ok: false, message: 'Session exists', code: 'session_exists' };
@@ -56,7 +58,7 @@ export async function generateSession(deps: Deps, opts: { light: boolean }): Pro
   });
 
   try {
-    const made = await produce(deps, sessionId, ctx);
+    const made = await produce(deps, sessionId, ctx, onStage);
     if (!made.ok) return await fail(deps, sessionId, made.message, made.code);
     const words = await listSpellingWords(deps.db);
     const ids = selectSpellingWords(await getSpellingStates(deps.db), words.map((w) => w.id), d, opts.light);
@@ -72,14 +74,14 @@ export async function generateSession(deps: Deps, opts: { light: boolean }): Pro
 
 /** Generate → validate → code check, with one retry. The llm_call rows carry `sessionId`. */
 export async function produce(
-  deps: Deps, sessionId: number, ctx: GenerationContext, onStage?: (s: GenStage) => void,
+  deps: Deps, sessionId: number, ctx: GenerationContext, onStage?: OnStage,
 ): Promise<{ ok: true; gen: GeneratedSession; defects: Defects } | { ok: false; message: string; code?: LlmErrorCode }> {
   const base = renderContext(ctx);
   let problems: string[] = [];
   let lastCode: LlmErrorCode | undefined;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const prompt = problems.length === 0 ? base : `${base}\n## Problems in the previous attempt (fix them)\n\n${problems.map((p) => `- ${p}`).join('\n')}\n`;
-    onStage?.('writing');
+    onStage?.('writing', attempt);
     const gen = await callStructured<GeneratedSession>(deps, 'generate_session', prompt, {
       sessionId,
       maxAttempts: 1,
@@ -91,7 +93,7 @@ export async function produce(
       lastCode = gen.code;
       continue;
     }
-    onStage?.('checking');
+    onStage?.('checking', attempt);
     const val = await callStructured<ValidationResult>(deps, 'validate_session', renderValidationInput(gen.data, ctx.allowed), { sessionId, maxAttempts: 1 });
     if (!val.ok) {
       if (FATAL.has(val.code)) return { ok: false, message: val.message, code: val.code };
@@ -103,7 +105,7 @@ export async function produce(
     problems = violations(remaining, ctx);
     lastCode = undefined;
     if (problems.length > 0) continue;
-    onStage?.('saving');
+    onStage?.('saving', attempt);
     return { ok: true, gen: gen.data, defects };
   }
   return lastCode === undefined ? { ok: false, message: problems.join('\n') } : { ok: false, message: problems.join('\n'), code: lastCode };
@@ -115,7 +117,7 @@ async function fail(deps: Deps, sessionId: number, message: string, code?: LlmEr
 }
 
 /** Deletes an ungraded session (rows cascade) and builds a new one for today. */
-export async function rebuildSession(deps: Deps, sessionId: number, opts: { light: boolean }): Promise<GenerateResult> {
+export async function rebuildSession(deps: Deps, sessionId: number, opts: { light: boolean }, onStage?: OnStage): Promise<GenerateResult> {
   const rows = await deps.db.select<{ status: string; date: string }>('SELECT status, date FROM session WHERE id = ?', [sessionId]);
   const row = rows[0];
   if (!row) throw new Error(`Session ${sessionId} not found`);
@@ -123,5 +125,5 @@ export async function rebuildSession(deps: Deps, sessionId: number, opts: { ligh
   if (row.date !== deps.clock.today()) throw new Error("Cannot rebuild a session of another day");
   forgetAwaiting(sessionId);
   await deleteSession(deps.db, sessionId);
-  return generateSession(deps, opts);
+  return generateSession(deps, opts, onStage);
 }

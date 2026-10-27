@@ -5,7 +5,7 @@ import { formatTitleDate } from '@/core/dates';
 import { t } from '@/core/i18n';
 import { closeSession } from '@/core/db/repos/sessions';
 import { extendSession } from '@/core/session/extend';
-import { generateSession, rebuildSession, type GenerateResult } from '@/core/session/generate';
+import { generateSession, rebuildSession, type GenerateResult, type GenStage, type OnStage } from '@/core/session/generate';
 import { getTodayState, type TodayState } from '@/core/session/plan';
 import { useCore } from '@/ui/app/CoreProvider';
 import { Button } from '@/ui/components/ui/button';
@@ -15,6 +15,8 @@ import { RuleDraft } from '@/ui/today/RuleDraft';
 import { SessionPage } from '@/ui/today/SessionPage';
 import { ErrorNotice } from '@/ui/today/ErrorNotice';
 import { StartSession, type GenError } from '@/ui/today/StartSession';
+import { GENERATION_STAGES, type LoaderView } from '@/ui/today/Loader';
+import { GENERATION_KINDS, useWaitInfo } from '@/ui/today/useWaitInfo';
 
 export function Today() {
   const { deps, lang, version, prereq } = useCore();
@@ -23,6 +25,8 @@ export function Today() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<GenError | null>(null);
+  const [progress, setProgress] = useState<{ stage: GenStage; attempt: number }>({ stage: 'writing', attempt: 1 });
+  const waiting = useWaitInfo(GENERATION_KINDS, generating);
   // A graded session of an earlier day stays on screen after grading, until the page is left.
   const [pinned, setPinned] = useState<number | null>(null);
   // A closed lesson shows its results below the card on request.
@@ -56,13 +60,14 @@ export function Today() {
     return () => window.removeEventListener('focus', onFocus);
   }, []);
 
-  const build = useCallback(async (job: () => Promise<GenerateResult>) => {
+  const build = useCallback(async (job: (onStage: OnStage) => Promise<GenerateResult>) => {
     if (starting.current) return;
     starting.current = true;
     setGenerating(true);
     setGenError(null);
+    setProgress({ stage: 'writing', attempt: 1 });
     try {
-      const res = await job();
+      const res = await job((stage, attempt) => setProgress({ stage, attempt }));
       if (!res.ok) setGenError({ message: res.message, code: res.code });
     } catch (e) {
       setGenError({ message: e instanceof Error ? e.message : String(e) });
@@ -74,10 +79,10 @@ export function Today() {
       setReload((n) => n + 1);
     }
   }, []);
-  const start = (light: boolean) => void build(() => generateSession(deps, { light }));
+  const start = (light: boolean) => void build((onStage) => generateSession(deps, { light }, onStage));
   const addMore = (sessionId: number) => {
     setShowResults(false);
-    void build(() => extendSession(deps, sessionId));
+    void build((onStage) => extendSession(deps, sessionId, onStage));
   };
   const close = (sessionId: number) => {
     setGenError(null);
@@ -89,8 +94,11 @@ export function Today() {
   const lastLight = useRef(false);
   const rebuild = (sessionId: number, light: boolean) => {
     lastLight.current = light;
-    void build(() => rebuildSession(deps, sessionId, { light }));
+    void build((onStage) => rebuildSession(deps, sessionId, { light }, onStage));
   };
+  const loader: LoaderView | null = generating
+    ? { stages: GENERATION_STAGES, current: progress.stage, attempt: progress.attempt, ...waiting }
+    : null;
 
   if (loadError) {
     return (
@@ -138,7 +146,7 @@ export function Today() {
         {closed && (
           <LessonClosed
             lang={lang}
-            adding={generating}
+            loader={loader}
             showingResults={showResults}
             onToggleResults={() => setShowResults((v) => !v)}
             onAddMore={() => addMore(shown.id)}
@@ -179,7 +187,7 @@ export function Today() {
       {state.kind === 'rest' && (
         <>
           <p className="reading mt-6 text-muted-foreground">{t(lang, 'today.restNote')}</p>
-          {noClaude ? claudeNotice : <StartSession lang={lang} generating={generating} error={genError} rest onStart={start} />}
+          {noClaude ? claudeNotice : <StartSession lang={lang} loader={loader} error={genError} rest onStart={start} />}
         </>
       )}
       {state.kind === 'rule_missing' && noClaude && claudeNotice}
@@ -197,7 +205,7 @@ export function Today() {
       {state.kind === 'no_session' && noClaude && claudeNotice}
       {state.kind === 'no_session' && !noClaude && (
         <>
-          <StartSession lang={lang} generating={generating} error={genError} onStart={start} />
+          <StartSession lang={lang} loader={loader} error={genError} onStart={start} />
           {state.missingRuleTopics.length > 0 && (
             <section className="mt-12">
               <p className="text-muted-foreground">{t(lang, 'today.missingSpotRules')}</p>

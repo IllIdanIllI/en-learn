@@ -3,24 +3,16 @@ import { t, type Lang } from '@/core/i18n';
 import { Button } from '@/ui/components/ui/button';
 import { Toggle } from '@/ui/components/ui/toggle';
 import { ErrorNotice } from './ErrorNotice';
+import { Loader, type LoaderView } from './Loader';
 
 export type GenError = { message: string; code?: string };
 
-export function Skeleton() {
-  return (
-    <div aria-hidden className="mt-8 flex flex-col gap-3">
-      {['w-1/3', 'w-full', 'w-5/6', 'w-full', 'w-2/3'].map((w, i) => (
-        <div key={i} className={`h-4 rounded-sm bg-input ${w}`} />
-      ))}
-    </div>
-  );
-}
-
 /** Empty state with the primary action, and the loading and error states of generation. */
-export function StartSession({ lang, generating, error, rest = false, onStart }: {
-  lang: Lang; generating: boolean; error: GenError | null; rest?: boolean; onStart: (light: boolean) => void;
+export function StartSession({ lang, loader, error, rest = false, onStart }: {
+  lang: Lang; loader: LoaderView | null; error: GenError | null; rest?: boolean; onStart: (light: boolean) => void;
 }) {
   const [lightChoice, setLight] = useState(false);
+  const generating = loader !== null;
   // A rest day has no toggle: the only way to practise is a light day.
   const light = rest || lightChoice;
   return (
@@ -39,14 +31,7 @@ export function StartSession({ lang, generating, error, rest = false, onStart }:
           </Toggle>
         )}
       </div>
-      <div role="status">
-        {generating && (
-          <>
-            <Skeleton />
-            <p className="mt-4 text-muted-foreground">{t(lang, 'today.generating')}</p>
-          </>
-        )}
-      </div>
+      {loader !== null && <Loader lang={lang} {...loader} />}
     </>
   );
 }

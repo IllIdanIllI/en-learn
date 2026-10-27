@@ -81,7 +81,8 @@ async function run(
   }
   if (session.status !== 'generated' && session.status !== 'graded') return errorOutcome('Session not ready', again, 'session_not_ready');
 
-  const all = await listGradingItems(deps.db, sessionId);
+  // Answered items are left alone only in an open round; a generated session is graded in full again (a crash mid-apply is repaired that way).
+  const all = (await listGradingItems(deps.db, sessionId)).map((i) => (session.status === 'graded' ? i : { ...i, answered: false }));
   const items = all.filter((i) => i.status === 'active' && !i.answered);
   const settings = await getSettings(deps.db);
   const snapshot = snapshotOf(sub);

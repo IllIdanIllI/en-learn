@@ -145,6 +145,15 @@ describe('gradeSession', () => {
     expect((await sessionRow(db)).status).toBe('graded');
   });
 
+  test('a generated session with some answer rows already written is graded in full again', async () => {
+    const { db, llm, deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(fullResult())]);
+    await db.execute("INSERT INTO answer (item_id, text, verdict) VALUES (2, 'old', 'wrong')"); // a partial apply
+    expect(await gradeSession(deps, sid, subm(), [])).toEqual({ kind: 'graded' });
+    expect(llm.calls).toHaveLength(1);
+    expect(await verdicts(db)).toMatchObject({ 2: 'correct' });
+    expect(await answerCount(db)).toBe(9);
+  });
+
   test('finish on an open round skips only the blank open items', async () => {
     const { db, deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(fullResult())]);
     await gradeSession(deps, sid, subm(), []);

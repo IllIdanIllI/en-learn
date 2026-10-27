@@ -136,7 +136,7 @@ describe('extendSession', () => {
     const { db, llm, deps, sid } = await setup({ generate_session: [ok(bad), ok(good)], validate_session: [ok(allOk(good))] });
     expect(await extendSession(deps, sid)).toEqual({ ok: true, sessionId: sid });
     expect(llm.calls.filter((c) => c.kind === 'generate_session')).toHaveLength(3);
-    expect(llm.calls.filter((c) => c.kind === 'generate_session').at(-1)!.userPrompt).toContain('at most 8');
+    expect(llm.calls.filter((c) => c.kind === 'generate_session').at(-1)!.userPrompt).toContain('need 6 to 8');
     expect((await db.select('SELECT id FROM item i WHERE i.block_id IN (SELECT id FROM block WHERE round = 2)')).length).toBe(8);
   });
 
@@ -157,6 +157,30 @@ describe('extendSession', () => {
     expect((await buildGenerationContext(sat, '2026-10-24', false)).taskTopic).toBeNull();
     expect(await extendSession(sat, sid)).toEqual({ ok: true, sessionId: sid });
     expect(llm.calls.filter((c) => c.kind === 'generate_session').at(-1)!.userPrompt).toContain('1. task (format fix, topic articles)');
+  });
+
+  test('a write failure removes the new round; the session is not open and a later extension is round 2', async () => {
+    const gen = extra(6);
+    const { db, llm, deps, sid } = await setup({ generate_session: [ok(gen), ok(gen)], validate_session: [ok(allOk(gen)), ok(allOk(gen))] });
+    let items = 0;
+    const flaky: Deps = {
+      ...deps,
+      db: {
+        select: (sql, p) => db.select(sql, p),
+        async execute(sql, p) {
+          if (sql.startsWith('INSERT INTO item') && ++items === 3) throw new Error('disk full');
+          return db.execute(sql, p);
+        },
+      },
+    };
+    await closeSession(db, sid);
+    await expect(extendSession(flaky, sid)).rejects.toThrow('disk full');
+    expect(await db.select('SELECT id FROM block WHERE round = 2')).toEqual([]);
+    expect((await loadSessionView(db, sid)).open).toBe(false);
+    expect((await getSettings(db)).closedSessions).toEqual([sid]);
+    expect(await extendSession(deps, sid)).toEqual({ ok: true, sessionId: sid });
+    expect((await db.select<{ round: number }>('SELECT MAX(round) AS round FROM block'))[0]!.round).toBe(2);
+    expect(llm.calls.filter((c) => c.kind === 'generate_session')).toHaveLength(3);
   });
 
   test('extending removes the session from the closed list', async () => {

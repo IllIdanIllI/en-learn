@@ -80,6 +80,7 @@ export function Today() {
     void build(() => extendSession(deps, sessionId));
   };
   const close = (sessionId: number) => {
+    setGenError(null);
     closeSession(deps.db, sessionId).then(
       () => setReload((n) => n + 1),
       (e: unknown) => setGenError({ message: e instanceof Error ? e.message : String(e) }),

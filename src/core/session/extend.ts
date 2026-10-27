@@ -1,7 +1,7 @@
 import type { Deps } from '@/core/ports';
 import { effectiveVerdict } from '@/core/verdict';
 import { getSettings } from '@/core/db/repos/settings';
-import { getSession, hasOpenItems, reopenSession } from '@/core/db/repos/sessions';
+import { deleteRound, getSession, hasOpenItems, reopenSession } from '@/core/db/repos/sessions';
 import { listGradedAnswerRows } from '@/core/db/repos/answers';
 import { buildGenerationContext, type GenerationContext, type RuleRef } from './context';
 import { produce, type GenerateResult, type GenStage } from './generate';
@@ -72,7 +72,12 @@ export async function extendSession(deps: Deps, sessionId: number, onStage?: (s:
   const { nativeLanguage } = await getSettings(deps.db);
   const last = blocks.at(-1);
   const round = Math.max(1, ...blocks.map((b) => b.round)) + 1;
-  await writeBlocks(deps.db, sessionId, nativeLanguage, extended, made.gen, made.defects, [], { ord: (last?.ord ?? -1) + 1, round });
+  try {
+    await writeBlocks(deps.db, sessionId, nativeLanguage, extended, made.gen, made.defects, [], { ord: (last?.ord ?? -1) + 1, round });
+  } catch (e) {
+    await deleteRound(deps.db, sessionId, round);
+    throw e;
+  }
   await reopenSession(deps.db, sessionId);
   return { ok: true, sessionId };
 }

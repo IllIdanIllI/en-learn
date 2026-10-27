@@ -20,7 +20,9 @@ export function violations(s: GeneratedSession, ctx: GenerationContext): string[
     if (b.kind === 'task' && taskFormat && b.format !== taskFormat) {
       out.push(`b${i} format: task block must be ${taskFormat}, got ${b.format}`);
     }
-    if (b.kind === 'task' && ctx.extra && b.items.length > 8) out.push(`b${i} items: ${b.items.length} items in an extra set, at most 8`);
+    if (b.kind === 'task' && ctx.extra && (b.items.length < 6 || b.items.length > 8)) {
+      out.push(`b${i} items: ${b.items.length} items in an extra set, need 6 to 8`);
+    }
     if (b.kind === 'review') {
       if (b.format !== 'gap' && b.format !== 'fix') out.push(`b${i} format: review block must be gap or fix`);
       const cap = Math.max(ctx.light ? 5 : 12, ctx.dueTopics.length);

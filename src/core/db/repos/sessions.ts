@@ -223,3 +223,8 @@ export async function hasOpenItems(db: Db, sessionId: number): Promise<boolean> 
   );
   return (rows[0]?.n ?? 0) > 0;
 }
+
+/** Removes the blocks of one round (items cascade); used to undo a failed extension. */
+export async function deleteRound(db: Db, sessionId: number, round: number): Promise<void> {
+  await db.execute('DELETE FROM block WHERE session_id = ? AND round = ?', [sessionId, round]);
+}

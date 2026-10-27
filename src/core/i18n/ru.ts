@@ -112,6 +112,7 @@ export const ru: Record<keyof typeof en, string> = {
   'today.minutes': '{n} мин',
   'today.readFirst': 'Прочитайте {section} перед блоком {n}',
   'today.check': 'Проверить ответы',
+  'today.finish': 'Завершить урок',
   'today.checking': 'Проверяю…',
   'q.skip': 'Пропустить это задание?',
   'q.yes': 'Да',

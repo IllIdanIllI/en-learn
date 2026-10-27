@@ -110,6 +110,7 @@ export const en = {
   'today.minutes': '{n} min',
   'today.readFirst': 'Read {section} before block {n}',
   'today.check': 'Check answers',
+  'today.finish': 'Finish lesson',
   'today.checking': 'Checking…',
   'q.skip': 'Skip this item?',
   'q.yes': 'Yes',

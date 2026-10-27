@@ -122,6 +122,15 @@ describe('gradeSession', () => {
     expect((await rows<{ n: number }>(db, 'SELECT COUNT(*) AS n FROM llm_call WHERE session_id = ?', [sid]))[0]!.n).toBe(1);
   });
 
+  test('finish skips blank gap/fix/spelling items without a question and grades the answered ones', async () => {
+    const { db, deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(result())]);
+    const sub = subm({ items: { 1: '', 2: '', 3: '', 4: 'an' }, spot: '' });
+    expect((await gradeSession(deps, sid, sub, [])).kind).toBe('questions');
+    expect(await gradeSession(deps, sid, sub, [], { finish: true })).toEqual({ kind: 'graded' });
+    const v = await verdicts(db);
+    expect(v).toMatchObject({ 1: 'skipped', 2: 'skipped', 3: 'skipped', 4: 'correct' });
+  });
+
   test('drafts of the session are deleted when it is graded, not when grading fails', async () => {
     const { db, deps, sid, failure } = await setup('2026-10-20', '2026-10-20', [ok(fullResult()), ok(fullResult())]);
     await saveDraftAnswer(db, sid, itemDraftKey(2), 'necessary');

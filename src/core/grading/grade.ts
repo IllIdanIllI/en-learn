@@ -56,17 +56,18 @@ export async function gradeSession(
   sessionId: number,
   sub: Submission,
   clarifications: ClarificationAnswer[],
+  opts: { finish?: boolean } = {},
 ): Promise<GradeOutcome> {
-  const again = () => gradeSession(deps, sessionId, sub, clarifications);
+  const again = () => gradeSession(deps, sessionId, sub, clarifications, opts);
   try {
-    return await run(deps, sessionId, sub, clarifications, again);
+    return await run(deps, sessionId, sub, clarifications, again, opts.finish === true);
   } catch (e) {
     return errorOutcome(e instanceof Error ? e.message : String(e), again);
   }
 }
 
 async function run(
-  deps: Deps, sessionId: number, sub: Submission, clarifications: ClarificationAnswer[], again: () => Promise<GradeOutcome>,
+  deps: Deps, sessionId: number, sub: Submission, clarifications: ClarificationAnswer[], again: () => Promise<GradeOutcome>, finish: boolean,
 ): Promise<GradeOutcome> {
   const session = await getSession(deps.db, sessionId);
   if (!session) {
@@ -125,6 +126,11 @@ async function run(
         }
         answers[c.itemId] = '✓';
       } else if (c.text !== undefined && c.text.trim() !== '') answers[c.itemId] = c.text;
+    }
+    if (finish) {
+      for (const i of items) {
+        if (i.format !== 'spot' && i.format !== 'question' && (answers[i.id] ?? '').trim() === '') skipped.add(i.id);
+      }
     }
     const open = items.filter((i) => !skipped.has(i.id));
     const questions = precheckAnswers({ items: answers, spot: sub.spot }, open, shorthands);

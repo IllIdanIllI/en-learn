@@ -6,6 +6,7 @@ import { t } from '@/core/i18n';
 import { loadSessionView, type SessionView } from '@/core/session/view';
 import { Button } from '@/ui/components/ui/button';
 import { useCore } from '@/ui/app/CoreProvider';
+import { ActionBar } from './ActionBar';
 import { Block } from './Block';
 import { ErrorNotice } from './ErrorNotice';
 import { FeedbackSummary } from './FeedbackSummary';
@@ -40,6 +41,7 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded }: {
   const [spot, setSpot] = useState<Record<string, string>>({});
   const [questions, setQuestions] = useState<Question[]>([]);
   const [replies, setReplies] = useState<Record<number, Reply>>({});
+  const [finish, setFinish] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [panel, setPanel] = useState<RuleTarget | null>(null);
@@ -119,6 +121,7 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded }: {
       focusResults.current = true;
       onGraded?.();
       setQuestions([]);
+      setFinish(false);
       setReload((n) => n + 1);
     } else if (outcome.kind === 'questions') setQuestions(outcome.questions);
     else setFailure({ message: outcome.message, code: outcome.code, retry: outcome.retry });
@@ -148,11 +151,12 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded }: {
       return [];
     });
 
-  const submit = () => {
+  const submit = (finishing = finish) => {
     if (!busy) {
+      setFinish(finishing);
       void run(async () => {
         await flushAll(); // a late draft write must not land after the drafts are deleted by grading
-        return gradeSession(deps, sessionId, { items, spot }, clarifications());
+        return gradeSession(deps, sessionId, { items, spot }, clarifications(), { finish: finishing });
       });
     }
   };
@@ -201,6 +205,7 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded }: {
     onRebuild(light);
   });
   const setAnswer = (id: number, value: string) => {
+    setFinish(false);
     setItems((prev) => ({ ...prev, [id]: value }));
     persist(itemDraftKey(id), value);
     // An edited answer invalidates a yes/no given about its old text.
@@ -233,6 +238,7 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded }: {
                 values={spot}
                 graded={graded}
                 onChange={(key, value) => {
+                  setFinish(false);
                   setSpot((prev) => ({ ...prev, [key]: value }));
                   const [blockId, paragraph] = key.split(':').map(Number) as [number, number];
                   persist(spotDraftKey(blockId, paragraph), value);
@@ -262,16 +268,21 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded }: {
             {failure && (
               <ErrorNotice
                 kind="grade"
-                className="mb-4"
+                className="mb-2"
                 message={failure.message}
                 code={failure.code}
                 busy={busy}
                 onRetry={() => void run(failure.retry)}
               />
             )}
-            <Button id="check-answers" disabled={busy} onClick={submit}>
-              {t(lang, busy ? 'today.checking' : 'today.check')}
-            </Button>
+            <ActionBar>
+              <Button id="check-answers" disabled={busy} onClick={() => submit()}>
+                {t(lang, busy ? 'today.checking' : 'today.check')}
+              </Button>
+              <Button variant="secondary" disabled={busy} onClick={() => submit(true)}>
+                {t(lang, 'today.finish')}
+              </Button>
+            </ActionBar>
           </div>
         )}
       </div>

@@ -91,6 +91,24 @@ export async function listGradedAnswerRows(db: Db): Promise<GradedAnswerRow[]> {
   }));
 }
 
+/** Gap and fix items the learner left unanswered in a session: active, skipped, not dropped by a dispute. */
+export async function listSkippedItems(
+  db: Db,
+  sessionId: number,
+): Promise<{ prompt: string; expected: string; topicId: number | null }[]> {
+  const rows = await db.select<{ prompt: string; expected: string; topic_id: number | null }>(
+    `SELECT i.prompt AS prompt, i.expected AS expected, i.topic_id AS topic_id
+     FROM block b
+     JOIN item i ON i.block_id = b.id
+     JOIN answer a ON a.item_id = i.id
+     WHERE b.session_id = ? AND b.format IN ('gap', 'fix') AND i.status = 'active'
+       AND a.verdict = 'skipped' AND (a.dispute_decision IS NULL OR a.dispute_decision != 'drop')
+     ORDER BY b.ord, i.ord`,
+    [sessionId],
+  );
+  return rows.map((r) => ({ prompt: r.prompt, expected: r.expected, topicId: r.topic_id }));
+}
+
 /**
  * One fact per stored attempt. An attempt that comes from a spelling-block item of its session takes the item's
  * effective verdict (so a won dispute counts as correct, a dropped item or a lost dispute is skipped); a word the

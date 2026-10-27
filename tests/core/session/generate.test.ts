@@ -327,6 +327,19 @@ describe('context', () => {
     expect(text).toContain('learner answer: a');
   });
 
+  test('skipped gap/fix items of the last graded session are review input, marked skipped', async () => {
+    const { db, deps } = await setup('2026-10-20', {});
+    await db.execute("INSERT INTO session (date, title, is_light, status, created_at) VALUES ('2026-10-19','old',0,'graded','x')");
+    await db.execute("INSERT INTO block (session_id, ord, kind, format, title, instruction, minutes) VALUES (1,0,'task','gap','g','i',5),(1,1,'spelling','spelling','s','i',3),(1,2,'task','spot','p','i',5)");
+    await db.execute(
+      "INSERT INTO item (block_id, ord, prompt, expected, topic_id, status) VALUES (1,0,'She has ___ apple.','an',1,'active'),(1,1,'He is ___ hour late.','an',1,'dropped'),(2,0,'hint','receive',NULL,'active'),(3,0,'a egg','an egg',1,'active')",
+    );
+    await db.execute("INSERT INTO answer (item_id, text, verdict) VALUES (1,'','skipped'),(2,'','skipped'),(3,'','skipped'),(4,'','skipped')");
+    const ctx = await buildGenerationContext(deps, '2026-10-20', false);
+    expect(ctx.reviewInputs).toEqual([{ prompt: 'She has ___ apple.', answer: '', fix: 'an', topicKey: expect.any(String), skipped: true }]);
+    expect(renderContext(ctx)).toContain('| skipped');
+  });
+
   test('lists the allowed rule section headings verbatim for the topic', async () => {
     const { deps } = await setup('2026-10-20', {});
     const ctx = await buildGenerationContext(deps, '2026-10-20', false);

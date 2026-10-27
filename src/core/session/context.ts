@@ -3,10 +3,11 @@ import type { Deps } from '@/core/ports';
 import { addDays, formatTitleDate } from '@/core/dates';
 import { dueTopicIds, replayTopics } from '@/core/schedule/topics';
 import { listGradedSessions } from '@/core/db/repos/sessions';
+import { listSkippedItems } from '@/core/db/repos/answers';
 import { loadDayInfo, spottingTopics, taskTopic, type DayInfo } from './plan';
 
 export interface RuleRef { topic: Topic; ruleId: number; version: number; body: string }
-export interface ReviewEntry { prompt: string; answer: string; fix: string; topicKey: string | null }
+export interface ReviewEntry { prompt: string; answer: string; fix: string; topicKey: string | null; skipped: boolean }
 export interface BlockSpec { kind: 'review' | 'task' | 'speaking'; format: string }
 
 export interface GenerationContext {
@@ -62,9 +63,22 @@ export async function buildGenerationContext(deps: Deps, d: ISODate, light: bool
     answer: r.text,
     fix: r.fix,
     topicKey: r.topicId === null ? null : (byId.get(r.topicId)?.key ?? null),
+    skipped: false,
   });
+  const skipped: ReviewEntry[] = last
+    ? (await listSkippedItems(deps.db, last.id)).map((r) => ({
+        prompt: r.prompt,
+        answer: '',
+        fix: r.expected,
+        topicKey: r.topicId === null ? null : (byId.get(r.topicId)?.key ?? null),
+        skipped: true,
+      }))
+    : [];
   const reviewInputs = last
-    ? facts.errorRows.filter((r) => r.format !== 'spelling' && r.date === last.date && r.effective === 'wrong' && !r.isInattention).map(entry)
+    ? [
+        ...facts.errorRows.filter((r) => r.format !== 'spelling' && r.date === last.date && r.effective === 'wrong' && !r.isInattention).map(entry),
+        ...skipped,
+      ]
     : [];
   const since = addDays(d, -INATTENTION_DAYS);
   const inattention = facts.errorRows
@@ -122,7 +136,7 @@ function renderRules(refs: RuleRef[], printed: Set<string>): string {
 function renderEntries(entries: ReviewEntry[]): string {
   if (entries.length === 0) return 'None.';
   return entries
-    .map((e) => `- prompt: ${e.prompt} | learner answer: ${e.answer} | fix: ${e.fix || '(none)'} | topic: ${e.topicKey ?? '(none)'}`)
+    .map((e) => `- prompt: ${e.prompt} | learner answer: ${e.answer} | fix: ${e.fix || '(none)'} | topic: ${e.topicKey ?? '(none)'}${e.skipped ? ' | skipped' : ''}`)
     .join('\n');
 }
 

@@ -30,15 +30,15 @@ const schemas = Object.fromEntries(
 const ok = (data: unknown): LlmResult<unknown> => ({ ok: true, data, costUsd: 0.01, durationMs: 5, raw: JSON.stringify(data) });
 
 const item = (n: number, over: Partial<GeneratedBlock['items'][number]> = {}): GeneratedBlock['items'][number] => ({
-  prompt: `I saw ___ owl number ${n}.`, expected: 'an', topicKey: 'articles', ruleSection: 'Basics', isCheck: false, ...over,
+  prompt: `I saw ___ owl number ${n}.`, expected: 'an', topicKey: 'articles', ruleSection: 'Basics', isCheck: false, wrong: '', ...over,
 });
 
 const fixBlock = (kind: 'review' | 'task', checkFirst = false): GeneratedBlock => ({
   kind, format: 'fix', title: 'Fix', instruction: 'Write ✓ or the fix.', formatExample: 'He has a umbrella. → an', minutes: 6,
   items: [
-    item(1, { prompt: 'She has a apple.', expected: 'an', isCheck: checkFirst }),
+    item(1, { prompt: 'She has a apple.', expected: 'an', isCheck: checkFirst, wrong: 'a apple' }),
     item(2, { prompt: 'He ate a banana.', expected: '✓' }),
-    item(3, { prompt: 'It is a hour long.', expected: 'an' }),
+    item(3, { prompt: 'It is a hour long.', expected: 'an', wrong: 'a hour' }),
   ],
   paragraphs: [], question: '',
 });
@@ -119,8 +119,20 @@ describe('generateSession', () => {
     expect(calls).toEqual([{ kind: 'generate_session', session_id: 1 }, { kind: 'validate_session', session_id: 1 }]);
   });
 
+  test('a fix item stores its wrong fragment; other items store NULL; blocks get round 1', async () => {
+    const gen = { blocks: [fixBlock('task'), speaking] };
+    const { db, deps } = await setup('2026-10-20', { generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
+    expect((await generateSession(deps, { light: false })).ok).toBe(true);
+    const fix = await db.select<{ expected: string; wrong: string | null }>(
+      "SELECT i.expected, i.wrong FROM item i JOIN block b ON b.id = i.block_id WHERE b.format = 'fix' ORDER BY i.id",
+    );
+    expect(fix.map((r) => r.wrong)).toEqual(['a apple', null, 'a hour']);
+    const rounds = await db.select<{ round: number }>('SELECT round FROM block');
+    expect(rounds.every((r) => r.round === 1)).toBe(true);
+  });
+
   test('an item marked defect is stored as defect and keeps its reason', async () => {
-    const gen = { blocks: [{ ...fixBlock('task'), items: [...fixBlock('task').items, item(4), item(5)] }, speaking] };
+    const gen = { blocks: [{ ...fixBlock('task'), items: [...fixBlock('task').items, item(4, { expected: '✓' }), item(5, { expected: '✓' })] }, speaking] };
     const val = allOk(gen);
     val.items[3] = { ref: 'b0.i3', ok: false, reason: 'TD-2: two answers' };
     const { db, deps } = await setup('2026-10-20', { generate_session: [ok(gen)], validate_session: [ok(val)] });
@@ -252,6 +264,7 @@ describe('generateSession', () => {
     );
     expect(rows).toHaveLength(10);
     expect(rows[5]).toEqual({ prompt: 'a apple', expected: 'an apple', paragraph: 1, is_check: 0 });
+    expect(await db.select('SELECT id FROM item WHERE wrong IS NOT NULL')).toEqual([]);
   });
 
   const failed = (code: 'not_signed_in' | 'budget' | 'timeout'): LlmResult<unknown> => ({

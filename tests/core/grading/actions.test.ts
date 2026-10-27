@@ -58,7 +58,7 @@ async function gradedSession(rows: Row[], status: 'draft' | 'generated' | 'grade
   for (const [ord, r] of rows.entries()) {
     await insertItem(db, blockId, ord, {
       prompt: r.prompt, expected: r.expected, paragraph: null, topicId: 1, ruleId: 1, ruleVersion: 1,
-      ruleSection: 'Basics', spellingWordId: null, isCheck: false, status: 'active', note: null,
+      ruleSection: 'Basics', spellingWordId: null, isCheck: false, status: 'active', note: null, wrong: null,
     });
     const itemId = (await db.select<{ id: number }>('SELECT id FROM item WHERE block_id = ? AND ord = ?', [blockId, ord]))[0]!.id;
     ids.push(itemId);

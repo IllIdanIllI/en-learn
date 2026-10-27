@@ -82,6 +82,7 @@ export interface NewItem {
   isCheck: boolean;
   status: ItemStatus;
   note: string | null;
+  wrong: string | null;
 }
 
 export async function getSessionByDate(db: Db, date: ISODate): Promise<{ id: number; status: SessionStatus } | null> {
@@ -109,10 +110,10 @@ export async function insertDraftSession(
   return res.lastInsertId;
 }
 
-export async function insertBlock(db: Db, sessionId: number, ord: number, b: NewBlock): Promise<number> {
+export async function insertBlock(db: Db, sessionId: number, ord: number, b: NewBlock, round = 1): Promise<number> {
   const res = await db.execute(
-    'INSERT INTO block (session_id, ord, kind, format, title, instruction, format_example, passage, minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [sessionId, ord, b.kind, b.format, b.title, b.instruction, b.formatExample, b.passage, b.minutes],
+    'INSERT INTO block (session_id, ord, kind, format, title, instruction, format_example, passage, minutes, round) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [sessionId, ord, b.kind, b.format, b.title, b.instruction, b.formatExample, b.passage, b.minutes, round],
   );
   return res.lastInsertId;
 }
@@ -120,10 +121,10 @@ export async function insertBlock(db: Db, sessionId: number, ord: number, b: New
 export async function insertItem(db: Db, blockId: number, ord: number, i: NewItem): Promise<void> {
   await db.execute(
     `INSERT INTO item (block_id, ord, prompt, expected, paragraph, topic_id, rule_id, rule_version, rule_section,
-                       spelling_word_id, is_check, status, note)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                       spelling_word_id, is_check, status, note, wrong)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [blockId, ord, i.prompt, i.expected, i.paragraph, i.topicId, i.ruleId, i.ruleVersion, i.ruleSection,
-      i.spellingWordId, i.isCheck ? 1 : 0, i.status, i.note],
+      i.spellingWordId, i.isCheck ? 1 : 0, i.status, i.note, i.wrong],
   );
 }
 
@@ -166,6 +167,7 @@ export interface GradingItem {
   ruleBody: string | null;
   spellingWordId: number | null;
   status: ItemStatus;
+  wrong: string | null;
 }
 
 /** Every item of a session in display order, with its topic key and the rule body of its stored version. */
@@ -174,12 +176,12 @@ export async function listGradingItems(db: Db, sessionId: number): Promise<Gradi
     id: number; block_id: number; block_ord: number; format: BlockFormat; passage: string | null; ord: number;
     prompt: string; expected: string; paragraph: number | null; topic_id: number | null; topic_key: string | null;
     rule_id: number | null; rule_version: number | null; rule_section: string | null; rule_body: string | null;
-    spelling_word_id: number | null; status: ItemStatus;
+    spelling_word_id: number | null; status: ItemStatus; wrong: string | null;
   }>(
     `SELECT i.id AS id, i.block_id AS block_id, b.ord AS block_ord, b.format AS format, b.passage AS passage, i.ord AS ord,
             i.prompt AS prompt, i.expected AS expected, i.paragraph AS paragraph, i.topic_id AS topic_id, t.key AS topic_key,
             i.rule_id AS rule_id, i.rule_version AS rule_version, i.rule_section AS rule_section, rv.body AS rule_body,
-            i.spelling_word_id AS spelling_word_id, i.status AS status
+            i.spelling_word_id AS spelling_word_id, i.status AS status, i.wrong AS wrong
      FROM item i JOIN block b ON b.id = i.block_id
      LEFT JOIN topic t ON t.id = i.topic_id
      LEFT JOIN rule_version rv ON rv.rule_id = i.rule_id AND rv.version = i.rule_version
@@ -191,6 +193,6 @@ export async function listGradingItems(db: Db, sessionId: number): Promise<Gradi
     passage: r.passage === null || r.format !== 'spot' ? null : (JSON.parse(r.passage) as string[]), ord: r.ord, prompt: r.prompt,
     expected: r.expected, paragraph: r.paragraph, topicId: r.topic_id, topicKey: r.topic_key, ruleId: r.rule_id,
     ruleVersion: r.rule_version, ruleSection: r.rule_section, ruleBody: r.rule_body, spellingWordId: r.spelling_word_id,
-    status: r.status,
+    status: r.status, wrong: r.wrong,
   }));
 }

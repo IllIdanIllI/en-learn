@@ -17,6 +17,7 @@ const item = (over: Partial<GeneratedItem> = {}): GeneratedItem => ({
   topicKey: 'conditionals',
   ruleSection: 'Type 1',
   isCheck: false,
+  wrong: '',
   ...over,
 });
 
@@ -60,9 +61,9 @@ const valid = (): GeneratedSession => ({
       format: 'fix',
       formatExample: 'He go home. -> goes',
       items: [
-        item({ prompt: 'She have gone.', expected: 'has gone', topicKey: 'present-perfect', ruleSection: 'Since and for' }),
+        item({ prompt: 'She have gone.', expected: 'has gone', wrong: 'have gone', topicKey: 'present-perfect', ruleSection: 'Since and for' }),
         item({ prompt: 'I have lived here.', expected: '✓', topicKey: 'present-perfect', ruleSection: 'Since and for' }),
-        item({ prompt: 'He go home.', expected: 'goes', topicKey: 'present-perfect', ruleSection: 'Since and for' }),
+        item({ prompt: 'He go home.', expected: 'goes', wrong: 'go', topicKey: 'present-perfect', ruleSection: 'Since and for' }),
       ],
     }),
     block({
@@ -178,12 +179,13 @@ describe('checkGenerated', () => {
     test('a fix block without a ✓ item fails', () => {
       const s = valid();
       s.blocks[1]!.items[1]!.expected = 'has lived';
+      s.blocks[1]!.items[1]!.wrong = 'lived';
       expect(checkGenerated(s, ctx)).toEqual(['b1 TD-4: no item with expected ✓']);
     });
 
     test('a fix block with only ✓ items fails', () => {
       const s = valid();
-      s.blocks[1]!.items = s.blocks[1]!.items.map((i) => ({ ...i, expected: '✓' }));
+      s.blocks[1]!.items = s.blocks[1]!.items.map((i) => ({ ...i, expected: '✓', wrong: '' }));
       expect(checkGenerated(s, ctx)).toEqual(['b1 TD-4: no item with a correction']);
     });
   });
@@ -209,6 +211,32 @@ describe('checkGenerated', () => {
       const s = valid();
       s.blocks[2]!.paragraphs[0]!.errors[0]!.correction = '  ';
       expect(checkGenerated(s, ctx)).toEqual(['b2.p0.e0 TD-7: correction has 0 words']);
+    });
+  });
+
+  describe('TD-7 wrong fragment of fix items', () => {
+    test('fix item with a correction needs a wrong fragment', () => {
+      const s = valid();
+      s.blocks[1]!.items[2]!.wrong = '';
+      expect(checkGenerated(s, ctx)).toEqual(['b1.i2 TD-7: wrong fragment missing']);
+    });
+
+    test('wrong fragment must occur exactly once in the prompt', () => {
+      const s = valid();
+      Object.assign(s.blocks[1]!.items[2]!, { prompt: 'He go and go', wrong: 'go' });
+      expect(checkGenerated(s, ctx)).toEqual(['b1.i2 TD-7: wrong fragment must occur exactly once in the prompt']);
+      s.blocks[1]!.items[2]!.wrong = 'went';
+      expect(checkGenerated(s, ctx)).toEqual(['b1.i2 TD-7: wrong fragment must occur exactly once in the prompt']);
+    });
+
+    test('✓ fix item and gap item must have empty wrong', () => {
+      const s = valid();
+      s.blocks[1]!.items[1]!.wrong = 'lived';
+      s.blocks[0]!.items[1]!.wrong = 'was';
+      expect(checkGenerated(s, ctx)).toEqual([
+        'b0.i1 TD-7: wrong fragment must be empty',
+        'b1.i1 TD-7: wrong fragment must be empty',
+      ]);
     });
   });
 

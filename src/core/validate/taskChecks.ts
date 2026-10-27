@@ -64,6 +64,14 @@ export function checkGenerated(s: GeneratedSession, ctx: CheckContext): string[]
         const n = wordCount(it.expected);
         if (n < 1 || n > 2) out.push(`${ref} TD-7: correction has ${n} words`);
       }
+      const hasCorrection = b.format === 'fix' && it.expected.trim() !== '✓';
+      if (!hasCorrection) {
+        if (it.wrong !== '') out.push(`${ref} TD-7: wrong fragment must be empty`);
+      } else if (it.wrong === '') {
+        out.push(`${ref} TD-7: wrong fragment missing`);
+      } else if (it.prompt.split(it.wrong).length - 1 !== 1) {
+        out.push(`${ref} TD-7: wrong fragment must occur exactly once in the prompt`);
+      }
       checkTopic(ref, it.topicKey, it.ruleSection);
     });
 

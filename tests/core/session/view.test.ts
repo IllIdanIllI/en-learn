@@ -6,7 +6,7 @@ import { loadSessionView } from '@/core/session/view';
 
 const base: NewItem = {
   prompt: '', expected: '', paragraph: null, topicId: null, ruleId: null, ruleVersion: null, ruleSection: null,
-  spellingWordId: null, isCheck: false, status: 'active', note: null,
+  spellingWordId: null, isCheck: false, status: 'active', note: null, wrong: null,
 };
 
 /** Spelling, a gap task with one defect item, a spot block with two errors in one paragraph, a speaking question. */

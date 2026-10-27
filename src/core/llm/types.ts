@@ -6,6 +6,7 @@ export interface GeneratedItem {
   topicKey: string;
   ruleSection: string;
   isCheck: boolean;
+  wrong: string;
 }
 
 export interface GeneratedParagraph {

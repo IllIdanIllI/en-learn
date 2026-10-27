@@ -29,7 +29,7 @@ export async function addItem(
   const ref = i.topic === null ? null : await ruleRef(db, i.topic);
   await insertItem(db, blockId, ord, {
     prompt: i.prompt, expected: i.expected, paragraph: null, topicId: ref?.topicId ?? null, ruleId: ref?.ruleId ?? null,
-    ruleVersion: ref?.version ?? null, ruleSection: i.ruleSection, spellingWordId: null, isCheck: false, status: 'active', note: null,
+    ruleVersion: ref?.version ?? null, ruleSection: i.ruleSection, spellingWordId: null, isCheck: false, status: 'active', note: null, wrong: null,
   });
   const rows = await db.select<{ id: number }>('SELECT id FROM item WHERE block_id = ? AND ord = ?', [blockId, ord]);
   return rows[0]!.id;

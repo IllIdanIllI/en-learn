@@ -35,7 +35,7 @@ const feedbackFor = (key: string) => FEEDBACK[key] ?? (FEEDBACK[FALLBACK] as (ty
 
 interface Bank {
   gap: { prompt: string; expected: string }[];
-  fix: { prompt: string; expected: string }[];
+  fix: { prompt: string; expected: string; wrong?: string }[];
   spot: { text: string; errors: { wrong: string; correction: string }[] };
 }
 
@@ -47,9 +47,9 @@ const BANKS: Record<string, Bank> = {
       { prompt: 'I need ___ hour to finish this.', expected: 'an' },
     ],
     fix: [
-      { prompt: 'She is an teacher at a local school.', expected: 'a teacher' },
+      { prompt: 'She is an teacher at a local school.', expected: 'a teacher', wrong: 'an teacher' },
       { prompt: 'The sun rises in the east.', expected: '✓' },
-      { prompt: 'I saw a elephant at the zoo.', expected: 'an elephant' },
+      { prompt: 'I saw a elephant at the zoo.', expected: 'an elephant', wrong: 'a elephant' },
     ],
     spot: {
       text: 'Yesterday I met a old friend at the station. He works as an engineer in the large company. We talked for a hour and then took the bus to a city centre. He has a idea about opening a cafe.',
@@ -69,9 +69,9 @@ const BANKS: Record<string, Bank> = {
       { prompt: 'If they leave now, they ___ the train.', expected: 'will catch' },
     ],
     fix: [
-      { prompt: 'If she will come, we will start.', expected: 'comes' },
+      { prompt: 'If she will come, we will start.', expected: 'comes', wrong: 'will come' },
       { prompt: 'If it rains, we stay at home.', expected: '✓' },
-      { prompt: 'If I would have time, I will call you.', expected: 'have' },
+      { prompt: 'If I would have time, I will call you.', expected: 'have', wrong: 'would have' },
     ],
     spot: {
       text: 'If it will rain tomorrow, we stay at home. If she comes late, we will to start without her. If I would have time, I will call you. If they leave now, they catch the train. If he will win, we will celebrate.',
@@ -91,9 +91,9 @@ const BANKS: Record<string, Bank> = {
       { prompt: 'They have ___ the film already.', expected: 'seen' },
     ],
     fix: [
-      { prompt: 'I have seen him yesterday.', expected: 'saw' },
+      { prompt: 'I have seen him yesterday.', expected: 'saw', wrong: 'have seen' },
       { prompt: 'She has lived here since 2020.', expected: '✓' },
-      { prompt: 'We have went to the museum.', expected: 'have gone' },
+      { prompt: 'We have went to the museum.', expected: 'have gone', wrong: 'have went' },
     ],
     spot: {
       text: 'I have visited Rome last year. She has lived here since five years. They have went home already. He has not finish his work yet. We have met in 2019.',
@@ -113,9 +113,9 @@ const BANKS: Record<string, Bank> = {
       { prompt: 'The shop ___ at nine.', expected: 'opens' },
     ],
     fix: [
-      { prompt: 'He work late on Fridays.', expected: 'works' },
+      { prompt: 'He work late on Fridays.', expected: 'works', wrong: 'work' },
       { prompt: 'She likes tea.', expected: '✓' },
-      { prompt: 'My brother play football every week.', expected: 'plays' },
+      { prompt: 'My brother play football every week.', expected: 'plays', wrong: 'play' },
     ],
     spot: {
       text: 'My brother live in London and work in a bank. He usually get up at six. His wife teach at a school. She love her job. They both enjoys the weekend.',
@@ -133,8 +133,8 @@ const BANKS: Record<string, Bank> = {
 const FALLBACK = 'articles';
 const bankFor = (key: string): Bank => BANKS[key] ?? (BANKS[FALLBACK] as Bank);
 
-const item = (b: { prompt: string; expected: string }, topicKey: string, isCheck: boolean): GeneratedItem => ({
-  prompt: b.prompt, expected: b.expected, topicKey, ruleSection: SECTION, isCheck,
+const item = (b: { prompt: string; expected: string; wrong?: string }, topicKey: string, isCheck: boolean): GeneratedItem => ({
+  prompt: b.prompt, expected: b.expected, topicKey, ruleSection: SECTION, isCheck, wrong: b.wrong ?? '',
 });
 
 function reviewBlock(allowed: string[], due: string[]): GeneratedBlock {

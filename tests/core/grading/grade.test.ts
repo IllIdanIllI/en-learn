@@ -79,7 +79,7 @@ async function setup(date: string, today: string, script: LlmResult<unknown>[], 
   await setSetting(db, 'nativeLanguage', 'en');
   await raw.execute("INSERT INTO spelling_word (word, hint, created_at) VALUES ('necessary', 'Not optional: ___', 'x')");
   const sid = await insertDraftSession(db, { date, title: 't', isLight: false, createdAt: 'x' });
-  const base = { paragraph: null, topicId: null, ruleId: null, ruleVersion: null, ruleSection: null, spellingWordId: null, isCheck: false, status: 'active', note: null } as const;
+  const base = { paragraph: null, topicId: null, ruleId: null, ruleVersion: null, ruleSection: null, spellingWordId: null, isCheck: false, status: 'active', note: null, wrong: null } as const;
   const linked: Pick<NewItem, 'topicId' | 'ruleId' | 'ruleVersion' | 'ruleSection'> = { topicId: 1, ruleId: 1, ruleVersion: 1, ruleSection: 'Basics' };
   const blk = { instruction: 'i', formatExample: null, minutes: 5 };
   const b0 = await insertBlock(db, sid, 0, { ...blk, kind: 'spelling', format: 'spelling', title: 'Spelling', passage: null });

@@ -36,12 +36,12 @@ export async function writeBlocks(
     for (const w of spelling) {
       await insertItem(db, blockId, i++, {
         prompt: w.hint ?? '', expected: w.word, paragraph: null, topicId: null, ruleId: null, ruleVersion: null,
-        ruleSection: null, spellingWordId: w.id, isCheck: false, status: 'active', note: null,
+        ruleSection: null, spellingWordId: w.id, isCheck: false, status: 'active', note: null, wrong: null,
       });
     }
   }
 
-  const linked = (ref: string, topicKey: string, ruleSection: string, base: Pick<NewItem, 'prompt' | 'expected' | 'paragraph' | 'isCheck'>): NewItem => {
+  const linked = (ref: string, topicKey: string, ruleSection: string, base: Pick<NewItem, 'prompt' | 'expected' | 'paragraph' | 'isCheck' | 'wrong'>): NewItem => {
     const r = byKey.get(normaliseTopicKey(topicKey));
     const reason = defects.get(ref);
     return {
@@ -71,12 +71,13 @@ export async function writeBlocks(
     for (const [ii, it] of b.items.entries()) {
       await insertItem(db, blockId, i++, linked(`b${bi}.i${ii}`, it.topicKey, it.ruleSection, {
         prompt: it.prompt, expected: it.expected, paragraph: null, isCheck: it.isCheck,
+        wrong: b.format === 'fix' && it.wrong !== '' ? it.wrong : null,
       }));
     }
     for (const [pi, p] of b.paragraphs.entries()) {
       for (const [ei, e] of p.errors.entries()) {
         await insertItem(db, blockId, i++, linked(`b${bi}.p${pi}.e${ei}`, e.topicKey, e.ruleSection, {
-          prompt: e.wrong, expected: e.correction, paragraph: pi, isCheck: false,
+          prompt: e.wrong, expected: e.correction, paragraph: pi, isCheck: false, wrong: null,
         }));
       }
     }

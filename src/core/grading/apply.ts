@@ -46,6 +46,10 @@ export async function applyGraded(db: Db, clock: Clock, items: GradingItem[], g:
         defects.push([it.id, e.explanation]);
         continue;
       }
+      if (g.skipped.has(it.id)) {
+        await upsertAnswer(db, { itemId: it.id, text: '', verdict: 'skipped', fix: null, ruleSection: null, explanation: null, vocabularyNote: null });
+        continue;
+      }
       const isFound = found.has(refs.refOf.get(it.id)!);
       await upsertAnswer(db, {
         itemId: it.id, text: matchingLine(text, it.prompt), verdict: isFound ? 'correct' : 'wrong', fix: it.expected,

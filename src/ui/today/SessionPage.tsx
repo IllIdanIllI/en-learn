@@ -65,7 +65,7 @@ export function SessionPage({ sessionId, rebuilding, loader = null, onRebuild, o
           setLoadError(null);
           // What was saved comes back into the fields; text typed meanwhile stays.
           const saved: Record<number, string> = {};
-          for (const b of v.blocks) for (const i of b.items) if (i.answer?.disputeText) saved[i.id] = i.answer.disputeText;
+          for (const b of v.blocks) for (const i of [...b.items, ...b.paragraphs.flatMap((p) => p.errors ?? [])]) if (i.answer?.disputeText) saved[i.id] = i.answer.disputeText;
           setDisputes((prev) => ({ ...saved, ...prev }));
         }
       },
@@ -180,7 +180,7 @@ export function SessionPage({ sessionId, rebuilding, loader = null, onRebuild, o
   // Typed objections on graded, disputable items whose exact text has no saved reply.
   const unsent = (view?.blocks ?? []).flatMap((b) =>
     b.graded
-      ? b.items.filter((i) => {
+      ? [...b.items, ...b.paragraphs.flatMap((p) => p.errors ?? [])].filter((i) => {
           const a = i.answer;
           const text = (disputes[i.id] ?? '').trim();
           return a != null && i.status === 'active' && (a.verdict === 'wrong' || a.verdict === 'rule_gap')

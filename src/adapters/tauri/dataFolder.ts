@@ -13,8 +13,8 @@ export interface DataLocation {
 export async function readDataDir(appDataDir: string): Promise<string | null> {
   const file = `${appDataDir}/location.json`;
   if (!(await exists(file))) return null;
-  const parsed = JSON.parse(await readTextFile(file)) as { dataDir?: unknown };
-  return typeof parsed.dataDir === 'string' && parsed.dataDir !== '' ? parsed.dataDir : null;
+  const parsed = JSON.parse(await readTextFile(file)) as { dataDir?: unknown } | null;
+  return typeof parsed?.dataDir === 'string' && parsed.dataDir !== '' ? parsed.dataDir : null;
 }
 
 async function listFiles(dir: string, rel: string): Promise<string[]> {
@@ -31,14 +31,23 @@ async function listFiles(dir: string, rel: string): Promise<string[]> {
 export async function moveDataDir(cur: DataLocation, target: string, closeDb: () => Promise<void>): Promise<void> {
   const dbBase = cur.custom ?? cur.appConfigDir;
   const promptsBase = cur.custom ?? cur.appDataDir;
-  const present: string[] = [];
-  for (const f of DB_FILES) if (await exists(`${dbBase}/${f}`)) present.push(f);
-  present.push(...(await listFiles(`${promptsBase}/prompts`, 'prompts')));
+  const scanDb = async () => {
+    const found: string[] = [];
+    for (const f of DB_FILES) if (await exists(`${dbBase}/${f}`)) found.push(f);
+    return found;
+  };
+  const prompts = await listFiles(`${promptsBase}/prompts`, 'prompts');
 
-  const plan = planMove(promptsBase, target, present, await exists(`${target}/enlearn.db`));
-  if (!plan.ok) throw new MoveRefused(plan.reason);
+  const first = planMove(promptsBase, target, [...(await scanDb()), ...prompts], false);
+  if (!first.ok) throw new MoveRefused(first.reason);
+  for (const c of first.copies) if (await exists(c.to)) throw new MoveRefused('occupied');
 
   await closeDb();
+  // Closing a WAL-mode database removes -wal/-shm, so what gets copied is what is left now.
+  const present = await scanDb();
+  if (!present.includes('enlearn.db')) throw new Error('enlearn.db not found');
+  const plan = planMove(promptsBase, target, [...present, ...prompts], false);
+  if (!plan.ok) throw new MoveRefused(plan.reason);
   const made: string[] = [];
   try {
     await mkdir(target, { recursive: true });
@@ -46,8 +55,8 @@ export async function moveDataDir(cur: DataLocation, target: string, closeDb: ()
       const rel = c.from.slice(promptsBase.length + 1);
       const from = `${rel.startsWith('prompts/') ? promptsBase : dbBase}/${rel}`;
       await mkdir(c.to.replace(/\/[^/]*$/, ''), { recursive: true });
-      await copyFile(from, c.to);
       made.push(c.to);
+      await copyFile(from, c.to);
       if ((await stat(from)).size !== (await stat(c.to)).size) throw new Error(`size mismatch: ${rel}`);
     }
     await writeTextFile(`${cur.appDataDir}/location.json`, JSON.stringify({ dataDir: target }));

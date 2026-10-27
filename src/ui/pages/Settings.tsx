@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { FieldError } from '@/ui/components/FieldError';
 import { Segmented } from '@/ui/components/Segmented';
 import { useCore } from '@/ui/app/CoreProvider';
+import { Notice } from '@/ui/today/chips';
 
 const MODELS = ['claude-sonnet-5-5', 'claude-haiku-5-5'];
 const KINDS: LlmKind[] = ['rule_draft', 'generate_session', 'validate_session', 'grade', 'dispute'];
@@ -38,7 +39,7 @@ const parseBudget = (raw: string): number | null | 'invalid' => {
 };
 
 export function Settings() {
-  const { deps, lang, settings, prereq, dataDir, moveDataDir, refresh } = useCore();
+  const { deps, lang, settings, prereq, dataDir, dataDirError, moveDataDir, refresh } = useCore();
   const [saved, setSaved] = useState(false);
   const timer = useRef<number | undefined>(undefined);
   const [budget, setBudget] = useState(settings.budgetUsd === null ? '' : String(settings.budgetUsd));
@@ -51,9 +52,9 @@ export function Settings() {
     if (!moveDataDir) return;
     setMoveError(null);
     try {
-      const { open } = await import('@tauri-apps/plugin-dialog');
+      const { open, ask } = await import('@tauri-apps/plugin-dialog');
       const picked = await open({ directory: true, multiple: false });
-      if (typeof picked !== 'string' || !window.confirm(t(lang, 'settings.dataDir.confirm', { path: picked }))) return;
+      if (typeof picked !== 'string' || !(await ask(t(lang, 'settings.dataDir.confirm', { path: picked }), { kind: 'warning' }))) return;
       setMoving(true);
       await moveDataDir(picked);
     } catch (e) {
@@ -108,6 +109,7 @@ export function Settings() {
         </p>
       </div>
       {failed && <FieldError>{t(lang, 'settings.err.save')}</FieldError>}
+      {dataDirError && <Notice className="mt-4">{t(lang, 'settings.dataDir.err.location', { message: dataDirError })}</Notice>}
 
       <div className="mt-6 border-t border-border">
         <Row label={t(lang, 'settings.language')}>

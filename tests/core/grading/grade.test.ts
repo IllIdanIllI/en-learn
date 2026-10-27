@@ -172,6 +172,23 @@ describe('gradeSession', () => {
     expect(v).toMatchObject({ 1: 'skipped', 2: 'skipped', 3: 'skipped', 4: 'correct' });
   });
 
+  test('a blank spot paragraph is skipped without an LLM call, with or without finish', async () => {
+    for (const finish of [false, true]) {
+      const { db, llm, deps, sid } = await setup('2026-10-20', '2026-10-20', []);
+      const sub = subm({ items: { 4: 'an' }, spot: ' \n  ' });
+      expect(await gradeSession(deps, sid, sub, [], { finish })).toEqual({ kind: 'graded' });
+      expect(llm.calls).toHaveLength(0);
+      expect(await verdicts(db)).toEqual({ 1: 'correct', 2: 'correct', 3: 'correct', 4: 'correct', 5: 'skipped', 6: 'skipped', 7: 'skipped', 8: 'skipped', 9: 'skipped' });
+    }
+  });
+
+  test('a code-graded spot paragraph marks the found errors correct and the rest wrong, without an LLM call', async () => {
+    const { db, llm, deps, sid } = await setup('2026-10-20', '2026-10-20', []);
+    expect(await gradeSession(deps, sid, subm({ items: { 4: 'an' } }), [])).toEqual({ kind: 'graded' });
+    expect(llm.calls).toHaveLength(0);
+    expect(await verdicts(db)).toMatchObject({ 5: 'correct', 6: 'correct', 7: 'wrong', 8: 'wrong', 9: 'wrong' });
+  });
+
   test('finish still asks about an unknown symbol answer', async () => {
     const { deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(result())]);
     const out = await gradeSession(deps, sid, subm({ items: { 2: '', 3: '~' } }), [], { finish: true });

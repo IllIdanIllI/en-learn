@@ -134,6 +134,8 @@ async function run(
         if (i.format !== 'spot' && i.format !== 'question' && (answers[i.id] ?? '').trim() === '') skipped.add(i.id);
       }
     }
+    // A spot paragraph without learner lines is not graded: its hidden errors are stored as skipped.
+    for (const s of spotParagraphs(items, sub.spot)) if (s.learnerText.trim() === '') for (const e of s.errors) skipped.add(e.id);
     const open = items.filter((i) => !skipped.has(i.id));
     const questions = precheckAnswers({ items: answers, spot: sub.spot }, open, shorthands);
     if (questions.length > 0) return { kind: 'questions', questions };
@@ -143,7 +145,8 @@ async function run(
       const a = (answers[it.id] ?? '').trim();
       texts.set(it.id, shorthands.includes(a) || BUILTIN_SHORTHANDS.includes(a) ? '✓' : a);
     }
-    const spots = spotParagraphs(items, sub.spot);
+    const allSpots = spotParagraphs(items, sub.spot);
+    const spots = allSpots.filter((s) => s.learnerText.trim() !== '');
     const result = emptyResult();
     const gradable = open.filter((i): i is typeof i & { format: 'gap' | 'fix' } => i.format === 'gap' || i.format === 'fix');
     const auto = new Set(gradable.filter((i) => autoCorrect(i, texts.get(i.id) ?? '')).map((i) => i.id));
@@ -160,7 +163,7 @@ async function run(
     });
     graded = {
       sessionId, texts, skipped,
-      spot: new Map(spots.map((s) => [`${s.blockId}:${s.paragraph}`, s.learnerText])),
+      spot: new Map(allSpots.map((s) => [`${s.blockId}:${s.paragraph}`, s.learnerText])),
       result,
     };
     batch = {

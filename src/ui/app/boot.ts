@@ -18,7 +18,13 @@ export async function bootTauri(): Promise<CoreInit> {
       import('@/adapters/tauri/claudeCli'),
     ]);
   const [appData, appConfig, home] = await Promise.all([appDataDir(), appConfigDir(), homeDir()]);
-  const custom = await readDataDir(appData);
+  let custom: string | null = null;
+  let dataDirError: string | undefined;
+  try {
+    custom = await readDataDir(appData);
+  } catch (e) {
+    dataDirError = e instanceof Error ? e.message : String(e);
+  }
   const dataDir = custom ?? appData;
   const db = await openTauriDb(custom);
   await startApp({ db });
@@ -44,6 +50,7 @@ export async function bootTauri(): Promise<CoreInit> {
       }
     },
     dataDir,
+    ...(dataDirError === undefined ? {} : { dataDirError }),
     moveDataDir: (target) => moveDataDir({ appDataDir: appData, appConfigDir: appConfig, custom }, target, () => db.close()),
     reopenDb: () => openTauriDb(custom),
     makeLlm: (location) => new ClaudeCli(runner, location, appData, home),

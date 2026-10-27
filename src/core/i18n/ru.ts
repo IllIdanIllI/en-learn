@@ -87,6 +87,7 @@ export const ru: Record<keyof typeof en, string> = {
   'settings.dataDir.err.inside': 'Нельзя выбрать папку внутри текущей.',
   'settings.dataDir.err.occupied': 'В этой папке уже есть база данных.',
   'settings.dataDir.err.failed': 'Не удалось перенести данные: {message}',
+  'settings.dataDir.err.location': 'Файл location.json повреждён, используется папка по умолчанию: {message}',
   'llm.rule_draft': 'Черновики правил',
   'llm.generate_session': 'Составление занятия',
   'llm.validate_session': 'Проверка занятия',

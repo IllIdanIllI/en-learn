@@ -85,6 +85,7 @@ export const en = {
   'settings.dataDir.err.inside': "The new folder can't be inside the current one.",
   'settings.dataDir.err.occupied': 'This folder already has a database.',
   'settings.dataDir.err.failed': 'Could not move the data: {message}',
+  'settings.dataDir.err.location': 'location.json is damaged; the default folder is used: {message}',
   'llm.rule_draft': 'Rule drafts',
   'llm.generate_session': 'Session generation',
   'llm.validate_session': 'Session validation',

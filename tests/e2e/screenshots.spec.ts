@@ -305,6 +305,17 @@ test.describe('today actions', () => {
     await expect(page.getByRole('button', { name: /Отправить возражения/ })).toHaveCount(0);
   });
 
+  test('a spot error counts in the sticky bar and its saved dispute is kept after sending', async ({ page }) => {
+    await page.goto('/?state=graded#/today');
+    const spotError = page.getByRole('listitem').filter({ hasText: '→' }).filter({ has: page.getByRole('button', { name: 'Оспорить' }) }).first();
+    await spotError.getByRole('button', { name: 'Оспорить' }).click();
+    await spotError.getByRole('textbox', { name: 'Ваше возражение' }).fill('Здесь нет ошибки.');
+    await page.getByRole('button', { name: 'Отправить возражения (1)' }).click();
+    await expect(page.getByRole('button', { name: /Отправить возражения/ })).toHaveCount(0);
+    await expect(page.getByText('Правило допускает только указанный вариант.')).toBeVisible();
+    await expect(page.getByText('Здесь нет ошибки.')).toBeVisible();
+  });
+
   test('counting a disputed item as correct raises the score', async ({ page }) => {
     await page.goto('/?state=graded#/today');
     await teacher(page).getByRole('button', { name: 'Оспорить' }).click();

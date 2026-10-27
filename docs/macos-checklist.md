@@ -76,6 +76,7 @@ F. **Light day (criterion 5).**
 G. **Move the data (spec F1).**
    - Action: Settings → Data folder → "Change…", pick a new empty folder (for example `~/Documents/enlearn-data`), confirm.
    - Expected: "Moving data…" shows, the app reloads, the Data folder row shows the new path, and Today still shows your lessons. The new folder has `enlearn.db` and, if you had overrides, `prompts/`. The old `enlearn.db*` and `prompts/` are gone; `location.json` stays in the app data folder.
+   - Also: check the move succeeds on a DB that was in use (open Today, grade or edit something first, then move).
    - If it fails: record the error line and the console output.
 
 H. **Restart after a move.**

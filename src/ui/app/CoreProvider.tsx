@@ -20,6 +20,8 @@ export interface CoreInit {
   loadSeedInput(): SeedBundle | null;
   /** Folder shown in Settings: the database and prompt overrides live there. */
   dataDir: string;
+  /** Set when location.json could not be read and the default folder is used. */
+  dataDirError?: string;
   /** Copies the data to `target` and switches to it (the caller reloads); absent in preview. Throws `MoveRefused` before touching anything. */
   moveDataDir?: (target: string) => Promise<void>;
   /** Reopens the database after a failed move closed it. */
@@ -36,6 +38,7 @@ export interface Core {
   prereq: PrereqResult | null;
   loadSeedInput(): SeedBundle | null;
   dataDir: string;
+  dataDirError?: string;
   /** Present when the data folder can be changed. Reloads the app on success, throws on failure with the old folder still in use. */
   moveDataDir?: (target: string) => Promise<void>;
   /** Reruns the `claude` check; on success the Llm is swapped in and `prereq` becomes ok. */
@@ -67,7 +70,7 @@ function useTheme(theme: Settings['theme']): void {
 }
 
 export function CoreProvider({ init, children }: { init: CoreInit; children: ReactNode }) {
-  const { runner, loadSeedInput, dataDir, makeLlm } = init;
+  const { runner, loadSeedInput, dataDir, dataDirError, makeLlm } = init;
   const [deps, setDeps] = useState(init.deps);
   const [prereq, setPrereq] = useState(init.prereq);
   const [settings, setSettings] = useState(init.settings);
@@ -99,8 +102,13 @@ export function CoreProvider({ init, children }: { init: CoreInit; children: Rea
         await move(target);
       } catch (e) {
         if (!(e instanceof MoveRefused) && init.reopenDb) {
-          const db = await init.reopenDb();
-          setDeps((d) => ({ ...d, db }));
+          try {
+            const db = await init.reopenDb();
+            setDeps((d) => ({ ...d, db }));
+          } catch (reopen) {
+            const message = (x: unknown) => (x instanceof Error ? x.message : String(x));
+            throw new Error(`${message(e)}; ${message(reopen)}`, { cause: reopen });
+          }
         }
         throw e;
       }
@@ -115,9 +123,9 @@ export function CoreProvider({ init, children }: { init: CoreInit; children: Rea
 
   const value = useMemo<Core>(
     () => ({
-      deps, runner, lang: settings.nativeLanguage, settings, prereq, loadSeedInput, dataDir, moveDataDir, recheckPrerequisites, refresh, version,
+      deps, runner, lang: settings.nativeLanguage, settings, prereq, loadSeedInput, dataDir, dataDirError, moveDataDir, recheckPrerequisites, refresh, version,
     }),
-    [deps, runner, settings, prereq, loadSeedInput, dataDir, moveDataDir, recheckPrerequisites, refresh, version],
+    [deps, runner, settings, prereq, loadSeedInput, dataDir, dataDirError, moveDataDir, recheckPrerequisites, refresh, version],
   );
   return <CoreContext.Provider value={value}>{children}</CoreContext.Provider>;
 }

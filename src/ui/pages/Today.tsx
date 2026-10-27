@@ -3,11 +3,14 @@ import { Link } from 'react-router-dom';
 import type { ISODate } from '@/core/domain';
 import { formatTitleDate } from '@/core/dates';
 import { t } from '@/core/i18n';
+import { closeSession } from '@/core/db/repos/sessions';
+import { extendSession } from '@/core/session/extend';
 import { generateSession, rebuildSession, type GenerateResult } from '@/core/session/generate';
 import { getTodayState, type TodayState } from '@/core/session/plan';
 import { useCore } from '@/ui/app/CoreProvider';
 import { Button } from '@/ui/components/ui/button';
 import { Notice } from '@/ui/today/chips';
+import { LessonClosed } from '@/ui/today/LessonClosed';
 import { RuleDraft } from '@/ui/today/RuleDraft';
 import { SessionPage } from '@/ui/today/SessionPage';
 import { ErrorNotice } from '@/ui/today/ErrorNotice';
@@ -22,6 +25,8 @@ export function Today() {
   const [genError, setGenError] = useState<GenError | null>(null);
   // A graded session of an earlier day stays on screen after grading, until the page is left.
   const [pinned, setPinned] = useState<number | null>(null);
+  // A closed lesson shows its results below the card on request.
+  const [showResults, setShowResults] = useState(false);
   const [reload, setReload] = useState(0);
   // Bumped after every build: a deleted session's id can be reused, and the page must not keep its answers.
   const [epoch, setEpoch] = useState(0);
@@ -70,6 +75,16 @@ export function Today() {
     }
   }, []);
   const start = (light: boolean) => void build(() => generateSession(deps, { light }));
+  const addMore = (sessionId: number) => {
+    setShowResults(false);
+    void build(() => extendSession(deps, sessionId));
+  };
+  const close = (sessionId: number) => {
+    closeSession(deps.db, sessionId).then(
+      () => setReload((n) => n + 1),
+      (e: unknown) => setGenError({ message: e instanceof Error ? e.message : String(e) }),
+    );
+  };
   const lastLight = useRef(false);
   const rebuild = (sessionId: number, light: boolean) => {
     lastLight.current = light;
@@ -91,6 +106,7 @@ export function Today() {
     : state.kind === 'earlier_session' ? { id: state.sessionId, earlier: true, restDay: state.restDay, date: state.date }
     : pinned !== null ? { id: pinned, earlier: true, restDay: state.kind === 'rest' }
     : null;
+  const closed = state.kind === 'session' && state.closed;
   if (shown) {
     return (
       <>
@@ -101,7 +117,7 @@ export function Today() {
             message={genError.message}
             code={genError.code}
             busy={generating}
-            onRetry={() => (shown.earlier ? start(shown.restDay) : rebuild(shown.id, lastLight.current))}
+            onRetry={() => (shown.earlier ? start(shown.restDay) : closed ? addMore(shown.id) : rebuild(shown.id, lastLight.current))}
           />
         )}
         {shown.earlier && (
@@ -118,13 +134,25 @@ export function Today() {
             )}
           </Notice>
         )}
-        <SessionPage
-          key={`${shown.id}:${epoch}`}
-          sessionId={shown.id}
-          rebuilding={generating}
-          onRebuild={shown.earlier ? undefined : (light) => rebuild(shown.id, light)}
-          onGraded={shown.earlier ? () => setPinned(shown.id) : undefined}
-        />
+        {closed && (
+          <LessonClosed
+            lang={lang}
+            adding={generating}
+            showingResults={showResults}
+            onToggleResults={() => setShowResults((v) => !v)}
+            onAddMore={() => addMore(shown.id)}
+          />
+        )}
+        {(!closed || showResults) && (
+          <SessionPage
+            key={`${shown.id}:${epoch}`}
+            sessionId={shown.id}
+            rebuilding={generating}
+            onRebuild={shown.earlier ? undefined : (light) => rebuild(shown.id, light)}
+            onGraded={shown.earlier ? () => setPinned(shown.id) : undefined}
+            onClose={shown.earlier || closed ? undefined : () => close(shown.id)}
+          />
+        )}
       </>
     );
   }

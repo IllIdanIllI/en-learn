@@ -122,6 +122,38 @@ describe('gradeSession', () => {
     expect((await rows<{ n: number }>(db, 'SELECT COUNT(*) AS n FROM llm_call WHERE session_id = ?', [sid]))[0]!.n).toBe(1);
   });
 
+  test('grading an open round sends only its refs, keeps earlier answers and appends the patterns', async () => {
+    const { db, llm, deps, sid } = await setup('2026-10-20', '2026-10-20', [
+      ok(fullResult({ patterns: ['first pattern'], tomorrow: ['first tomorrow'] })),
+      ok(result({ items: [entry('b4.i0', 'wrong', { fix: 'an', ruleSection: 'Basics', explanation: 'Use an.' }), entry('b4.i1', 'correct')], patterns: ['first pattern', 'second pattern'], tomorrow: ['second tomorrow'] })),
+    ]);
+    expect(await gradeSession(deps, sid, subm(), [])).toEqual({ kind: 'graded' });
+    const before = await rows(db, 'SELECT * FROM answer ORDER BY item_id');
+    const b4 = await insertBlock(db, sid, 4, { instruction: 'i', formatExample: null, minutes: 5, kind: 'task', format: 'fix', title: 'More', passage: null }, 2);
+    const it = { paragraph: null, topicId: 1, ruleId: 1, ruleVersion: 1, ruleSection: 'Basics', spellingWordId: null, isCheck: false, status: 'active', note: null } as const;
+    await insertItem(db, b4, 0, { ...it, prompt: 'I saw a owl.', expected: 'an', wrong: 'a owl' });
+    await insertItem(db, b4, 1, { ...it, prompt: 'He ate a pear.', expected: '✓', wrong: null });
+
+    expect(await gradeSession(deps, sid, { items: { 10: 'a', 11: '✓' }, spot: {} }, [])).toEqual({ kind: 'graded' });
+    const second = userPrompt(llm, 1);
+    expect(second.match(/^### b\d+\.i\d+/gm)).toEqual(['### b4.i0']);
+    expect(await rows(db, 'SELECT * FROM answer WHERE item_id <= 9 ORDER BY item_id')).toEqual(before);
+    expect(await verdicts(db)).toMatchObject({ 10: 'wrong', 11: 'correct' });
+    const fb = (await rows<{ patterns: string; tomorrow: string }>(db, 'SELECT * FROM session_feedback'))[0]!;
+    expect(JSON.parse(fb.patterns)).toEqual(['first pattern', 'second pattern']);
+    expect(JSON.parse(fb.tomorrow)).toEqual(['first tomorrow', 'second tomorrow']);
+    expect((await sessionRow(db)).status).toBe('graded');
+  });
+
+  test('finish on an open round skips only the blank open items', async () => {
+    const { db, deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(fullResult())]);
+    await gradeSession(deps, sid, subm(), []);
+    const b4 = await insertBlock(db, sid, 4, { instruction: 'i', formatExample: null, minutes: 5, kind: 'task', format: 'fix', title: 'More', passage: null }, 2);
+    await insertItem(db, b4, 0, { paragraph: null, topicId: 1, ruleId: 1, ruleVersion: 1, ruleSection: 'Basics', spellingWordId: null, isCheck: false, status: 'active', note: null, prompt: 'I saw a owl.', expected: 'an', wrong: 'a owl' });
+    expect(await gradeSession(deps, sid, { items: {}, spot: {} }, [], { finish: true })).toEqual({ kind: 'graded' });
+    expect(await verdicts(db)).toMatchObject({ 4: 'wrong', 10: 'skipped' });
+  });
+
   test('finish skips blank gap/fix/spelling items without a question and grades the answered ones', async () => {
     const { db, deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(result())]);
     const sub = subm({ items: { 1: '', 2: '', 3: '', 4: 'an' }, spot: '' });
@@ -413,6 +445,7 @@ describe('gradeSession', () => {
     const other = await setup('2026-10-20', '2026-10-20', [ok(clarify())]);
     await gradeSession(other.deps, other.sid, subm({ items: { 3: 'a/an' } }), []);
     await other.db.execute("UPDATE session SET status = 'graded'");
+    await other.db.execute("INSERT INTO answer (item_id, text, verdict) SELECT id, 'x', 'correct' FROM item"); // nothing left open
     expect(await gradeSession(other.deps, other.sid, subm(), [])).toEqual({ kind: 'graded' });
     expect(hasAwaiting(other.sid)).toBe(false);
   });

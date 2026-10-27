@@ -8,6 +8,8 @@ export interface Settings {
   acceptedShorthands: string[];
   spellingVariant: 'british' | 'american';
   theme: 'dark' | 'light' | 'system';
+  /** Ids of sessions the learner closed; the last 30 are kept. */
+  closedSessions: number[];
 }
 
 const DEFAULT_MODEL = 'claude-sonnet-5-5';
@@ -25,6 +27,7 @@ export const DEFAULT_SETTINGS: Settings = {
   acceptedShorthands: ['✓'],
   spellingVariant: 'british',
   theme: 'dark',
+  closedSessions: [],
 };
 
 export async function getSettings(db: Db): Promise<Settings> {

@@ -130,6 +130,42 @@ const BANKS: Record<string, Bank> = {
   },
 };
 
+/** Fix items of an extra set ("Add more questions"): six per topic, none of them in the main banks. */
+const EXTRA_FIX: Record<string, { prompt: string; expected: string; wrong?: string }[]> = {
+  articles: [
+    { prompt: 'My sister is an nurse in a big hospital.', expected: 'a nurse', wrong: 'an nurse' },
+    { prompt: 'We waited for an hour at the airport.', expected: '✓' },
+    { prompt: 'He bought a umbrella because of the rain.', expected: 'an umbrella', wrong: 'a umbrella' },
+    { prompt: 'She plays the guitar every evening.', expected: '✓' },
+    { prompt: 'It was a honest answer to a difficult question.', expected: 'an honest', wrong: 'a honest' },
+    { prompt: 'I have a university degree in physics.', expected: '✓' },
+  ],
+  conditionals: [
+    { prompt: 'If he will call, I will answer.', expected: 'calls', wrong: 'will call' },
+    { prompt: 'If we leave now, we will catch the bus.', expected: '✓' },
+    { prompt: 'If it would rain, we will cancel the trip.', expected: 'rains', wrong: 'would rain' },
+    { prompt: 'If you heat ice, it melts.', expected: '✓' },
+    { prompt: 'If they will arrive late, we start without them.', expected: 'arrive', wrong: 'will arrive' },
+    { prompt: 'If I see her, I will tell her.', expected: '✓' },
+  ],
+  'present-perfect': [
+    { prompt: 'She has finished the report two days ago.', expected: 'finished', wrong: 'has finished' },
+    { prompt: 'We have lived here since 2018.', expected: '✓' },
+    { prompt: 'They have saw this film already.', expected: 'have seen', wrong: 'have saw' },
+    { prompt: 'I have never been to Spain.', expected: '✓' },
+    { prompt: 'He has left the office at six yesterday.', expected: 'left', wrong: 'has left' },
+    { prompt: 'Have you ever tried sushi?', expected: '✓' },
+  ],
+  'third-person-s': [
+    { prompt: 'My mother work in a school.', expected: 'works', wrong: 'work' },
+    { prompt: 'He drinks coffee every morning.', expected: '✓' },
+    { prompt: 'The train leave at noon.', expected: 'leaves', wrong: 'leave' },
+    { prompt: 'She watches the news at night.', expected: '✓' },
+    { prompt: 'Our dog like long walks.', expected: 'likes', wrong: 'like' },
+    { prompt: 'It rains a lot here.', expected: '✓' },
+  ],
+};
+
 const FALLBACK = 'articles';
 const bankFor = (key: string): Bank => BANKS[key] ?? (BANKS[FALLBACK] as Bank);
 
@@ -148,7 +184,7 @@ function reviewBlock(allowed: string[], due: string[]): GeneratedBlock {
   };
 }
 
-function taskBlock(format: string, key: string): GeneratedBlock {
+function taskBlock(format: string, key: string, extra = false): GeneratedBlock {
   const bank = bankFor(key);
   const base = { kind: 'task' as const, minutes: 10, question: '' };
   if (format === 'spot') {
@@ -166,7 +202,9 @@ function taskBlock(format: string, key: string): GeneratedBlock {
     return {
       ...base, format: 'fix', title: 'Задание дня',
       instruction: 'Напишите ✓, если предложение верно, иначе исправленный фрагмент.',
-      formatExample: 'If it rains, we stay at home. → ✓', items: bank.fix.map((f) => item(f, key, false)), paragraphs: [],
+      formatExample: 'If it rains, we stay at home. → ✓',
+      items: (extra ? (EXTRA_FIX[key] ?? (EXTRA_FIX[FALLBACK] as { prompt: string; expected: string; wrong?: string }[])) : bank.fix).map((f) => item(f, key, false)),
+      paragraphs: [],
     };
   }
   return {
@@ -179,11 +217,12 @@ function taskBlock(format: string, key: string): GeneratedBlock {
 function generate(prompt: string): GeneratedSession {
   const allowed = [...(prompt.split('## Topic keys allowed')[1] ?? '').matchAll(/^- (\S+)$/gm)].map((m) => m[1] as string);
   const due = (/in the review block: ([^.\n]+)\./.exec(prompt)?.[1] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  const extra = prompt.includes('## Extra set');
   const blocks: GeneratedBlock[] = [];
   for (const m of prompt.matchAll(/^\d+\. (review|task|speaking) \(format ([^,)]+)(?:, topic ([^)]+))?\)$/gm)) {
     const [, kind, format, topic] = m;
     if (kind === 'review') blocks.push(reviewBlock(allowed, due));
-    else if (kind === 'task') blocks.push(taskBlock(format as string, topic ?? allowed[0] ?? FALLBACK));
+    else if (kind === 'task') blocks.push(taskBlock(format as string, topic ?? allowed[0] ?? FALLBACK, extra));
     else {
       blocks.push({
         kind: 'speaking', format: 'question', title: 'Говорение',

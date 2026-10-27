@@ -22,7 +22,7 @@ test('shell collapses to icons below 1100px', async ({ page }) => {
   await page.screenshot({ path: `${SHOTS}/shell-collapsed.png` });
 });
 
-for (const state of ['empty', 'no_session', 'generated', 'questions', 'graded', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing', 'earlier_session', 'progress_archived']) {
+for (const state of ['empty', 'no_session', 'generated', 'questions', 'graded', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing', 'earlier_session', 'progress_archived', 'closed', 'open-round']) {
   test(`today loads in state ${state}`, async ({ page }) => {
     const errors: string[] = [];
     page.on('console', (m) => {
@@ -166,6 +166,45 @@ test.describe('today session', () => {
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toHaveCount(0);
     expect(await page.content()).toContain('a teacher');
     await page.screenshot({ path: `${SHOTS}/today-graded.png`, fullPage: true });
+  });
+
+  test('Close lesson on the graded page leads to the closed card, which can show the results again', async ({ page }) => {
+    await page.goto('/?state=graded#/today');
+    await page.getByRole('button', { name: 'Закрыть урок' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Урок завершён' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Добавить вопросы' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Закрыть урок' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Показать результаты' }).click();
+    await expect(page.getByRole('heading', { name: 'Итоги' })).toBeVisible();
+    expect(await page.content()).toContain('a teacher');
+    await expect(page.getByRole('button', { name: 'Закрыть урок' })).toHaveCount(0);
+  });
+
+  test('a closed lesson stays closed on a later visit; Add more questions opens a new round', async ({ page }) => {
+    await page.goto('/?state=closed&delay=600#/today');
+    await expect(page.getByRole('heading', { level: 1, name: 'Урок завершён' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Добавить вопросы' }).click();
+    await expect(page.getByText('Добавляю вопросы…')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('My sister is an nurse')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Закрыть урок' })).toHaveCount(0);
+  });
+
+  test('an open round takes answers while the earlier blocks keep their results; grading it enables Close lesson', async ({ page }) => {
+    await page.goto('/?state=open-round#/today');
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Завершить урок' })).toBeVisible();
+    const html = await page.content();
+    expect(html).toContain('a teacher');
+    for (const key of ['an honest', 'a nurse', 'an umbrella']) expect(html).not.toContain(key);
+    await expect(page.getByRole('heading', { name: 'Итоги' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Закрыть урок' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Завершить урок' }).click();
+    await expect(page.getByRole('button', { name: 'Закрыть урок' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toHaveCount(0);
+    await expect(page.getByText('My sister is an nurse')).toBeVisible();
+    await expect(page.getByText('Не засчитано').first()).toBeVisible();
   });
 
   test('Ctrl+Enter submits from anywhere on the page', async ({ page }) => {

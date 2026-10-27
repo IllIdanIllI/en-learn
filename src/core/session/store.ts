@@ -9,7 +9,7 @@ import type { Defects } from './validation';
 
 const SPELLING_WORDS_PER_MINUTE = 3;
 
-/** Writes the blocks and items of a draft session: the spelling block first, then the generated blocks. */
+/** Writes the blocks and items of a draft session: the spelling block first, then the generated blocks. An added round starts at `at`. */
 export async function writeBlocks(
   db: Db,
   sessionId: number,
@@ -18,9 +18,10 @@ export async function writeBlocks(
   gen: GeneratedSession,
   defects: Defects,
   spelling: SpellingWord[],
+  at: { ord: number; round: number } = { ord: 0, round: 1 },
 ): Promise<void> {
   const byKey = new Map(ctx.allowed.map((r) => [normaliseTopicKey(r.topic.key), r]));
-  let ord = 0;
+  let ord = at.ord;
 
   if (spelling.length > 0) {
     const blockId = await insertBlock(db, sessionId, ord++, {
@@ -66,7 +67,7 @@ export async function writeBlocks(
       // A speaking block keeps its question text here; a spot block keeps its paragraphs as a JSON array.
       passage: b.format === 'spot' ? JSON.stringify(b.paragraphs.map((p) => p.text)) : b.format === 'question' ? b.question : null,
       minutes: b.minutes,
-    });
+    }, at.round);
     let i = 0;
     for (const [ii, it] of b.items.entries()) {
       await insertItem(db, blockId, i++, linked(`b${bi}.i${ii}`, it.topicKey, it.ruleSection, {

@@ -26,6 +26,8 @@ export interface GenerationContext {
   dueTopics: RuleRef[];
   /** Every topic whose rule is part of the context, once each. */
   allowed: RuleRef[];
+  /** An extra set for a lesson already done: the prompts of that lesson, not to be repeated. */
+  extra?: { prompts: string[] };
 }
 
 const INATTENTION_DAYS = 14;
@@ -171,6 +173,14 @@ export function renderContext(ctx: GenerationContext): string {
     '',
     blocks,
     '',
+    ...(ctx.extra
+      ? [
+          '## Extra set',
+          '',
+          `This is an extra set for today's finished lesson: 6 to 8 items, do not repeat these prompts:\n${ctx.extra.prompts.map((p) => `- ${p}`).join('\n')}`,
+          '',
+        ]
+      : []),
     '## Task topic',
     '',
     taskSection,

@@ -395,7 +395,7 @@ describe('getTodayState', () => {
     const gen = taskDay();
     const { deps } = await setup('2026-10-20', { generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
     await generateSession(deps, { light: false });
-    expect(await getTodayState(deps)).toEqual({ kind: 'session', sessionId: 1, status: 'generated' });
+    expect(await getTodayState(deps)).toEqual({ kind: 'session', sessionId: 1, status: 'generated', closed: false });
   });
 
   test('an earlier generated session is shown when there is none for today', async () => {

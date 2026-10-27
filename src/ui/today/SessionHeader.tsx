@@ -1,11 +1,12 @@
 import { t, type Lang } from '@/core/i18n';
 import type { SessionView } from '@/core/session/view';
+import { Button } from '@/ui/components/ui/button';
 import { LightToggle } from './LightToggle';
 import { useSessionActions } from './sessionActions';
 
 /** The link is the section, set in the line "Read § X before block N"; it opens the rule panel. */
-export function SessionHeader({ view, lang, rebuilding, onRebuild }: {
-  view: SessionView; lang: Lang; rebuilding: boolean; onRebuild?: (light: boolean) => void;
+export function SessionHeader({ view, lang, rebuilding, onRebuild, onClose }: {
+  view: SessionView; lang: Lang; rebuilding: boolean; onRebuild?: (light: boolean) => void; onClose?: () => void;
 }) {
   const { openRule } = useSessionActions();
   const first = view.readFirst;
@@ -35,6 +36,9 @@ export function SessionHeader({ view, lang, rebuilding, onRebuild }: {
           </>
         )}
       </p>
+      {view.status === 'graded' && !view.open && onClose && (
+        <Button className="mt-4" onClick={onClose}>{t(lang, 'today.close')}</Button>
+      )}
       {view.status === 'generated' && onRebuild && <LightToggle isLight={view.isLight} lang={lang} busy={rebuilding} onRebuild={onRebuild} />}
     </header>
   );

@@ -6,7 +6,7 @@ import { ErrorNotice } from './ErrorNotice';
 
 export type GenError = { message: string; code?: string };
 
-function Skeleton() {
+export function Skeleton() {
   return (
     <div aria-hidden className="mt-8 flex flex-col gap-3">
       {['w-1/3', 'w-full', 'w-5/6', 'w-full', 'w-2/3'].map((w, i) => (

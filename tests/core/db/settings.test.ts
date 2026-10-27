@@ -18,6 +18,7 @@ describe('settings repo', () => {
       acceptedShorthands: ['✓'],
       spellingVariant: 'british',
       theme: 'dark',
+      closedSessions: [],
     });
   });
 

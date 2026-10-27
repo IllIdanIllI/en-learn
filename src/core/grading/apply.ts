@@ -3,7 +3,7 @@ import type { GradeResult } from '@/core/llm/types';
 import type { GradingItem } from '@/core/db/repos/sessions';
 import { markSessionGraded } from '@/core/db/repos/sessions';
 import {
-  markItemDefect, upsertAnswer, upsertExtraFinding, upsertRuleGap, upsertSessionFeedback, upsertSpellingAttempt,
+  appendSessionFeedback, markItemDefect, upsertAnswer, upsertExtraFinding, upsertRuleGap, upsertSpellingAttempt,
   upsertSpotAnswer,
 } from '@/core/db/repos/answers';
 import { deleteDraftAnswers } from '@/core/db/repos/drafts';
@@ -24,7 +24,7 @@ export interface Graded {
 const norm = (s: string) => s.trim().toLowerCase();
 
 /**
- * Spec 3.1: idempotent upserts first, `status = 'graded'` last. A defect item gets status 'defect' and no
+ * Spec 3.1: idempotent upserts first, `status = 'graded'` last. Items that already have an answer (earlier rounds) are left alone. A defect item gets status 'defect' and no
  * answer row, so it stays out of scores and the error bank.
  */
 export async function applyGraded(db: Db, clock: Clock, items: GradingItem[], g: Graded): Promise<void> {
@@ -38,7 +38,7 @@ export async function applyGraded(db: Db, clock: Clock, items: GradingItem[], g:
   const found = new Set(g.result.spot.flatMap((s) => s.found));
 
   for (const it of items) {
-    if (it.status !== 'active' || it.format === 'question') continue;
+    if (it.status !== 'active' || it.format === 'question' || it.answered) continue;
     const e = entries.get(it.id);
     if (it.format === 'spot') {
       const text = g.spot.get(`${it.blockId}:${it.paragraph}`) ?? '';
@@ -92,7 +92,8 @@ export async function applyGraded(db: Db, clock: Clock, items: GradingItem[], g:
     const id = await findOrCreateSpellingWord(db, w.word, w.hint, clock.now());
     await upsertSpellingAttempt(db, id, g.sessionId, false);
   }
-  await upsertSessionFeedback(db, g.sessionId, g.result.patterns, g.result.tomorrow);
+  // A later round adds to the feedback of the earlier ones.
+  await appendSessionFeedback(db, g.sessionId, g.result.patterns, g.result.tomorrow);
   // Defect marks change item.status, which gates re-grading, so they are written last, right before 'graded'.
   for (const [id, note] of defects) await markItemDefect(db, id, note);
   await markSessionGraded(db, g.sessionId, clock.now());

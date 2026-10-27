@@ -5,9 +5,10 @@ import { CLAUDE_LOCATIONS } from '@/core/llm/claude';
 import { bundledPrompts } from '@/core/llm/bundledPrompts';
 import { startApp } from '@/core/startup';
 import { insertSeedRules, saveProgramme, type SeedRule } from '@/core/programme/setup';
+import { extendSession } from '@/core/session/extend';
 import { generateSession } from '@/core/session/generate';
 import { gradeSession } from '@/core/grading/grade';
-import { listGradingItems, getSessionByDate } from '@/core/db/repos/sessions';
+import { closeSession, listGradingItems, getSessionByDate } from '@/core/db/repos/sessions';
 import { findOrCreateSpellingWord } from '@/core/db/repos/spelling';
 import { createSqlJsDb } from './sqljsDb';
 import { previewLlm } from './previewLlm';
@@ -15,7 +16,7 @@ import { MINI_PROGRAMME, MINI_RULES } from './miniSeed';
 
 export const PREVIEW_STATES = [
   'empty', 'no_session', 'generated', 'questions', 'graded', 'progress', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing',
-  'earlier_session', 'progress_archived',
+  'earlier_session', 'progress_archived', 'closed', 'open-round',
 ] as const;
 export type PreviewState = (typeof PREVIEW_STATES)[number];
 
@@ -181,11 +182,18 @@ export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
     requireOk(await generateSession(deps, { light: false }), 'generateSession');
     clock.set(THURSDAY);
   }
-  if (state === 'generated' || state === 'questions' || state === 'graded' || progressLike) {
+  const answered = state === 'graded' || state === 'closed' || state === 'open-round';
+  if (state === 'generated' || state === 'questions' || answered || progressLike) {
     requireOk(await generateSession(deps, { light: false }), 'generateSession');
   }
-  if (state === 'questions' || state === 'graded' || progressLike) {
+  if (state === 'questions' || answered || progressLike) {
     await answerToday(deps, state === 'questions' ? 'questions' : 'graded');
+  }
+  if (state === 'closed' || state === 'open-round') {
+    const session = await getSessionByDate(deps.db, today);
+    if (!session) throw new Error('Preview fixture: no session');
+    if (state === 'closed') await closeSession(deps.db, session.id);
+    else requireOk(await extendSession(deps, session.id), 'extendSession');
   }
   // A topic dropped from the programme while it still has history is kept, archived.
   if (state === 'progress_archived') await deps.db.execute("UPDATE topic SET archived = 1 WHERE key = 'articles'");

@@ -13,12 +13,14 @@ import { selectSpellingWords } from '@/core/schedule/spelling';
 import { forgetAwaiting } from '@/core/grading/grade';
 import { buildGenerationContext, renderContext, type GenerationContext } from './context';
 import { writeBlocks } from './store';
-import { applyValidation, renderValidationInput, violations } from './validation';
+import { applyValidation, renderValidationInput, violations, type Defects } from './validation';
 
 export { cleanupDrafts };
 
 /** `code` lets the UI show its own text; without it the message is shown as is. */
 export type GenerateErrorCode = LlmErrorCode | 'session_exists';
+/** Where a generation run is: the model writes, the code and a reviewer check, the result is saved. */
+export type GenStage = 'writing' | 'checking' | 'saving';
 export type GenerateResult = { ok: true; sessionId: number } | { ok: false; message: string; code?: GenerateErrorCode };
 
 const MAX_ATTEMPTS = 2;
@@ -54,46 +56,57 @@ export async function generateSession(deps: Deps, opts: { light: boolean }): Pro
   });
 
   try {
-    const base = renderContext(ctx);
-    let problems: string[] = [];
-    let lastCode: LlmErrorCode | undefined;
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      const prompt = problems.length === 0 ? base : `${base}\n## Problems in the previous attempt (fix them)\n\n${problems.map((p) => `- ${p}`).join('\n')}\n`;
-      const gen = await callStructured<GeneratedSession>(deps, 'generate_session', prompt, {
-        sessionId,
-        maxAttempts: 1,
-        check: (s) => violations(s, ctx).join('\n') || null,
-      });
-      if (!gen.ok) {
-        if (FATAL.has(gen.code)) return await fail(deps, sessionId, gen.message, gen.code);
-        problems = [gen.message];
-        lastCode = gen.code;
-        continue;
-      }
-      const val = await callStructured<ValidationResult>(deps, 'validate_session', renderValidationInput(gen.data, ctx.allowed), { sessionId, maxAttempts: 1 });
-      if (!val.ok) {
-        if (FATAL.has(val.code)) return await fail(deps, sessionId, val.message, val.code);
-        problems = [val.message];
-        lastCode = val.code;
-        continue;
-      }
-      const { defects, remaining } = applyValidation(gen.data, val.data);
-      problems = violations(remaining, ctx);
-      lastCode = undefined;
-      if (problems.length > 0) continue;
-
-      const words = await listSpellingWords(deps.db);
-      const ids = selectSpellingWords(await getSpellingStates(deps.db), words.map((w) => w.id), d, opts.light);
-      const chosen = ids.flatMap((id) => words.find((w) => w.id === id) ?? []);
-      await writeBlocks(deps.db, sessionId, settings.nativeLanguage, ctx, gen.data, defects, chosen);
-      await setSessionStatus(deps.db, sessionId, 'generated');
-      return { ok: true, sessionId };
-    }
-    return await fail(deps, sessionId, problems.join('\n'), lastCode);
+    const made = await produce(deps, sessionId, ctx);
+    if (!made.ok) return await fail(deps, sessionId, made.message, made.code);
+    const words = await listSpellingWords(deps.db);
+    const ids = selectSpellingWords(await getSpellingStates(deps.db), words.map((w) => w.id), d, opts.light);
+    const chosen = ids.flatMap((id) => words.find((w) => w.id === id) ?? []);
+    await writeBlocks(deps.db, sessionId, settings.nativeLanguage, ctx, made.gen, made.defects, chosen);
+    await setSessionStatus(deps.db, sessionId, 'generated');
+    return { ok: true, sessionId };
   } catch (e) {
     await deleteSession(deps.db, sessionId);
     throw e;
   }
+}
+
+/** Generate → validate → code check, with one retry. The llm_call rows carry `sessionId`. */
+export async function produce(
+  deps: Deps, sessionId: number, ctx: GenerationContext, onStage?: (s: GenStage) => void,
+): Promise<{ ok: true; gen: GeneratedSession; defects: Defects } | { ok: false; message: string; code?: LlmErrorCode }> {
+  const base = renderContext(ctx);
+  let problems: string[] = [];
+  let lastCode: LlmErrorCode | undefined;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const prompt = problems.length === 0 ? base : `${base}\n## Problems in the previous attempt (fix them)\n\n${problems.map((p) => `- ${p}`).join('\n')}\n`;
+    onStage?.('writing');
+    const gen = await callStructured<GeneratedSession>(deps, 'generate_session', prompt, {
+      sessionId,
+      maxAttempts: 1,
+      check: (s) => violations(s, ctx).join('\n') || null,
+    });
+    if (!gen.ok) {
+      if (FATAL.has(gen.code)) return { ok: false, message: gen.message, code: gen.code };
+      problems = [gen.message];
+      lastCode = gen.code;
+      continue;
+    }
+    onStage?.('checking');
+    const val = await callStructured<ValidationResult>(deps, 'validate_session', renderValidationInput(gen.data, ctx.allowed), { sessionId, maxAttempts: 1 });
+    if (!val.ok) {
+      if (FATAL.has(val.code)) return { ok: false, message: val.message, code: val.code };
+      problems = [val.message];
+      lastCode = val.code;
+      continue;
+    }
+    const { defects, remaining } = applyValidation(gen.data, val.data);
+    problems = violations(remaining, ctx);
+    lastCode = undefined;
+    if (problems.length > 0) continue;
+    onStage?.('saving');
+    return { ok: true, gen: gen.data, defects };
+  }
+  return lastCode === undefined ? { ok: false, message: problems.join('\n') } : { ok: false, message: problems.join('\n'), code: lastCode };
 }
 
 async function fail(deps: Deps, sessionId: number, message: string, code?: LlmErrorCode): Promise<GenerateResult> {

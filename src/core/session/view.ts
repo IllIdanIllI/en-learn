@@ -27,7 +27,7 @@ export interface ViewItem {
   ruleId: number | null;
   ruleSection: string | null;
   status: ItemStatus;
-  /** Graded sessions only: the answer key and everything derived from the answer. */
+  /** Graded blocks only: the answer key and everything derived from the answer. */
   expected?: string;
   note?: string | null;
   answer?: ViewAnswer | null;
@@ -41,7 +41,7 @@ export interface ViewItem {
 export interface ViewParagraph {
   index: number;
   text: string;
-  /** Graded sessions only. */
+  /** Graded blocks only. */
   learnerText?: string;
   errors?: ViewItem[];
   extra?: { text: string; explanation: string }[];
@@ -56,6 +56,10 @@ export interface ViewBlock {
   instruction: string;
   formatExample: string | null;
   minutes: number;
+  /** 1 for the lesson itself, 2 and up for sets added with "Add more questions". */
+  round: number;
+  /** The block is graded: the session is graded and every active item of the block has an answer (a speaking block: the session is graded). */
+  graded: boolean;
   /** Speaking blocks: the question to answer aloud. */
   question?: string;
   /** Spot blocks keep their hidden errors under `paragraphs`, and only once graded. */
@@ -74,6 +78,8 @@ export interface SessionView {
   /** First rule section of the task block and the 1-based number of that block. */
   readFirst: { section: string; blockNumber: number; ruleId: number | null; topicId: number | null } | null;
   blocks: ViewBlock[];
+  /** Graded, with a block still to be answered (an added round). */
+  open: boolean;
   feedback?: { patterns: string[]; tomorrow: string[] };
 }
 
@@ -100,8 +106,8 @@ export async function loadSessionView(db: Db, sessionId: number): Promise<Sessio
 
   const blockRows = await db.select<{
     id: number; ord: number; kind: BlockKind; format: BlockFormat; title: string; instruction: string;
-    format_example: string | null; passage: string | null; minutes: number;
-  }>('SELECT id, ord, kind, format, title, instruction, format_example, passage, minutes FROM block WHERE session_id = ? ORDER BY ord', [sessionId]);
+    format_example: string | null; passage: string | null; minutes: number; round: number;
+  }>('SELECT id, ord, kind, format, title, instruction, format_example, passage, minutes, round FROM block WHERE session_id = ? ORDER BY ord', [sessionId]);
 
   const itemRows = await db.select<ItemRow>(
     `SELECT i.id AS id, i.block_id AS block_id, i.ord AS ord, i.prompt AS prompt, i.expected AS expected, i.paragraph AS paragraph,
@@ -138,11 +144,11 @@ export async function loadSessionView(db: Db, sessionId: number): Promise<Sessio
     feedback = { patterns: fb[0] ? (JSON.parse(fb[0].patterns) as string[]) : [], tomorrow: fb[0] ? (JSON.parse(fb[0].tomorrow) as string[]) : [] };
   }
 
-  const toItem = (r: ItemRow, format: BlockFormat): ViewItem => {
+  const toItem = (r: ItemRow, format: BlockFormat, blockGraded: boolean): ViewItem => {
     const item: ViewItem = {
       id: r.id, ord: r.ord, prompt: r.prompt, format, topicId: r.topic_id, ruleId: r.rule_id, ruleSection: r.rule_section, status: r.status,
     };
-    if (!graded) return item;
+    if (!blockGraded) return item;
     const answer: ViewAnswer | null = r.has_answer === null ? null : {
       text: r.a_text ?? '', verdict: r.a_verdict ?? 'skipped', fix: r.a_fix ?? '', explanation: r.a_explanation ?? '',
       vocabularyNote: r.a_vocabulary_note ?? '', ruleSection: r.a_rule_section ?? '', isInattention: r.a_is_inattention === 1,
@@ -165,20 +171,21 @@ export async function loadSessionView(db: Db, sessionId: number): Promise<Sessio
   const blocks: ViewBlock[] = blockRows.map((b) => {
     const rows = itemRows.filter((r) => r.block_id === b.id);
     const isSpot = b.format === 'spot';
-    const visible = rows.filter((r) => graded || r.status !== 'defect');
     const isQuestion = b.format === 'question';
+    const blockGraded = graded && (isQuestion || rows.every((r) => r.status !== 'active' || r.has_answer !== null));
+    const visible = rows.filter((r) => blockGraded || r.status !== 'defect');
     const passage = b.passage === null || isQuestion ? [] : (JSON.parse(b.passage) as string[]);
     return {
       id: b.id, ord: b.ord, kind: b.kind, format: b.format, title: b.title, instruction: b.instruction,
-      formatExample: b.format_example, minutes: b.minutes,
+      formatExample: b.format_example, minutes: b.minutes, round: b.round, graded: blockGraded,
       ...(isQuestion ? { question: b.passage ?? '' } : {}),
-      items: isSpot ? [] : visible.map((r) => toItem(r, b.format)),
+      items: isSpot ? [] : visible.map((r) => toItem(r, b.format, blockGraded)),
       paragraphs: passage.map((text, index): ViewParagraph => {
-        if (!graded) return { index, text };
+        if (!blockGraded) return { index, text };
         const key = `${b.id}:${index}`;
         return {
           index, text, learnerText: spotTexts.get(key) ?? '',
-          errors: visible.filter((r) => r.paragraph === index).map((r) => toItem(r, b.format)),
+          errors: visible.filter((r) => r.paragraph === index).map((r) => toItem(r, b.format, blockGraded)),
           extra: extras.get(key) ?? [],
         };
       }),
@@ -186,7 +193,7 @@ export async function loadSessionView(db: Db, sessionId: number): Promise<Sessio
   });
 
   if (graded) {
-    const scored = blocks.flatMap((b) =>
+    const scored = blocks.filter((b) => b.graded).flatMap((b) =>
       [...b.items, ...b.paragraphs.flatMap((p) => p.errors ?? [])].map((i) => ({
         blockId: b.id, blockKind: b.kind, format: b.format, verdict: i.effective ?? null,
       })),
@@ -207,6 +214,7 @@ export async function loadSessionView(db: Db, sessionId: number): Promise<Sessio
     totalMinutes: blocks.reduce((sum, b) => sum + b.minutes, 0),
     readFirst: section ? { section, blockNumber: task + 1, ruleId: first.rule_id, topicId: first.topic_id } : null,
     blocks,
+    open: graded && blocks.some((b) => !b.graded),
     ...(feedback ? { feedback } : {}),
   };
 }

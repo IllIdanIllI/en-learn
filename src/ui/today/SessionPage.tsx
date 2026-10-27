@@ -29,8 +29,10 @@ const DRAFT_DELAY_MS = 300;
  * Answers live in component state keyed by item id and `${blockId}:${paragraph}`, and are saved as drafts (debounced)
  * so a reload or another page does not lose them. Without `onRebuild` the session cannot be rebuilt (an earlier day).
  */
-export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded }: {
+export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded, onClose }: {
   sessionId: number; rebuilding: boolean; onRebuild?: (light: boolean) => void; onGraded?: () => void;
+  /** Today's session only: shown in the header once everything is graded. */
+  onClose?: () => void;
 }) {
   const { deps, lang } = useCore();
   const [view, setView] = useState<SessionView | null>(null);
@@ -161,12 +163,15 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded }: {
     }
   };
   const graded = view?.status === 'graded';
+  // Answers are taken before grading, and for the open round of a graded session.
+  const answerable = view !== null && (view.status === 'generated' || view.open);
+  const done = graded && view !== null && !view.open;
 
   const actions: SessionActions = {
     openRule: (ref, opener) => {
       setPanel({ ...ref, opener });
       // Support (D19): reading the rule before submitting is recorded; after grading it is ignored by the core.
-      if (!graded && ref.topicId !== null) {
+      if (view?.status === 'generated' && ref.topicId !== null) {
         recordSupport(deps.db, sessionId, ref.topicId).catch((e: unknown) => console.error('recordSupport failed', e));
       }
     },
@@ -174,7 +179,7 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded }: {
   };
 
   useEffect(() => {
-    if (graded) return;
+    if (!answerable) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
@@ -191,11 +196,11 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded }: {
   }, [questions]);
 
   useEffect(() => {
-    if (graded && focusResults.current) {
+    if (done && focusResults.current) {
       focusResults.current = false;
       document.getElementById('feedback-title')?.focus();
     }
-  }, [graded]);
+  }, [done]);
 
   if (loadError) return <Notice>{t(lang, 'today.loadError', { message: loadError })}</Notice>;
   if (!view || !draftsReady) return null;
@@ -225,7 +230,7 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded }: {
   return (
     <SessionActionsProvider value={actions}>
       <div ref={root}>
-        <SessionHeader view={view} lang={lang} rebuilding={rebuilding} onRebuild={rebuild} />
+        <SessionHeader view={view} lang={lang} rebuilding={rebuilding} onRebuild={rebuild} onClose={onClose} />
         {graded && <FeedbackSummary view={view} lang={lang} />}
         {view.blocks.map((block, i) => (
           <Block key={block.id} block={block} number={i + 1} lang={lang}>
@@ -236,7 +241,7 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded }: {
                 block={block}
                 lang={lang}
                 values={spot}
-                graded={graded}
+                graded={block.graded}
                 onChange={(key, value) => {
                   setFinish(false);
                   setSpot((prev) => ({ ...prev, [key]: value }));
@@ -247,7 +252,7 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded }: {
             ) : (
               <ol className="flex flex-col gap-3">
                 {block.items.map((item, n) =>
-                  graded ? (
+                  block.graded ? (
                     <GradedItem key={item.id} item={item} number={n + 1} lang={lang} />
                   ) : block.format === 'spelling' ? (
                     <SpellingRow key={item.id} item={item} number={n + 1} lang={lang} value={items[item.id] ?? ''} onChange={(v) => setAnswer(item.id, v)}>
@@ -263,7 +268,7 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded }: {
             )}
           </Block>
         ))}
-        {!graded && (
+        {answerable && (
           <>
             <div className="h-12" />
             {failure && (

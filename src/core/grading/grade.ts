@@ -4,7 +4,7 @@ import type { GradeResult } from '@/core/llm/types';
 import { toneViolations } from '@/core/validate/tone';
 import { callStructured } from '@/core/llm/call';
 import { getSettings, setSetting } from '@/core/db/repos/settings';
-import { getSession, listGradingItems, type GradingItem } from '@/core/db/repos/sessions';
+import { getSession, hasOpenItems, listGradingItems, type GradingItem } from '@/core/db/repos/sessions';
 import { applyGraded, type Graded } from './apply';
 import { buildRefs, missingRefs, proseOf, renderGradeInput, spotParagraphs, type GradeBatch } from './input';
 import { autoCorrect, autoSpot } from './autocheck';
@@ -74,14 +74,15 @@ async function run(
     forgetAwaiting(sessionId);
     return errorOutcome('Session not found', again, 'session_not_found');
   }
-  if (session.status === 'graded') {
+  // A graded session with an open round is graded again, for the items without an answer only.
+  if (session.status === 'graded' && !(await hasOpenItems(deps.db, sessionId))) {
     forgetAwaiting(sessionId);
     return { kind: 'graded' };
   }
-  if (session.status !== 'generated') return errorOutcome('Session not ready', again, 'session_not_ready');
+  if (session.status !== 'generated' && session.status !== 'graded') return errorOutcome('Session not ready', again, 'session_not_ready');
 
   const all = await listGradingItems(deps.db, sessionId);
-  const items = all.filter((i) => i.status === 'active');
+  const items = all.filter((i) => i.status === 'active' && !i.answered);
   const settings = await getSettings(deps.db);
   const snapshot = snapshotOf(sub);
   let prior = awaiting.get(sessionId);

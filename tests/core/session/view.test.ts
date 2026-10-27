@@ -132,6 +132,36 @@ describe('loadSessionView after grading', () => {
     expect((await loadSessionView(db, sid)).blocks[0]!.items[0]).toMatchObject({ spellingWordId: 1, mnemonic: 'one c, two s' });
   });
 
+  test('a closed round-1 block keeps its key, an open round-2 block of the graded session has none', async () => {
+    const db = await createTestDb();
+    const { sid } = await build(db);
+    await grade(db, sid);
+    const b4 = await insertBlock(db, sid, 4, { kind: 'task', format: 'fix', title: 'More', instruction: 'do it', formatExample: null, passage: null, minutes: 5 }, 2);
+    await insertItem(db, b4, 0, { ...base, prompt: 'Extra prompt', expected: 'KEY-EXTRA', wrong: 'prompt' });
+    const view = await loadSessionView(db, sid);
+    expect(view.open).toBe(true);
+    expect(view.blocks.map((b) => [b.round, b.graded])).toEqual([[1, true], [1, true], [1, true], [1, true], [2, false]]);
+    expect(view.blocks[1]!.items[0]).toMatchObject({ expected: 'KEY-AN' });
+    const open = view.blocks[4]!;
+    expect(open.items).toHaveLength(1);
+    expect(open.items[0]).toMatchObject({ prompt: 'Extra prompt' });
+    expect(JSON.stringify(open)).not.toContain('KEY-EXTRA');
+    expect(open.score).toBeUndefined();
+    await db.execute("INSERT INTO answer (item_id, text, verdict, fix) VALUES (7, 'x', 'wrong', 'KEY-EXTRA')");
+    const done = await loadSessionView(db, sid);
+    expect(done.open).toBe(false);
+    expect(done.blocks[4]).toMatchObject({ graded: true, score: { correct: 0, counted: 1 } });
+    expect(done.blocks[4]!.items[0]).toMatchObject({ expected: 'KEY-EXTRA' });
+  });
+
+  test('a session before grading is not open and has no graded block', async () => {
+    const db = await createTestDb();
+    const { sid } = await build(db);
+    const view = await loadSessionView(db, sid);
+    expect(view.open).toBe(false);
+    expect(view.blocks.every((b) => !b.graded && b.round === 1)).toBe(true);
+  });
+
   test('throws for an unknown session', async () => {
     await expect(loadSessionView(await createTestDb(), 99)).rejects.toThrow('Session 99 not found');
   });

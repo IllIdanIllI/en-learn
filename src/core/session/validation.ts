@@ -16,9 +16,11 @@ export function violations(s: GeneratedSession, ctx: GenerationContext): string[
   const wanted = ctx.blocks.map((b) => b.kind).join(', ');
   if (kinds !== wanted) out.push(`blocks: got [${kinds}], the context asks for [${wanted}]`);
   s.blocks.forEach((b, i) => {
-    if (b.kind === 'task' && ctx.plan.task && b.format !== ctx.plan.task.format) {
-      out.push(`b${i} format: task block must be ${ctx.plan.task.format}, got ${b.format}`);
+    const taskFormat = ctx.extra ? ctx.blocks.find((x) => x.kind === 'task')?.format : ctx.plan.task?.format;
+    if (b.kind === 'task' && taskFormat && b.format !== taskFormat) {
+      out.push(`b${i} format: task block must be ${taskFormat}, got ${b.format}`);
     }
+    if (b.kind === 'task' && ctx.extra && b.items.length > 8) out.push(`b${i} items: ${b.items.length} items in an extra set, at most 8`);
     if (b.kind === 'review') {
       if (b.format !== 'gap' && b.format !== 'fix') out.push(`b${i} format: review block must be gap or fix`);
       const cap = Math.max(ctx.light ? 5 : 12, ctx.dueTopics.length);

@@ -206,6 +206,13 @@ export async function upsertSessionFeedback(db: Db, sessionId: number, patterns:
   );
 }
 
+/** Adds the patterns and "tomorrow" lines of a later round to the stored ones, without duplicates. */
+export async function appendSessionFeedback(db: Db, sessionId: number, patterns: string[], tomorrow: string[]): Promise<void> {
+  const rows = await db.select<{ patterns: string; tomorrow: string }>('SELECT patterns, tomorrow FROM session_feedback WHERE session_id = ?', [sessionId]);
+  const union = (old: string | undefined, add: string[]) => [...new Set([...(old === undefined ? [] : (JSON.parse(old) as string[])), ...add])];
+  await upsertSessionFeedback(db, sessionId, union(rows[0]?.patterns, patterns), union(rows[0]?.tomorrow, tomorrow));
+}
+
 export async function markItemDefect(db: Db, itemId: number, note: string): Promise<void> {
   await db.execute("UPDATE item SET status = 'defect', note = CASE WHEN ? = '' THEN note ELSE ? END WHERE id = ?", [note, note, itemId]);
 }

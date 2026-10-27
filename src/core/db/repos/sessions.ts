@@ -1,5 +1,6 @@
 import type { Db } from '@/core/ports';
 import type { BlockFormat, BlockKind, ISODate, ItemStatus, SessionStatus } from '@/core/domain';
+import { getSettings, setSetting } from './settings';
 
 export interface GradedSession {
   id: number;
@@ -168,6 +169,8 @@ export interface GradingItem {
   spellingWordId: number | null;
   status: ItemStatus;
   wrong: string | null;
+  /** The item already has an answer row (an earlier round of a graded session). */
+  answered: boolean;
 }
 
 /** Every item of a session in display order, with its topic key and the rule body of its stored version. */
@@ -176,12 +179,13 @@ export async function listGradingItems(db: Db, sessionId: number): Promise<Gradi
     id: number; block_id: number; block_ord: number; format: BlockFormat; passage: string | null; ord: number;
     prompt: string; expected: string; paragraph: number | null; topic_id: number | null; topic_key: string | null;
     rule_id: number | null; rule_version: number | null; rule_section: string | null; rule_body: string | null;
-    spelling_word_id: number | null; status: ItemStatus; wrong: string | null;
+    spelling_word_id: number | null; status: ItemStatus; wrong: string | null; answered: number;
   }>(
     `SELECT i.id AS id, i.block_id AS block_id, b.ord AS block_ord, b.format AS format, b.passage AS passage, i.ord AS ord,
             i.prompt AS prompt, i.expected AS expected, i.paragraph AS paragraph, i.topic_id AS topic_id, t.key AS topic_key,
             i.rule_id AS rule_id, i.rule_version AS rule_version, i.rule_section AS rule_section, rv.body AS rule_body,
-            i.spelling_word_id AS spelling_word_id, i.status AS status, i.wrong AS wrong
+            i.spelling_word_id AS spelling_word_id, i.status AS status, i.wrong AS wrong,
+            EXISTS (SELECT 1 FROM answer a WHERE a.item_id = i.id) AS answered
      FROM item i JOIN block b ON b.id = i.block_id
      LEFT JOIN topic t ON t.id = i.topic_id
      LEFT JOIN rule_version rv ON rv.rule_id = i.rule_id AND rv.version = i.rule_version
@@ -193,6 +197,29 @@ export async function listGradingItems(db: Db, sessionId: number): Promise<Gradi
     passage: r.passage === null || r.format !== 'spot' ? null : (JSON.parse(r.passage) as string[]), ord: r.ord, prompt: r.prompt,
     expected: r.expected, paragraph: r.paragraph, topicId: r.topic_id, topicKey: r.topic_key, ruleId: r.rule_id,
     ruleVersion: r.rule_version, ruleSection: r.rule_section, ruleBody: r.rule_body, spellingWordId: r.spelling_word_id,
-    status: r.status, wrong: r.wrong,
+    status: r.status, wrong: r.wrong, answered: r.answered === 1,
   }));
+}
+
+const CLOSED_KEPT = 30;
+
+export async function closeSession(db: Db, id: number): Promise<void> {
+  const { closedSessions } = await getSettings(db);
+  await setSetting(db, 'closedSessions', [...closedSessions.filter((x) => x !== id), id].slice(-CLOSED_KEPT));
+}
+
+export async function reopenSession(db: Db, id: number): Promise<void> {
+  const { closedSessions } = await getSettings(db);
+  if (closedSessions.includes(id)) await setSetting(db, 'closedSessions', closedSessions.filter((x) => x !== id));
+}
+
+/** True when an active item of the session (a speaking question aside) has no answer row yet. */
+export async function hasOpenItems(db: Db, sessionId: number): Promise<boolean> {
+  const rows = await db.select<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM item i JOIN block b ON b.id = i.block_id
+     WHERE b.session_id = ? AND i.status = 'active' AND b.format != 'question'
+       AND NOT EXISTS (SELECT 1 FROM answer a WHERE a.item_id = i.id)`,
+    [sessionId],
+  );
+  return (rows[0]?.n ?? 0) > 0;
 }

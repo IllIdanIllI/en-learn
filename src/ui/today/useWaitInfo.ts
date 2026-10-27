@@ -23,6 +23,7 @@ export function useWaitInfo(kinds: LlmKind[], active: boolean): { estimateMs: nu
     );
     return () => {
       live = false;
+      setInfo({ estimateMs: null, tips: [] });
     };
   }, [active, deps, kinds]);
 

@@ -12,7 +12,7 @@ import { ErrorNotice } from './ErrorNotice';
 import { FeedbackSummary } from './FeedbackSummary';
 import { GradedItem } from './GradedItem';
 import { ItemRow } from './ItemRow';
-import { GRADING_STAGES, Loader } from './Loader';
+import { GRADING_STAGES, Loader, type LoaderView } from './Loader';
 import { QuestionBlock } from './QuestionBlock';
 import { Questions, type Reply } from './Questions';
 import { SessionHeader } from './SessionHeader';
@@ -31,8 +31,8 @@ const DRAFT_DELAY_MS = 300;
  * Answers live in component state keyed by item id and `${blockId}:${paragraph}`, and are saved as drafts (debounced)
  * so a reload or another page does not lose them. Without `onRebuild` the session cannot be rebuilt (an earlier day).
  */
-export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded, onClose }: {
-  sessionId: number; rebuilding: boolean; onRebuild?: (light: boolean) => void; onGraded?: () => void;
+export function SessionPage({ sessionId, rebuilding, loader = null, onRebuild, onGraded, onClose }: {
+  sessionId: number; rebuilding: boolean; loader?: LoaderView | null; onRebuild?: (light: boolean) => void; onGraded?: () => void;
   /** Today's session only: shown in the header once everything is graded. */
   onClose?: () => void;
 }) {
@@ -275,6 +275,7 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded, onClos
     <SessionActionsProvider value={actions}>
       <div ref={root}>
         <SessionHeader view={view} lang={lang} rebuilding={rebuilding} onRebuild={rebuild} onClose={onClose} />
+        {loader && <Loader lang={lang} {...loader} />}
         {graded && <FeedbackSummary view={view} lang={lang} />}
         {view.blocks.map((block, i) => (
           <Block key={block.id} block={block} number={i + 1} lang={lang}>

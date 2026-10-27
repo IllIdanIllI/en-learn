@@ -52,22 +52,25 @@ export function Loader({ lang, stages, current, attempt, estimateMs, tips }: Loa
   }
 
   return (
-    <div role="status" className="mt-6 flex flex-col gap-4">
-      <ol className="flex flex-col gap-1.5">
-        {stages.map((stage, i) => {
-          const isCurrent = i === currentIndex;
-          const color = i < currentIndex ? 'text-muted-foreground' : isCurrent ? 'text-foreground' : 'text-faint';
-          return (
-            <li key={stage} aria-current={isCurrent ? 'step' : undefined} className={`flex items-center gap-2 ${color}`}>
-              <span className="flex size-4 items-center justify-center">
-                {i < currentIndex && <Check aria-hidden className="size-4" />}
-              </span>
-              <span>{t(lang, `loader.${stage}`)}</span>
-              {isCurrent && attempt > 1 && <span className="text-muted-foreground">· {t(lang, 'loader.attempt', { n: attempt })}</span>}
-            </li>
-          );
-        })}
-      </ol>
+    <div className="mt-6 flex flex-col gap-4">
+      {/* Only the stages are announced; the ticking clock stays silent. */}
+      <div role="status">
+        <ol className="flex flex-col gap-1.5">
+          {stages.map((stage, i) => {
+            const isCurrent = i === currentIndex;
+            const color = i < currentIndex ? 'text-muted-foreground' : isCurrent ? 'text-foreground' : 'text-faint';
+            return (
+              <li key={stage} aria-current={isCurrent ? 'step' : undefined} className={`flex items-center gap-2 ${color}`}>
+                <span className="flex size-4 items-center justify-center">
+                  {i < currentIndex && <Check aria-hidden className="size-4" />}
+                </span>
+                <span>{t(lang, `loader.${stage}`)}</span>
+                {isCurrent && attempt > 1 && <span className="text-muted-foreground">· {t(lang, 'loader.attempt', { n: attempt })}</span>}
+              </li>
+            );
+          })}
+        </ol>
+      </div>
       {estimate !== null && (
         <div aria-hidden className="h-1 w-full overflow-hidden rounded-full bg-input">
           <div
@@ -76,7 +79,7 @@ export function Loader({ lang, stages, current, attempt, estimateMs, tips }: Loa
           />
         </div>
       )}
-      <div className="tabular flex justify-between text-muted-foreground">
+      <div aria-live="off" className="tabular flex justify-between text-muted-foreground">
         <span>{eta}</span>
         <span>{clock(elapsed)}</span>
       </div>

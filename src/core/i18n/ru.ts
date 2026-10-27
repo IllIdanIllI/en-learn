@@ -100,7 +100,6 @@ export const ru: Record<keyof typeof en, string> = {
   'today.empty': 'Сегодня сессии ещё нет. Кнопка «Начать сессию» соберёт её из ошибок последней сессии.',
   'today.start': 'Начать сессию',
   'today.light': 'Лёгкий день',
-  'today.generating': 'Собираю сессию на сегодня…',
   'today.retry': 'Повторить',
   'today.genError': 'Сессия не собрана: {message}',
   'today.loadError': 'Страница не загрузилась: {message}',

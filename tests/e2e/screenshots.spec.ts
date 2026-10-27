@@ -548,6 +548,22 @@ test.describe('answers, earlier sessions, errors and fallbacks', () => {
     await expect(page.getByPlaceholder('Ответ').first()).toHaveValue('necessary');
   });
 
+  test('rebuilding a generated session shows the loader under its header', async ({ page }) => {
+    await page.goto('/?state=generated&delay=1500#/today');
+    const rebuild = page.getByRole('button', { name: 'Пересобрать' });
+    await rebuild.click();
+    await expect(page.getByText('Составляю задания', { exact: true })).toBeVisible();
+    await expect(rebuild).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
+  });
+
+  test('starting today from an earlier session shows the loader below the notice', async ({ page }) => {
+    await page.goto('/?state=earlier_session&delay=1500#/today');
+    await page.getByRole('button', { name: 'Начать сегодняшнюю сессию' }).click();
+    await expect(page.getByText('Составляю задания', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Чт 22 окт', { timeout: 15_000 });
+  });
+
   test('an earlier ungraded session is shown with its own title and a way to start today', async ({ page }) => {
     await page.goto('/?state=earlier_session#/today');
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Вт 20 окт');

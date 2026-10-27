@@ -15,7 +15,7 @@ import { RuleDraft } from '@/ui/today/RuleDraft';
 import { SessionPage } from '@/ui/today/SessionPage';
 import { ErrorNotice } from '@/ui/today/ErrorNotice';
 import { StartSession, type GenError } from '@/ui/today/StartSession';
-import { GENERATION_STAGES, type LoaderView } from '@/ui/today/Loader';
+import { GENERATION_STAGES, Loader, type LoaderView } from '@/ui/today/Loader';
 import { GENERATION_KINDS, useWaitInfo } from '@/ui/today/useWaitInfo';
 
 export function Today() {
@@ -130,18 +130,21 @@ export function Today() {
           />
         )}
         {shown.earlier && (
-          <Notice className="mb-6">
-            <span>
-              {shown.date !== undefined ? t(lang, 'today.earlier', { date: formatTitleDate(shown.date, lang) }) : t(lang, 'today.notStarted')}
-            </span>
-            {noClaude ? (
-              <Link to="/prerequisites" className="underline underline-offset-2">{t(lang, 'today.noClaudeLink')}</Link>
-            ) : (
-              <Button variant="secondary" size="sm" disabled={generating} onClick={() => start(shown.restDay)}>
-                {t(lang, 'today.startToday')}
-              </Button>
-            )}
-          </Notice>
+          <>
+            <Notice className="mb-6">
+              <span>
+                {shown.date !== undefined ? t(lang, 'today.earlier', { date: formatTitleDate(shown.date, lang) }) : t(lang, 'today.notStarted')}
+              </span>
+              {noClaude ? (
+                <Link to="/prerequisites" className="underline underline-offset-2">{t(lang, 'today.noClaudeLink')}</Link>
+              ) : (
+                <Button variant="secondary" size="sm" disabled={generating} onClick={() => start(shown.restDay)}>
+                  {t(lang, 'today.startToday')}
+                </Button>
+              )}
+            </Notice>
+            {loader !== null && <Loader lang={lang} {...loader} />}
+          </>
         )}
         {closed && (
           <LessonClosed
@@ -157,6 +160,7 @@ export function Today() {
             key={`${shown.id}:${epoch}`}
             sessionId={shown.id}
             rebuilding={generating}
+            loader={shown.earlier || closed ? null : loader}
             onRebuild={shown.earlier ? undefined : (light) => rebuild(shown.id, light)}
             onGraded={shown.earlier ? () => setPinned(shown.id) : undefined}
             onClose={shown.earlier || closed ? undefined : () => close(shown.id)}

@@ -19,7 +19,6 @@ export function LightToggle({ isLight, lang, busy, onRebuild }: {
       <Button variant={light === isLight ? 'ghost' : 'secondary'} size="sm" disabled={busy} onClick={() => onRebuild(light)}>
         {t(lang, 'today.rebuild')}
       </Button>
-      <span role="status" className="px-2 text-muted-foreground">{busy ? t(lang, 'today.generating') : ''}</span>
     </div>
   );
 }

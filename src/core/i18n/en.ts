@@ -98,7 +98,6 @@ export const en = {
   'today.empty': "No session yet today. Start session builds it from your last session's mistakes.",
   'today.start': 'Start session',
   'today.light': 'Light day',
-  'today.generating': "Building today's session…",
   'today.retry': 'Retry',
   'today.genError': 'The session was not built: {message}',
   'today.loadError': 'The page could not be loaded: {message}',

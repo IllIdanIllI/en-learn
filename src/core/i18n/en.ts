@@ -130,6 +130,7 @@ export const en = {
   'q.answer': 'Your answer',
   'grade.error': 'Checking failed: {message}',
   'input.fix': '✓ or the corrected fragment',
+  'input.markCorrect': 'Mark as correct',
   'input.spot': 'wrong → right, one per line',
   'input.answer': 'Answer',
   'verdict.correct': 'Correct',

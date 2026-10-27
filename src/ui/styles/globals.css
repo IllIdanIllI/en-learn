@@ -112,6 +112,17 @@
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
+  button,
+  [role='button'],
+  a,
+  summary,
+  label[for],
+  select {
+    cursor: pointer;
+  }
+  :is(button, [role='button'], select):disabled {
+    cursor: not-allowed;
+  }
 }
 
 /* The rule panel is a non-modal side panel: the content column makes room for it instead of sitting under it (below 1100px the panel overlays the content edge). */

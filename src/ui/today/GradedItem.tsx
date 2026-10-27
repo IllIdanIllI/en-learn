@@ -1,5 +1,6 @@
 import { t, type Lang } from '@/core/i18n';
 import type { ViewItem } from '@/core/session/view';
+import { cn } from '@/lib/utils';
 import { ItemActions } from './ItemActions';
 import { NoteChip, RuleRef, VerdictChip } from './chips';
 import { useSessionActions } from './sessionActions';
@@ -25,10 +26,11 @@ export function GradedItem({ item, number, lang }: { item: ViewItem; number?: nu
   const ok = item.effective === 'correct';
   const section = a?.ruleSection || item.ruleSection || '';
   const expected = a?.fix || item.expected || '';
+  const wrong = reason === null && !ok;
   return (
     <li className="flex gap-3">
       <span className="label tabular mt-1.5 w-6 shrink-0 text-right text-faint">{number ?? ''}</span>
-      <div className="min-w-0 flex-1">
+      <div className={cn('min-w-0 flex-1', wrong && 'rounded-md border-l-[3px] border-destructive bg-destructive/8 px-3 py-2')}>
         {!spot && <p className="reading">{item.prompt}</p>}
         <p className={`answer flex flex-wrap items-center gap-x-2.5 gap-y-1 ${spot ? '' : 'mt-2'}`}>
           {reason !== null ? (
@@ -40,11 +42,13 @@ export function GradedItem({ item, number, lang }: { item: ViewItem; number?: nu
             />
           )}
           {spot ? (
-            <span>{item.prompt} → {item.expected}</span>
+            <>
+              <span className={wrong ? 'line-through text-muted-foreground' : ''}>{item.prompt}</span> → <span className={wrong ? 'font-semibold text-success' : ''}>{item.expected}</span>
+            </>
           ) : (
             <>
-              {a && a.text !== '' && <span className={ok ? '' : 'text-muted-foreground'}>{a.text}</span>}
-              {!ok && reason === null && expected !== '' && <span>→ {expected}</span>}
+              {a && a.text !== '' && <span className={cn(ok ? '' : 'text-muted-foreground', wrong && 'line-through')}>{a.text}</span>}
+              {wrong && expected !== '' && <span className="font-semibold text-success">→ {expected}</span>}
             </>
           )}
           {!ok && reason === null && section !== '' && (

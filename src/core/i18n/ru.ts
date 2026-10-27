@@ -132,6 +132,7 @@ export const ru: Record<keyof typeof en, string> = {
   'q.answer': 'Ваш ответ',
   'grade.error': 'Проверка не удалась: {message}',
   'input.fix': '✓ или исправленный фрагмент',
+  'input.markCorrect': 'Отметить как верное',
   'input.spot': 'было → стало, по одному на строке',
   'input.answer': 'Ответ',
   'verdict.correct': 'Верно',

@@ -157,6 +157,27 @@ test.describe('today session', () => {
     await expect(page.getByRole('heading', { name: 'Итоги' })).toBeFocused();
   });
 
+  test('buttons show a pointer cursor and disabled ones not-allowed', async ({ page }) => {
+    await page.goto('/?state=generated#/today');
+    const check = page.getByRole('button', { name: 'Проверить ответы' });
+    await expect(check).toBeVisible();
+    expect(await check.evaluate((el) => getComputedStyle(el).cursor)).toBe('pointer');
+    await page.goto('/?state=no_session&delay=1500#/today');
+    const start = page.getByRole('button', { name: 'Начать сессию' });
+    await start.click();
+    await expect(start).toBeDisabled();
+    expect(await start.evaluate((el) => getComputedStyle(el).cursor)).toBe('not-allowed');
+  });
+
+  test('the ✓ button on a fix item fills its answer with ✓', async ({ page }) => {
+    await page.goto('/?state=generated#/today');
+    const inputs = page.getByPlaceholder('✓ или исправленный фрагмент');
+    const marks = page.getByRole('button', { name: 'Отметить как верное' });
+    await expect(marks).toHaveCount(await inputs.count());
+    await marks.first().click();
+    await expect(inputs.first()).toHaveValue('✓');
+  });
+
   test('graded session shows the feedback summary and verdicts with a mark, not only colour', async ({ page }) => {
     await page.goto('/?state=graded#/today');
     await expect(page.getByRole('heading', { name: 'Исправить' })).toBeVisible();

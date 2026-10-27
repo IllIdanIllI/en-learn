@@ -129,10 +129,21 @@ test.describe('today session', () => {
     await page.screenshot({ path: `${SHOTS}/today-generated.png`, fullPage: true });
   });
 
+  test('the action bar sticks to the bottom of a long session', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 500 });
+    await page.goto('/?state=generated#/today');
+    const check = page.locator('#check-answers');
+    await expect(check).toBeVisible();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.locator('main').evaluate((m) => m.scrollTo(0, 0)).catch(() => undefined);
+    const box = (await check.boundingBox())!;
+    expect(box.y + box.height).toBeLessThanOrEqual(500);
+  });
+
   test('blank and shorthand answers raise inline questions', async ({ page }) => {
     await page.goto('/?state=questions#/today');
     const inputs = page.getByPlaceholder('✓ или исправленный фрагмент');
-    await inputs.nth(1).fill('+');
+    await inputs.nth(1).fill('~');
     await page.getByRole('button', { name: 'Проверить ответы' }).click();
     await expect(page.getByText('Пропустить это задание?').first()).toBeVisible();
     await expect(page.getByText('Значит ли', { exact: false })).toBeVisible();

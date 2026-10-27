@@ -131,6 +131,12 @@ describe('gradeSession', () => {
     expect(v).toMatchObject({ 1: 'skipped', 2: 'skipped', 3: 'skipped', 4: 'correct' });
   });
 
+  test('finish still asks about an unknown symbol answer', async () => {
+    const { deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(result())]);
+    const out = await gradeSession(deps, sid, subm({ items: { 2: '', 3: '~' } }), [], { finish: true });
+    expect(out).toEqual({ kind: 'questions', questions: [{ itemId: 3, kind: 'shorthand', symbol: '~' }] });
+  });
+
   test('drafts of the session are deleted when it is graded, not when grading fails', async () => {
     const { db, deps, sid, failure } = await setup('2026-10-20', '2026-10-20', [ok(fullResult()), ok(fullResult())]);
     await saveDraftAnswer(db, sid, itemDraftKey(2), 'necessary');

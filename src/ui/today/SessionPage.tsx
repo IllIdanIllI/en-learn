@@ -264,7 +264,8 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded }: {
           </Block>
         ))}
         {!graded && (
-          <div className="mt-12">
+          <>
+            <div className="h-12" />
             {failure && (
               <ErrorNotice
                 kind="grade"
@@ -283,7 +284,7 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded }: {
                 {t(lang, 'today.finish')}
               </Button>
             </ActionBar>
-          </div>
+          </>
         )}
       </div>
     <RulePanel target={panel} onClose={() => setPanel(null)} />

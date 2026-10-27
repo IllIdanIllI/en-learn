@@ -50,10 +50,26 @@ Record of the decisions made on the learner's behalf while building S1 (from the
 - final whole-branch review runs on Sonnet (user limited subagents to Sonnet at most; skill would prefer the most capable model) — cost if wrong: a subtler issue could slip past.
 - drafts persisted in a draft_answer table (0001 edited in place, unreleased); earlier ungraded generated session shown on Today when today has none; seed start = today; session.id AUTOINCREMENT — cost if wrong: schema edits before release.
 
+## Feedback round decisions (2026-10-27)
+
+Spec `specs/2026-10-27-s1-feedback-round.md`, plan `plans/2026-10-27-s1-feedback-round.md`.
+
+- `closedSessions: number[]` (last 30) is kept in settings; adding questions reopens the session — cost if wrong: trivial move to its own table.
+- The data folder relies on the dialog plugin's runtime scope plus persisted-scope; fs commands are also scoped to `$APPDATA/**` and `$APPCONFIG/**` — only verifiable on macOS — cost if wrong: widen the scope.
+- After "Finish lesson" raised questions, "Check answers" and ⌘Enter keep finishing (blanks skipped) — the learner already chose to finish — cost if wrong: one blank skipped instead of asked.
+- An extra set's topic: today's task topic, else the most frequent topic of today's counted mistakes, else the first allowed topic — cost if wrong: a different topic mix.
+- Opening a rule is not recorded as support in extra rounds (their items are never re-checks) — cost if wrong: topic replay slightly off.
+- Already-answered items are skipped only in an open round of a graded session; an ungraded session is always graded in full, so a crash during grading is still repaired — cost if wrong: none.
+- The loader shows an elapsed m:ss clock when there is no estimate yet — cost if wrong: cosmetic.
+- A spot paragraph left empty has its hidden errors stored as skipped (not counted), with or without Finish — every paragraph hides 5–7 errors, so empty means not attempted — cost if wrong: untouched paragraphs no longer feed the error bank.
+- Unsent dispute text is lost if the page remounts after "Add more questions" — rare — cost if wrong: retype.
+
 ## Still open
 
 - **Mac-only checks** (`docs/macos-checklist.md`): `$HOME` in the shell permission, long multi-line arguments, plugin-sql migrations, the not-signed-in output, PATH/HOME when launched from Finder. Not verifiable in the Linux build container.
 - **Rule gaps to add later** (no source at hand, so not added): present perfect with for/since ("I have lived here for five years"); modal verbs take no -s.
 - **Model quality** (`evals/`): Haiku 5.5 stored 7–8 of 10 generated sessions (some on the second attempt) and graded 29–31 of 32–33 labelled answers as labelled; results vary between runs. Grading labels need the learner's review before the numbers are trusted. Sonnet 5.5 has not been evaluated.
 - **Small known limitations**: a few rare error messages are still English (rebuild failure, missing session, boot "claude is not available"); rule-draft and dispute errors show the raw message with Retry; rule sources in the side panel are plain text, not links (Tauri webview).
+- **Feedback round, Mac-only checks**: moving the data folder (checklist G–J: move, restart, refusals, failure keeps the old folder), the folder picker and the confirm dialog.
+- **Feedback round, small known limitations** (from reviews, not fixed): moving prompts deletes the old `prompts/` folder recursively; once moved there is no "back to default" button; empty folders created by a failed move stay; Check/Finish are not disabled while a session is rebuilt; one e2e test is timing-sensitive under load.
 - **Design pass**: the learner noted the UI looks generic ("Claudified"); revisit after trying the app.

@@ -274,6 +274,16 @@ test.describe('today actions', () => {
     await expect(teacher(page).getByText('Задание снято с подсчёта.')).toBeVisible();
   });
 
+  test('the sticky bar sends typed disputes in one go', async ({ page }) => {
+    await page.goto('/?state=graded#/today');
+    await expect(page.getByRole('button', { name: /Отправить возражения/ })).toHaveCount(0);
+    await teacher(page).getByRole('button', { name: 'Оспорить' }).click();
+    await teacher(page).getByRole('textbox', { name: 'Ваше возражение' }).fill('Допустимо.');
+    await page.getByRole('button', { name: 'Отправить возражения (1)' }).click();
+    await expect(teacher(page).getByText('Правило допускает только указанный вариант.')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Отправить возражения/ })).toHaveCount(0);
+  });
+
   test('counting a disputed item as correct raises the score', async ({ page }) => {
     await page.goto('/?state=graded#/today');
     await teacher(page).getByRole('button', { name: 'Оспорить' }).click();

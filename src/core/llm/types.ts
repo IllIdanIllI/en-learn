@@ -58,3 +58,5 @@ export interface DisputeReply {
   sources: Source[];
   recommendation: 'keep' | 'correct' | 'drop';
 }
+
+export interface DisputeBatchReply { replies: (DisputeReply & { ref: string })[] }

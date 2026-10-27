@@ -3,7 +3,7 @@ import { Ajv } from 'ajv';
 import { describe, expect, test } from 'vitest';
 import { bundledPrompts } from '@/core/llm/bundledPrompts';
 import type { LlmKind } from '@/core/domain';
-import type { DisputeReply, GeneratedSession, GradeResult, RuleDraft, ValidationResult } from '@/core/llm/types';
+import type { DisputeBatchReply, GeneratedSession, GradeResult, RuleDraft, ValidationResult } from '@/core/llm/types';
 
 const kinds: LlmKind[] = ['rule_draft', 'generate_session', 'validate_session', 'grade', 'dispute'];
 const ajv = new Ajv({ allErrors: true, strict: true });
@@ -16,7 +16,7 @@ export const typedFixtures = [
   fixture('validate_session', 'valid') as ValidationResult,
   fixture('grade', 'valid') as GradeResult,
   fixture('rule_draft', 'valid') as RuleDraft,
-  fixture('dispute', 'valid') as DisputeReply,
+  fixture('dispute', 'valid') as DisputeBatchReply,
 ];
 
 function strictObjects(node: unknown, path: string, problems: string[]): void {

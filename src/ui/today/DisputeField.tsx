@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { DisputeDecision } from '@/core/domain';
-import { decideDispute, disputeItem } from '@/core/grading/actions';
+import { decideDispute } from '@/core/grading/actions';
 import { t, type Lang } from '@/core/i18n';
 import type { DisputeReply } from '@/core/llm/types';
 import type { ViewItem } from '@/core/session/view';
@@ -33,9 +33,9 @@ const DECISIONS: { decision: DisputeDecision; label: 'dispute.keep' | 'dispute.c
 /** Inline dispute under a graded item (no dialog): objection, the app's position, then the learner's decision. */
 export function DisputeField({ item, lang }: { item: ViewItem; lang: Lang }) {
   const { deps } = useCore();
-  const { reload, openRule } = useSessionActions();
+  const { reload, openRule, disputes, setDispute, sendDisputes } = useSessionActions();
   const a = item.answer;
-  const [text, setText] = useState(a?.disputeText ?? '');
+  const text = disputes[item.id] ?? '';
   // `sending` stays true after a successful send: the reply branch takes over once the view reloads.
   const [sending, setSending] = useState(false);
   const [deciding, setDeciding] = useState(false);
@@ -53,9 +53,7 @@ export function DisputeField({ item, lang }: { item: ViewItem; lang: Lang }) {
     setSending(true);
     setError(null);
     try {
-      const res = await disputeItem(deps, item.id, text.trim());
-      if (res.ok) reload();
-      else fail(new Error(res.message));
+      await sendDisputes([item.id]);
     } catch (e) {
       fail(e);
     }
@@ -83,7 +81,7 @@ export function DisputeField({ item, lang }: { item: ViewItem; lang: Lang }) {
             aria-label={t(lang, 'dispute.label')}
             placeholder={t(lang, 'dispute.placeholder')}
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => setDispute(item.id, e.target.value)}
           />
           <Button className="mt-2" variant="secondary" size="sm" disabled={sending || text.trim() === ''} onClick={() => void send()}>
             {t(lang, sending ? 'dispute.sending' : 'dispute.send')}

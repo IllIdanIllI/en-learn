@@ -14,7 +14,7 @@ import type { Db, Deps, Llm, LlmResult } from '@/core/ports';
 import type { DisputeReply, Source } from '@/core/llm/types';
 import type { Verdict } from '@/core/domain';
 import {
-  decideDispute, decideRuleGap, disputeItem, recordSupport, saveMnemonic, setInattention,
+  decideDispute, decideRuleGap, disputeItem, disputeItems, recordSupport, saveMnemonic, setInattention,
 } from '@/core/grading/actions';
 
 const seedDir = path.resolve(import.meta.dirname, '../../fixtures/seed');
@@ -30,6 +30,8 @@ const ok = (data: unknown): LlmResult<unknown> => ({ ok: true, data, costUsd: 0.
 const reply = (recommendation: DisputeReply['recommendation'] = 'drop'): DisputeReply => ({
   position: 'Position text.', ruleSection: 'Basics', sources: [], recommendation,
 });
+
+const one = (r: DisputeReply, ref = 'd1'): LlmResult<unknown> => ok({ replies: [{ ref, ...r }] });
 
 const PROPOSAL = '## Basics\n\nUse "a" before a consonant sound and "an" before a vowel sound, including silent h: "an hour".';
 const GAP_SOURCES: Source[] = [{ title: 'Cambridge Dictionary', url: 'https://dictionary.cambridge.org/grammar/british-grammar/a-an-and-the' }];
@@ -87,11 +89,62 @@ const GAP = {
   gap: { proposal: PROPOSAL, explanation: 'Silent h takes an.', sources: GAP_SOURCES },
 } as const;
 
+describe('disputeItems', () => {
+  const answerRow = async (db: Db, id: number) =>
+    (await db.select<{ dispute_text: string | null; dispute_reply: string | null }>('SELECT dispute_text, dispute_reply FROM answer WHERE item_id = ?', [id]))[0]!;
+
+  test('two disputes: one LLM call, numbered entries, both replies saved', async () => {
+    const { db, ids } = await gradedSession([{ ...WRONG }, { ...WRONG_2 }]);
+    const llm = new FakeLlm({ dispute: [ok({ replies: [{ ref: 'd2', ...reply('keep') }, { ref: 'd1', ...reply('correct') }] })] });
+    const res = await disputeItems(depsFor(db, llm), [{ itemId: ids[0]!, text: 'first' }, { itemId: ids[1]!, text: 'second' }]);
+    expect(res.ok).toBe(true);
+    expect(llm.calls).toHaveLength(1);
+    const p = llm.calls[0]!.userPrompt;
+    expect(p).toContain('### d1\nTopic key: articles\nPrompt: She has a apple.');
+    expect(p).toContain('### d2\nTopic key: articles\nPrompt: It is a hour long.');
+    expect(await answerRow(db, ids[0]!)).toEqual({ dispute_text: 'first', dispute_reply: JSON.stringify(reply('correct')) });
+    expect(await answerRow(db, ids[1]!)).toEqual({ dispute_text: 'second', dispute_reply: JSON.stringify(reply('keep')) });
+  });
+
+  test('a reply missing one ref is retried once, then errors; objections stay, no reply saved', async () => {
+    const { db, ids } = await gradedSession([{ ...WRONG }, { ...WRONG_2 }]);
+    const llm = new FakeLlm({ dispute: [one(reply()), one(reply())] });
+    const res = await disputeItems(depsFor(db, llm), [{ itemId: ids[0]!, text: 'first' }, { itemId: ids[1]!, text: 'second' }]);
+    expect(res).toMatchObject({ ok: false, code: 'check' });
+    expect(llm.calls).toHaveLength(2);
+    expect(await answerRow(db, ids[0]!)).toEqual({ dispute_text: 'first', dispute_reply: null });
+    expect(await answerRow(db, ids[1]!)).toEqual({ dispute_text: 'second', dispute_reply: null });
+  });
+
+  test('entries from two sessions throw and save nothing', async () => {
+    const a = await gradedSession([{ ...WRONG }]);
+    const sid2 = await insertDraftSession(a.db, { date: '2026-10-21', title: 't2', isLight: false, createdAt: 'x' });
+    const block2 = await insertBlock(a.db, sid2, 0, { kind: 'task', format: 'fix', title: 'Fix', instruction: 'i', formatExample: null, passage: null, minutes: 5 });
+    await insertItem(a.db, block2, 0, {
+      prompt: 'Other.', expected: 'an', paragraph: null, topicId: 1, ruleId: 1, ruleVersion: 1,
+      ruleSection: 'Basics', spellingWordId: null, isCheck: false, status: 'active', note: null, wrong: null,
+    });
+    const other = (await a.db.select<{ id: number }>('SELECT id FROM item WHERE block_id = ?', [block2]))[0]!.id;
+    await upsertAnswer(a.db, { itemId: other, text: 'a', verdict: 'wrong', fix: 'an', ruleSection: 'Basics', explanation: 'x', vocabularyNote: null });
+    const llm = new FakeLlm({});
+    await expect(disputeItems(depsFor(a.db, llm), [{ itemId: a.ids[0]!, text: 'x' }, { itemId: other, text: 'y' }])).rejects.toThrow('one session');
+    expect(llm.calls).toHaveLength(0);
+    expect(await answerRow(a.db, a.ids[0]!)).toEqual({ dispute_text: null, dispute_reply: null });
+  });
+
+  test('a non-disputable item throws before anything is saved', async () => {
+    const { db, ids } = await gradedSession([{ ...WRONG }, { ...RIGHT }]);
+    const llm = new FakeLlm({});
+    await expect(disputeItems(depsFor(db, llm), [{ itemId: ids[0]!, text: 'x' }, { itemId: ids[1]!, text: 'y' }])).rejects.toThrow('dispute not allowed');
+    expect(await answerRow(db, ids[0]!)).toEqual({ dispute_text: null, dispute_reply: null });
+  });
+});
+
 describe('disputeItem', () => {
   test('wrong item: saves dispute_text and the reply JSON, returns the LLM result', async () => {
     const { db, ids, sid } = await gradedSession([{ ...WRONG }]);
     const r = reply('keep');
-    const llm = new FakeLlm({ dispute: [ok(r)] });
+    const llm = new FakeLlm({ dispute: [one(r)] });
     const res = await disputeItem(depsFor(db, llm), ids[0]!, 'I think "a apple" is fine.');
     expect(res).toMatchObject({ ok: true, data: r });
     const row = (await db.select<{ dispute_text: string; dispute_reply: string }>('SELECT dispute_text, dispute_reply FROM answer WHERE item_id = ?', [ids[0]]))[0]!;
@@ -101,7 +154,7 @@ describe('disputeItem', () => {
 
   test('rule_gap item is allowed', async () => {
     const { db, ids } = await gradedSession([{ ...GAP }]);
-    const llm = new FakeLlm({ dispute: [ok(reply('correct'))] });
+    const llm = new FakeLlm({ dispute: [one(reply('correct'))] });
     const res = await disputeItem(depsFor(db, llm), ids[0]!, 'Natural English.');
     expect(res.ok).toBe(true);
     expect(await count(db, 'SELECT COUNT(*) AS n FROM answer WHERE item_id = ? AND dispute_text IS NOT NULL', [ids[0]])).toBe(1);
@@ -116,7 +169,7 @@ describe('disputeItem', () => {
 
   test('user message carries labelled item, grade, rule section, full rule body and objection', async () => {
     const { db, ids } = await gradedSession([{ ...WRONG }]);
-    const llm = new FakeLlm({ dispute: [ok(reply())] });
+    const llm = new FakeLlm({ dispute: [one(reply())] });
     await disputeItem(depsFor(db, llm), ids[0]!, 'Why is "a apple" wrong?');
     const p = llm.calls[0]!.userPrompt;
     expect(p).toContain('Topic key: articles');
@@ -139,7 +192,7 @@ describe('disputeItem', () => {
     const llm: Llm = {
       call: async () => {
         seen.push((await db.select<{ t: string | null }>('SELECT dispute_text AS t FROM answer WHERE item_id = ?', [ids[0]]))[0]!.t);
-        return ok(reply());
+        return one(reply());
       },
     };
     await disputeItem(depsFor(db, llm), ids[0]!, 'objection');
@@ -148,7 +201,7 @@ describe('disputeItem', () => {
 
   test('a new objection clears the previous reply and decision', async () => {
     const { db, ids } = await gradedSession([{ ...WRONG }]);
-    const llm = new FakeLlm({ dispute: [ok(reply('drop')), ok(reply('keep'))] });
+    const llm = new FakeLlm({ dispute: [one(reply('drop')), one(reply('keep'))] });
     const deps = depsFor(db, llm);
     await disputeItem(deps, ids[0]!, 'first objection');
     await decideDispute(db, ids[0]!, 'drop');
@@ -164,7 +217,7 @@ describe('disputeItem', () => {
   test('a new objection whose call fails leaves no stale reply or decision', async () => {
     const { db, ids } = await gradedSession([{ ...WRONG }]);
     const failed: LlmResult<unknown> = { ok: false, code: 'cli_error', message: 'boom', costUsd: 0, durationMs: 1, raw: '' };
-    const llm = new FakeLlm({ dispute: [ok(reply('drop')), failed, failed] });
+    const llm = new FakeLlm({ dispute: [one(reply('drop')), failed, failed] });
     const deps = depsFor(db, llm);
     await disputeItem(deps, ids[0]!, 'first objection');
     await decideDispute(db, ids[0]!, 'drop');
@@ -191,7 +244,7 @@ describe('decideDispute', () => {
     const { db, ids, blockId } = await gradedSession([{ ...WRONG }, { ...RIGHT }, { ...WRONG_2 }, { ...GAP }]);
     const scoreOf = async () => blockScores((await loadGradedFacts(db)).scored).find((s) => s.blockId === blockId);
     expect(await scoreOf()).toEqual({ blockId, correct: 1, counted: 3 });
-    await disputeItem(depsFor(db, new FakeLlm({ dispute: [ok(reply('drop'))] })), ids[0]!, 'Bad item.');
+    await disputeItem(depsFor(db, new FakeLlm({ dispute: [one(reply('drop'))] })), ids[0]!, 'Bad item.');
     await decideDispute(db, ids[0]!, 'drop');
     expect(await scoreOf()).toEqual({ blockId, correct: 1, counted: 2 });
   });
@@ -199,7 +252,7 @@ describe('decideDispute', () => {
   test("'correct' removes the topic's error from the replay", async () => {
     const { db, ids } = await gradedSession([{ ...WRONG }]);
     expect((await getTopicStates(db)).get(1)!.status).toBe('open');
-    await disputeItem(depsFor(db, new FakeLlm({ dispute: [ok(reply('correct'))] })), ids[0]!, 'I was right.');
+    await disputeItem(depsFor(db, new FakeLlm({ dispute: [one(reply('correct'))] })), ids[0]!, 'I was right.');
     await decideDispute(db, ids[0]!, 'correct');
     const topic = (await getTopicStates(db)).get(1);
     expect(topic?.status ?? 'none').toBe('none');

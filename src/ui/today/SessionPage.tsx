@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { recordSupport } from '@/core/grading/actions';
+import { disputeItems, recordSupport } from '@/core/grading/actions';
 import { draftsToAnswers, itemDraftKey, loadDraftAnswers, saveDraftAnswer, spotDraftKey } from '@/core/db/repos/drafts';
 import { gradeSession, type ClarificationAnswer, type GradeOutcome, type Question } from '@/core/grading/grade';
 import { t } from '@/core/i18n';
@@ -46,6 +46,9 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded, onClos
   const [finish, setFinish] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
+  const [disputes, setDisputes] = useState<Record<number, string>>({});
+  const [disputeBusy, setDisputeBusy] = useState(false);
+  const [disputeError, setDisputeError] = useState<string | null>(null);
   const [panel, setPanel] = useState<RuleTarget | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const focusResults = useRef(false);
@@ -57,6 +60,10 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded, onClos
         if (live) {
           setView(v);
           setLoadError(null);
+          // What was saved comes back into the fields; text typed meanwhile stays.
+          const saved: Record<number, string> = {};
+          for (const b of v.blocks) for (const i of b.items) if (i.answer?.disputeText) saved[i.id] = i.answer.disputeText;
+          setDisputes((prev) => ({ ...saved, ...prev }));
         }
       },
       (e: unknown) => {
@@ -167,7 +174,41 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded, onClos
   const answerable = view !== null && (view.status === 'generated' || view.open);
   const done = graded && view !== null && !view.open;
 
+  // Typed objections on graded, disputable items whose exact text has no saved reply.
+  const unsent = (view?.blocks ?? []).flatMap((b) =>
+    b.graded
+      ? b.items.filter((i) => {
+          const a = i.answer;
+          const text = (disputes[i.id] ?? '').trim();
+          return a != null && i.status === 'active' && (a.verdict === 'wrong' || a.verdict === 'rule_gap')
+            && text !== '' && !(a.disputeReply !== null && a.disputeText === text);
+        }).map((i) => i.id)
+      : [],
+  );
+  const sendDisputes = async (ids: number[] = unsent) => {
+    const entries = ids.map((itemId) => ({ itemId, text: (disputes[itemId] ?? '').trim() })).filter((e) => e.text !== '');
+    if (entries.length === 0) return;
+    const res = await disputeItems(deps, entries);
+    setReload((n) => n + 1);
+    if (!res.ok) throw new Error(res.message);
+  };
+  const sendAll = async () => {
+    if (disputeBusy) return;
+    setDisputeBusy(true);
+    setDisputeError(null);
+    try {
+      await sendDisputes();
+    } catch (e) {
+      setDisputeError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDisputeBusy(false);
+    }
+  };
+
   const actions: SessionActions = {
+    disputes,
+    setDispute: (itemId, text) => setDisputes((prev) => ({ ...prev, [itemId]: text })),
+    sendDisputes,
     openRule: (ref, opener) => {
       setPanel({ ...ref, opener });
       // Support (D19): reading the rule before submitting is recorded; after grading it is ignored by the core.
@@ -268,10 +309,11 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded, onClos
             )}
           </Block>
         ))}
-        {answerable && (
+        {(answerable || unsent.length > 0) && (
           <>
             <div className="h-12" />
-            {failure && (
+            {disputeError !== null && <Notice className="mb-2">{t(lang, 'dispute.error', { message: disputeError })}</Notice>}
+            {answerable && failure && (
               <ErrorNotice
                 kind="grade"
                 className="mb-2"
@@ -282,12 +324,21 @@ export function SessionPage({ sessionId, rebuilding, onRebuild, onGraded, onClos
               />
             )}
             <ActionBar>
-              <Button id="check-answers" disabled={busy} onClick={() => submit()}>
-                {t(lang, busy ? 'today.checking' : 'today.check')}
-              </Button>
-              <Button variant="secondary" disabled={busy} onClick={() => submit(true)}>
-                {t(lang, 'today.finish')}
-              </Button>
+              {answerable && (
+                <>
+                  <Button id="check-answers" disabled={busy} onClick={() => submit()}>
+                    {t(lang, busy ? 'today.checking' : 'today.check')}
+                  </Button>
+                  <Button variant="secondary" disabled={busy} onClick={() => submit(true)}>
+                    {t(lang, 'today.finish')}
+                  </Button>
+                </>
+              )}
+              {unsent.length > 0 && (
+                <Button variant="secondary" disabled={disputeBusy} onClick={() => void sendAll()}>
+                  {t(lang, disputeBusy ? 'dispute.sending' : 'dispute.sendAll', { n: unsent.length })}
+                </Button>
+              )}
             </ActionBar>
           </>
         )}

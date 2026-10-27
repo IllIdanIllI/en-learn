@@ -1,7 +1,7 @@
 import type { Llm, LlmRequest, LlmResult } from '@/core/ports';
 import { MINI_RULES } from './miniSeed';
 import type {
-  DisputeReply, GeneratedBlock, GeneratedItem, GeneratedParagraph, GeneratedSession, GradeResult, RuleDraft, ValidationResult,
+  DisputeBatchReply, GeneratedBlock, GeneratedItem, GeneratedParagraph, GeneratedSession, GradeResult, RuleDraft, ValidationResult,
 } from '@/core/llm/types';
 
 /** Canned, valid model outputs for preview mode. They are derived from the request text so they pass the code checks. */
@@ -306,11 +306,15 @@ function gapProposal(): string {
   return seed.body.replace('\n\n## Объяснение', '\n- I saw one elephant: one называет число, а не предмет.\n\n## Объяснение');
 }
 
-const dispute = (): DisputeReply => ({
-  position: 'Правило допускает только указанный вариант.',
-  ruleSection: SECTION,
-  sources: [{ title: 'Cambridge Dictionary', url: 'https://dictionary.cambridge.org/grammar/british-grammar/' }],
-  recommendation: 'keep',
+/** One canned reply per `### d<k>` entry of the request. */
+const dispute = (userPrompt: string): DisputeBatchReply => ({
+  replies: [...userPrompt.matchAll(/^### (d\d+)$/gm)].map((m) => ({
+    ref: m[1]!,
+    position: 'Правило допускает только указанный вариант.',
+    ruleSection: SECTION,
+    sources: [{ title: 'Cambridge Dictionary', url: 'https://dictionary.cambridge.org/grammar/british-grammar/' }],
+    recommendation: 'keep',
+  })),
 });
 
 export const previewLlm: Llm = {
@@ -321,7 +325,7 @@ export const previewLlm: Llm = {
       case 'validate_session': data = validate(req.userPrompt); break;
       case 'grade': data = grade(req.userPrompt); break;
       case 'rule_draft': data = ruleDraft(req.userPrompt); break;
-      case 'dispute': data = dispute(); break;
+      case 'dispute': data = dispute(req.userPrompt); break;
     }
     return { ok: true, data, costUsd: 0, durationMs: 5, raw: JSON.stringify(data) };
   },

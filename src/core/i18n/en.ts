@@ -185,6 +185,7 @@ export const en = {
   'dispute.label': 'Your objection',
   'dispute.send': 'Send',
   'dispute.sending': 'Sending…',
+  'dispute.sendAll': 'Send disputes ({n})',
   'dispute.error': 'No reply came: {message}',
   'dispute.keep': 'Keep grade',
   'dispute.correct': 'Count as correct',

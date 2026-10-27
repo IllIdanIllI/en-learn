@@ -187,6 +187,7 @@ export const ru: Record<keyof typeof en, string> = {
   'dispute.label': 'Ваше возражение',
   'dispute.send': 'Отправить',
   'dispute.sending': 'Отправляю…',
+  'dispute.sendAll': 'Отправить возражения ({n})',
   'dispute.error': 'Ответа нет: {message}',
   'dispute.keep': 'Оставить оценку',
   'dispute.correct': 'Засчитать как верный',

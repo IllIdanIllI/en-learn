@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { t, type MessageKey } from '@/core/i18n';
 import type { LlmKind } from '@/core/domain';
 import { CLAUDE_LOCATIONS } from '@/core/llm/claude';
+import { MoveRefused } from '@/core/dataFolder';
+import { Button } from '@/ui/components/ui/button';
 import { setSetting, type Settings as SettingsData } from '@/core/db/repos/settings';
 import { FieldInput } from '@/ui/components/ui/field-input';
 import { NativeSelect } from '@/ui/components/ui/native-select';
@@ -36,12 +38,34 @@ const parseBudget = (raw: string): number | null | 'invalid' => {
 };
 
 export function Settings() {
-  const { deps, lang, settings, prereq, promptsDir, refresh } = useCore();
+  const { deps, lang, settings, prereq, dataDir, moveDataDir, refresh } = useCore();
   const [saved, setSaved] = useState(false);
   const timer = useRef<number | undefined>(undefined);
   const [budget, setBudget] = useState(settings.budgetUsd === null ? '' : String(settings.budgetUsd));
   const [budgetInvalid, setBudgetInvalid] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const [moveError, setMoveError] = useState<string | null>(null);
+
+  const changeDataDir = async () => {
+    if (!moveDataDir) return;
+    setMoveError(null);
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const picked = await open({ directory: true, multiple: false });
+      if (typeof picked !== 'string' || !window.confirm(t(lang, 'settings.dataDir.confirm', { path: picked }))) return;
+      setMoving(true);
+      await moveDataDir(picked);
+    } catch (e) {
+      setMoveError(
+        e instanceof MoveRefused
+          ? t(lang, `settings.dataDir.err.${e.reason}` as MessageKey)
+          : t(lang, 'settings.dataDir.err.failed', { message: e instanceof Error ? e.message : String(e) }),
+      );
+    } finally {
+      setMoving(false);
+    }
+  };
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
@@ -158,8 +182,14 @@ export function Settings() {
         <Row label={t(lang, 'settings.claude')}>
           <p className={cn('pt-1.5 break-words', prereq?.ok && 'font-mono text-[0.9375rem]')}>{claude}</p>
         </Row>
-        <Row label={t(lang, 'settings.prompts')}>
-          <p className="pt-1.5 font-mono text-[0.9375rem] break-words">{promptsDir}</p>
+        <Row label={t(lang, 'settings.dataDir')}>
+          <p className="pt-1.5 font-mono text-[0.9375rem] break-words">{dataDir}</p>
+          {moveDataDir && (
+            <Button className="mt-2" variant="secondary" disabled={moving} onClick={() => void changeDataDir()}>
+              {moving ? t(lang, 'settings.dataDirMoving') : t(lang, 'settings.dataDirChange')}
+            </Button>
+          )}
+          {moveError && <FieldError>{moveError}</FieldError>}
         </Row>
       </div>
 

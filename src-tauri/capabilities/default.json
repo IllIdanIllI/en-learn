@@ -343,11 +343,18 @@
       ]
     },
     "shell:allow-kill",
+    "dialog:allow-open",
     {
       "identifier": "fs:allow-read-text-file",
       "allow": [
         {
           "path": "$APPDATA/prompts/**"
+        },
+        {
+          "path": "$APPDATA/**"
+        },
+        {
+          "path": "$APPCONFIG/**"
         }
       ]
     },
@@ -356,6 +363,12 @@
       "allow": [
         {
           "path": "$APPDATA/prompts/**"
+        },
+        {
+          "path": "$APPDATA/**"
+        },
+        {
+          "path": "$APPCONFIG/**"
         }
       ]
     },
@@ -364,6 +377,82 @@
       "allow": [
         {
           "path": "$APPDATA/prompts/**"
+        },
+        {
+          "path": "$APPDATA/**"
+        },
+        {
+          "path": "$APPCONFIG/**"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:allow-copy-file",
+      "allow": [
+        {
+          "path": "$APPDATA/prompts/**"
+        },
+        {
+          "path": "$APPDATA/**"
+        },
+        {
+          "path": "$APPCONFIG/**"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:allow-mkdir",
+      "allow": [
+        {
+          "path": "$APPDATA/prompts/**"
+        },
+        {
+          "path": "$APPDATA/**"
+        },
+        {
+          "path": "$APPCONFIG/**"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:allow-remove",
+      "allow": [
+        {
+          "path": "$APPDATA/prompts/**"
+        },
+        {
+          "path": "$APPDATA/**"
+        },
+        {
+          "path": "$APPCONFIG/**"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:allow-stat",
+      "allow": [
+        {
+          "path": "$APPDATA/prompts/**"
+        },
+        {
+          "path": "$APPDATA/**"
+        },
+        {
+          "path": "$APPCONFIG/**"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:allow-write-text-file",
+      "allow": [
+        {
+          "path": "$APPDATA/prompts/**"
+        },
+        {
+          "path": "$APPDATA/**"
+        },
+        {
+          "path": "$APPCONFIG/**"
         }
       ]
     }

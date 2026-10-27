@@ -38,6 +38,10 @@ All data stays on your machine, in the app data directory:
 
 Delete the file to start from scratch.
 
+## Data folder
+
+Settings → Data folder shows where the app keeps `enlearn.db` and `prompts/` (overrides). "Change…" moves them to a folder you pick; the choice is stored in `<app data>/location.json`.
+
 ## Prompt overrides
 
 The prompts the app sends are bundled. To change one, put a file in `<app data>/prompts/`:

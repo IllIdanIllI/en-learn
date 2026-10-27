@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Deps, Llm, ProcessRunner } from '@/core/ports';
+import type { Db, Deps, Llm, ProcessRunner } from '@/core/ports';
+import { MoveRefused } from '@/core/dataFolder';
 import type { Lang } from '@/core/i18n';
 import type { PrereqResult } from '@/core/prereq';
 import { recheck } from './recheck';
@@ -17,8 +18,12 @@ export interface CoreInit {
   settings: Settings;
   /** Seed programme and rules for the setup form; null when no seed is available. */
   loadSeedInput(): SeedBundle | null;
-  /** Folder shown in Settings where prompt overrides live. */
-  promptsDir: string;
+  /** Folder shown in Settings: the database and prompt overrides live there. */
+  dataDir: string;
+  /** Copies the data to `target` and switches to it (the caller reloads); absent in preview. Throws `MoveRefused` before touching anything. */
+  moveDataDir?: (target: string) => Promise<void>;
+  /** Reopens the database after a failed move closed it. */
+  reopenDb?: () => Promise<Db>;
   /** Builds the real Llm once a `claude` location works; absent in preview, where a recheck changes nothing. */
   makeLlm?: (location: ClaudeLocation) => Llm;
 }
@@ -30,7 +35,9 @@ export interface Core {
   settings: Settings;
   prereq: PrereqResult | null;
   loadSeedInput(): SeedBundle | null;
-  promptsDir: string;
+  dataDir: string;
+  /** Present when the data folder can be changed. Reloads the app on success, throws on failure with the old folder still in use. */
+  moveDataDir?: (target: string) => Promise<void>;
   /** Reruns the `claude` check; on success the Llm is swapped in and `prereq` becomes ok. */
   recheckPrerequisites(): Promise<PrereqResult | null>;
   /** Re-reads settings and bumps `version`; pages that load data depend on `version`. */
@@ -60,7 +67,7 @@ function useTheme(theme: Settings['theme']): void {
 }
 
 export function CoreProvider({ init, children }: { init: CoreInit; children: ReactNode }) {
-  const { runner, loadSeedInput, promptsDir, makeLlm } = init;
+  const { runner, loadSeedInput, dataDir, makeLlm } = init;
   const [deps, setDeps] = useState(init.deps);
   const [prereq, setPrereq] = useState(init.prereq);
   const [settings, setSettings] = useState(init.settings);
@@ -84,6 +91,23 @@ export function CoreProvider({ init, children }: { init: CoreInit; children: Rea
     return next.prereq;
   }, [makeLlm, prereq, runner, deps]);
 
+  const moveDataDir = useMemo(() => {
+    const move = init.moveDataDir;
+    if (!move) return undefined;
+    return async (target: string) => {
+      try {
+        await move(target);
+      } catch (e) {
+        if (!(e instanceof MoveRefused) && init.reopenDb) {
+          const db = await init.reopenDb();
+          setDeps((d) => ({ ...d, db }));
+        }
+        throw e;
+      }
+      window.location.reload();
+    };
+  }, [init]);
+
   useTheme(settings.theme);
   useEffect(() => {
     document.documentElement.lang = settings.nativeLanguage;
@@ -91,9 +115,9 @@ export function CoreProvider({ init, children }: { init: CoreInit; children: Rea
 
   const value = useMemo<Core>(
     () => ({
-      deps, runner, lang: settings.nativeLanguage, settings, prereq, loadSeedInput, promptsDir, recheckPrerequisites, refresh, version,
+      deps, runner, lang: settings.nativeLanguage, settings, prereq, loadSeedInput, dataDir, moveDataDir, recheckPrerequisites, refresh, version,
     }),
-    [deps, runner, settings, prereq, loadSeedInput, promptsDir, recheckPrerequisites, refresh, version],
+    [deps, runner, settings, prereq, loadSeedInput, dataDir, moveDataDir, recheckPrerequisites, refresh, version],
   );
   return <CoreContext.Provider value={value}>{children}</CoreContext.Provider>;
 }

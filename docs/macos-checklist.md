@@ -70,3 +70,23 @@ F. **Light day (criterion 5).**
    - Action: on the next day (or another fresh database with the date moved), on a rest day press "Start light day", or use the light-day toggle before starting; answer, submit.
    - Expected: a shorter session. Progress marks the day as a light day (`light day`), not as a full day.
    - If it fails: record the number of items generated and how Progress shows the day.
+
+## Data folder
+
+G. **Move the data (spec F1).**
+   - Action: Settings → Data folder → "Change…", pick a new empty folder (for example `~/Documents/enlearn-data`), confirm.
+   - Expected: "Moving data…" shows, the app reloads, the Data folder row shows the new path, and Today still shows your lessons. The new folder has `enlearn.db` and, if you had overrides, `prompts/`. The old `enlearn.db*` and `prompts/` are gone; `location.json` stays in the app data folder.
+   - If it fails: record the error line and the console output.
+
+H. **Restart after a move.**
+   - Action: quit the app and start it again. Put a changed `grade.md` into `<new folder>/prompts/` first and generate or grade something.
+   - Expected: data and history load from the new folder, the changed prompt is used, and the Data folder row still shows the new path (the picked folder stays readable after restart).
+   - If it fails: record whether the DB or the prompts failed and the console error.
+
+I. **Refusals.**
+   - Action: try to pick (1) the current folder, (2) a folder inside the current one, (3) a folder that already has an `enlearn.db`.
+   - Expected: no copy is made and the row shows "This is the current folder.", "The new folder can't be inside the current one." and "This folder already has a database." (Russian when the language is Russian). The app keeps working.
+
+J. **A failed move keeps the old folder.**
+   - Action: pick a folder you cannot write to (for example make one with `chmod 555`), confirm.
+   - Expected: the row shows "Could not move the data: …", no files are left in the target, the old folder still has everything, and the app keeps working without a reload (add an answer or change a setting to check the database).

@@ -7,24 +7,27 @@ import type { CoreInit } from './CoreProvider';
 
 /** Real app: Tauri adapters, SQLite file, the installed `claude` CLI. */
 export async function bootTauri(): Promise<CoreInit> {
-  const [{ appDataDir, homeDir }, { openTauriDb }, { TauriClock }, { TauriProcessRunner }, { TauriPromptStore }, { ClaudeCli }] =
+  const [{ appDataDir, appConfigDir, homeDir }, { openTauriDb }, { readDataDir, moveDataDir }, { TauriClock }, { TauriProcessRunner }, { TauriPromptStore }, { ClaudeCli }] =
     await Promise.all([
       import('@tauri-apps/api/path'),
       import('@/adapters/tauri/db'),
+      import('@/adapters/tauri/dataFolder'),
       import('@/adapters/tauri/clock'),
       import('@/adapters/tauri/processRunner'),
       import('@/adapters/tauri/promptStore'),
       import('@/adapters/tauri/claudeCli'),
     ]);
-  const [dataDir, home] = await Promise.all([appDataDir(), homeDir()]);
-  const db = await openTauriDb();
+  const [appData, appConfig, home] = await Promise.all([appDataDir(), appConfigDir(), homeDir()]);
+  const custom = await readDataDir(appData);
+  const dataDir = custom ?? appData;
+  const db = await openTauriDb(custom);
   await startApp({ db });
 
   const runner = new TauriProcessRunner();
   const prereq = await checkPrerequisites(runner);
   // Without a usable `claude` Today shows a notice instead of building and no call is made, so this Llm is not reached.
   const llm: Llm = prereq.ok
-    ? new ClaudeCli(runner, prereq.location, dataDir, home)
+    ? new ClaudeCli(runner, prereq.location, appData, home)
     : { call: () => Promise.reject(new Error('claude is not available')) };
   const clock = new TauriClock();
   const deps: Deps = { db, llm, clock, prompts: new TauriPromptStore(dataDir) };
@@ -40,8 +43,10 @@ export async function bootTauri(): Promise<CoreInit> {
         return null; // No usable seed files: the setup form starts empty.
       }
     },
-    promptsDir: `${dataDir}/prompts`,
-    makeLlm: (location) => new ClaudeCli(runner, location, dataDir, home),
+    dataDir,
+    moveDataDir: (target) => moveDataDir({ appDataDir: appData, appConfigDir: appConfig, custom }, target, () => db.close()),
+    reopenDb: () => openTauriDb(custom),
+    makeLlm: (location) => new ClaudeCli(runner, location, appData, home),
   };
 }
 
@@ -56,7 +61,7 @@ export async function bootPreview(search: string): Promise<CoreInit> {
     deps,
     settings: await getSettings(core.deps.db),
     loadSeedInput: () => ({ programme: MINI_PROGRAMME, rules: MINI_RULES }),
-    promptsDir: '~/Library/Application Support/English Exam Coach/prompts',
+    dataDir: '~/Library/Application Support/English Exam Coach',
   };
 }
 

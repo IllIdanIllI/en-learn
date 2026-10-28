@@ -29,11 +29,11 @@ const SPELLING_WORDS: [word: string, hint: string][] = [
 ];
 
 /**
- * Canned answers of the graded fixture: one wrong, one right, and one the rulebook does not cover (a rule gap),
+ * Canned answers of the graded fixture: one wrong (answered with a bare tick), one right, and one the rulebook does not cover (a rule gap),
  * matched by prompt. Other items alternate right and wrong.
  */
 const ANSWERS: Record<string, string> = {
-  'She is an teacher at a local school.': 'the teacher',
+  'She is an teacher at a local school.': '✓',
   'The sun rises in the east.': '✓',
   'I saw a elephant at the zoo.': 'one elephant',
 };

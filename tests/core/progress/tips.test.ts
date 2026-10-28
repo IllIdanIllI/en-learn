@@ -47,7 +47,7 @@ describe('waitTips', () => {
     expect(await waitTips(db)).toEqual([]);
   });
 
-  test('error-bank tips use the sentence context and never show a tick', async () => {
+  test('error-bank tips use the sentence context, never show a tick and drop identical pairs', async () => {
     const db = await createTestDb();
     await seedWrongAnswers(db, [
       { text: 'went', fix: 'goes', expected: 'goes', format: 'gap', prompt: 'He ___ home.' },
@@ -58,10 +58,8 @@ describe('waitTips', () => {
     ]);
     const tips = (await waitTips(db)).sort((a, b) => a.was.localeCompare(b.was));
     for (const tip of tips) for (const v of [tip.was, tip.should]) expect(['✓', '+', '']).not.toContain(v.trim());
-    expect(tips).toHaveLength(5);
+    expect(tips).toHaveLength(3);
     expect(tips).toEqual([
-      { was: 'He go home', should: 'He go home' },
-      { was: 'He goes home', should: 'He goes home' },
       { was: 'He went home.', should: 'He goes home.' },
       { was: 'It went home.', should: 'It goes home.' },
       { was: 'She ___ home.', should: 'She goes home.' },

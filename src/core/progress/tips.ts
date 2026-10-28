@@ -10,7 +10,7 @@ export type WaitTip = { was: string; should: string };
 export async function waitTips(db: Db, limit = 10): Promise<WaitTip[]> {
   const bank = errorBank((await loadGradedFacts(db)).errorRows)
     .map((r) => ({ was: snippetText(r.was), should: snippetText(r.shouldBe) }))
-    .filter((r) => r.was.trim() !== '' && r.should.trim() !== '');
+    .filter((r) => r.was.trim() !== '' && r.should.trim() !== '' && r.was.trim() !== r.should.trim());
   const words = (await listSpellingMnemonics(db)).map((w) => ({ was: w.word, should: w.mnemonic }));
   const all = [...bank, ...words];
   for (let i = all.length - 1; i > 0; i--) {

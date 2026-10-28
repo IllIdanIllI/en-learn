@@ -46,7 +46,7 @@ export function GradedItem({ item, number, lang }: { item: ViewItem; number?: nu
             </>
           ) : (
             <>
-              {a && a.text !== '' && !(ok && a.text.trim() === '✓') && <span className={cn(ok ? '' : 'text-muted-foreground', wrong && 'line-through')}>{a.text}</span>}
+              {a && a.text !== '' && a.text.trim() !== '✓' && <span className={cn(ok ? '' : 'text-muted-foreground', wrong && 'line-through')}>{a.text}</span>}
               {wrong && expected !== '' && <span className="font-semibold text-success">→ {expected}</span>}
             </>
           )}

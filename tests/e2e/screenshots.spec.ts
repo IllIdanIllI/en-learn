@@ -238,7 +238,7 @@ test.describe('today session', () => {
     await expect(first).toHaveValue('');
   });
 
-  test('graded session shows the feedback summary and verdicts with a mark, not only colour', async ({ page }) => {
+  test('graded session shows the feedback summary and verdicts with a word, not only colour', async ({ page }) => {
     await page.goto('/?state=graded#/today');
     await expect(page.getByRole('heading', { name: 'Исправить' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Что повторить завтра' })).toBeVisible();
@@ -249,6 +249,10 @@ test.describe('today session', () => {
     expect(words.filter((w) => /[✓✗]/.test(w))).toEqual([]);
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toHaveCount(0);
     expect(await page.content()).toContain('a teacher');
+    // A wrong item answered with a bare tick shows no tick, only the correction.
+    const tickItem = page.locator('li').filter({ hasText: 'She is an teacher at a local school.' });
+    await expect(tickItem.getByText('→ a teacher')).toBeVisible();
+    await expect(tickItem.getByText('✓')).toHaveCount(0);
     await page.screenshot({ path: `${SHOTS}/today-graded.png`, fullPage: true });
   });
 
@@ -319,6 +323,9 @@ test.describe('today session', () => {
     await page.goto('/?state=round-graded#/today');
     const close = page.getByRole('button', { name: 'Закрыть урок' });
     await expect(close).toBeVisible();
+    const first = await page.locator('#latest-round ol > li').first().innerText();
+    expect(first.split('\n')[0]).toBe('4');
+    await expect(page.getByRole('heading', { name: 'Итоги' })).toHaveCount(0);
     await expect(page.locator('header').getByRole('button', { name: 'Закрыть урок' })).toHaveCount(0);
     expect(await close.evaluate((el) => {
       for (let n: Element | null = el.parentElement; n; n = n.parentElement) if (getComputedStyle(n).position === 'sticky') return true;

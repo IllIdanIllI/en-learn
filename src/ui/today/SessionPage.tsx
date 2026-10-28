@@ -276,40 +276,40 @@ export function SessionPage({ sessionId, rebuilding, loader = null, onRebuild, o
     // An added round continues the numbering of the task blocks before it.
     const offset = view.blocks.filter((b) => b.kind === 'task' && b.round < block.round).reduce((n, b) => n + b.items.length, 0);
     return (
-        <Block key={block.id} block={block} number={i + 1} lang={lang} hideTitle={hideTitle}>
-          {block.format === 'question' ? (
-            <QuestionBlock block={block} />
-          ) : block.format === 'spot' ? (
-            <SpotBlock
-              block={block}
-              lang={lang}
-              values={spot}
-              graded={block.graded}
-              onChange={(key, value) => {
-                setFinish(false);
-                setSpot((prev) => ({ ...prev, [key]: value }));
-                const [blockId, paragraph] = key.split(':').map(Number) as [number, number];
-                persist(spotDraftKey(blockId, paragraph), value);
-              }}
-            />
-          ) : (
-            <ol className="flex flex-col gap-3">
-              {block.items.map((item, n) =>
-                block.graded ? (
-                  <GradedItem key={item.id} item={item} number={offset + n + 1} lang={lang} />
-                ) : block.format === 'spelling' ? (
-                  <SpellingRow key={item.id} item={item} number={offset + n + 1} lang={lang} value={items[item.id] ?? ''} onChange={(v) => setAnswer(item.id, v)}>
-                    {inline(item.id)}
-                  </SpellingRow>
-                ) : (
-                  <ItemRow key={item.id} item={item} number={offset + n + 1} lang={lang} value={items[item.id] ?? ''} onChange={(v) => setAnswer(item.id, v)}>
-                    {inline(item.id)}
-                  </ItemRow>
-                ),
-              )}
-            </ol>
-          )}
-        </Block>
+      <Block key={block.id} block={block} number={i + 1} lang={lang} hideTitle={hideTitle}>
+        {block.format === 'question' ? (
+          <QuestionBlock block={block} />
+        ) : block.format === 'spot' ? (
+          <SpotBlock
+            block={block}
+            lang={lang}
+            values={spot}
+            graded={block.graded}
+            onChange={(key, value) => {
+              setFinish(false);
+              setSpot((prev) => ({ ...prev, [key]: value }));
+              const [blockId, paragraph] = key.split(':').map(Number) as [number, number];
+              persist(spotDraftKey(blockId, paragraph), value);
+            }}
+          />
+        ) : (
+          <ol className="flex flex-col gap-3">
+            {block.items.map((item, n) =>
+              block.graded ? (
+                <GradedItem key={item.id} item={item} number={offset + n + 1} lang={lang} />
+              ) : block.format === 'spelling' ? (
+                <SpellingRow key={item.id} item={item} number={offset + n + 1} lang={lang} value={items[item.id] ?? ''} onChange={(v) => setAnswer(item.id, v)}>
+                  {inline(item.id)}
+                </SpellingRow>
+              ) : (
+                <ItemRow key={item.id} item={item} number={offset + n + 1} lang={lang} value={items[item.id] ?? ''} onChange={(v) => setAnswer(item.id, v)}>
+                  {inline(item.id)}
+                </ItemRow>
+              ),
+            )}
+          </ol>
+        )}
+      </Block>
     );
   };
   const latestRound = Math.max(...view.blocks.map((b) => b.round));

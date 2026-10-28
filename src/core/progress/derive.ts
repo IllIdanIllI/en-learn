@@ -1,5 +1,6 @@
 import type { BlockFormat, BlockKind, EffectiveVerdict, ISODate, SessionStatus, Verdict } from '@/core/domain';
 import { addDays, daysBetween } from '@/core/dates';
+import { errorContext, type Snippet } from './errorContext';
 import type { SessionUsage } from './usage';
 
 export type ScoredItem = { blockId: number; blockKind: BlockKind; format: BlockFormat; verdict: EffectiveVerdict };
@@ -23,8 +24,10 @@ export function blockScores(items: ScoredItem[]): BlockScore[] {
 
 export type ErrorBankRow = {
   date: ISODate;
-  was: string;
-  shouldBe: string;
+  was: Snippet;
+  shouldBe: Snippet;
+  sentence: string;
+  hint: string | null;
   kind: 'grammar' | 'spelling' | 'inattention';
   topicId: number | null;
   itemId: number;
@@ -37,6 +40,9 @@ export type ErrorBankInput = {
   format: BlockFormat;
   prompt: string;
   expected: string;
+  wrong: string | null;
+  /** Spot items: the paragraph text the item sits in. */
+  paragraph: string | null;
   topicId: number | null;
   itemId: number;
   effective: EffectiveVerdict;
@@ -49,9 +55,8 @@ export function errorBank(rows: ErrorBankInput[]): ErrorBankRow[] {
   for (const r of rows) {
     if (r.effective !== 'wrong') continue;
     const kind = r.isInattention && r.verdict === 'wrong' ? 'inattention' : r.format === 'spelling' ? 'spelling' : 'grammar';
-    const was = r.format === 'spot' ? r.prompt : r.text;
-    const shouldBe = r.format === 'spot' ? r.expected : r.fix !== '' ? r.fix : r.expected;
-    out.push({ date: r.date, was, shouldBe, kind, topicId: r.topicId, itemId: r.itemId });
+    const { was, shouldBe, sentence, hint } = errorContext(r);
+    out.push({ date: r.date, was, shouldBe, sentence, hint, kind, topicId: r.topicId, itemId: r.itemId });
   }
   return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.itemId - b.itemId));
 }

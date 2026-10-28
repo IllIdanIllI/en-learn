@@ -64,6 +64,17 @@ describe('loadGradedFacts', () => {
     expect(rows.find((r) => r.itemId === 6)).toMatchObject({ format: 'spot', prompt: 'frag', expected: 'right' });
   });
 
+  test('error rows carry the wrong fragment and the spot paragraph text', async () => {
+    const db = await createTestDb();
+    await seed(db);
+    await db.execute("UPDATE block SET passage = '[\"first\",\"Say frag now.\"]' WHERE id = 2");
+    await db.execute('UPDATE item SET paragraph = 1 WHERE id = 6');
+    await db.execute("UPDATE item SET wrong = 'p2 bit' WHERE id = 2");
+    const rows = (await loadGradedFacts(db)).errorRows;
+    expect(rows.find((r) => r.itemId === 6)).toMatchObject({ paragraph: 'Say frag now.', wrong: null });
+    expect(rows.find((r) => r.itemId === 2)).toMatchObject({ paragraph: null, wrong: 'p2 bit' });
+  });
+
   test('state wrappers replay the facts', async () => {
     const db = await createTestDb();
     await seed(db);

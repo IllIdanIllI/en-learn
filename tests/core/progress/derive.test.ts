@@ -30,6 +30,8 @@ const row = (over: Partial<Parameters<typeof errorBank>[0][number]> = {}): Param
   format: 'gap',
   prompt: 'He ___ home',
   expected: 'goes',
+  wrong: null,
+  paragraph: null,
   topicId: 1,
   itemId: 1,
   effective: 'wrong',
@@ -59,13 +61,18 @@ describe('errorBank', () => {
 
   test('fix replaces expected for non-spot, falls back to expected when empty', () => {
     const out = errorBank([row({ itemId: 1, fix: 'goes!' }), row({ itemId: 2 })]);
-    expect(out[0]).toMatchObject({ was: 'went', shouldBe: 'goes!' });
-    expect(out[1]).toMatchObject({ was: 'went', shouldBe: 'goes' });
+    expect(out[0]).toMatchObject({ was: { changed: 'went' }, shouldBe: { before: 'He ', changed: 'goes!', after: ' home' } });
+    expect(out[1]).toMatchObject({ was: { changed: 'went' }, shouldBe: { changed: 'goes' } });
   });
 
   test('spot rows use prompt as was and expected as shouldBe', () => {
-    const out = errorBank([row({ format: 'spot', prompt: 'He go home', expected: 'He goes home', text: 'x', fix: 'y' })]);
-    expect(out[0]).toMatchObject({ was: 'He go home', shouldBe: 'He goes home', kind: 'grammar' });
+    const out = errorBank([row({ format: 'spot', prompt: 'He go', expected: 'He goes', text: 'x', fix: 'y', paragraph: 'Then He go home.' })]);
+    expect(out[0]).toMatchObject({
+      was: { before: 'Then ', changed: 'He go', after: ' home.' },
+      shouldBe: { before: 'Then ', changed: 'He goes', after: ' home.' },
+      sentence: 'Then He go home.',
+      kind: 'grammar',
+    });
   });
 });
 

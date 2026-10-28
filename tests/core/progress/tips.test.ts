@@ -47,18 +47,19 @@ describe('waitTips', () => {
     expect(await waitTips(db)).toEqual([]);
   });
 
-  test('drops error-bank tips whose was or should is a tick', async () => {
+  test('error-bank tips use the sentence context and never show a tick', async () => {
     const db = await createTestDb();
     await seedWrongAnswers(db, [
-      { text: 'went', fix: 'goes', expected: 'goes', format: 'gap' },
-      { text: '✓', fix: 'goes', expected: 'goes', format: 'gap' },
-      { text: 'went', fix: '✓', expected: 'goes', format: 'gap' },
-      { text: 'went', fix: ' + ', expected: 'goes', format: 'gap' },
-      { text: '', fix: '', expected: 'goes', format: 'gap' },
-      { text: 'He go home', fix: '', expected: '✓', format: 'spot', prompt: 'He go home' },
-      { text: 'x', fix: '', expected: '+', format: 'spot', prompt: 'He goes home' },
+      { text: 'went', fix: 'goes', expected: 'goes', format: 'gap', prompt: 'He ___ home.' },
+      { text: '✓', fix: '✓', expected: 'goes', format: 'gap', prompt: 'She ___ home.' },
+      { text: 'went', fix: ' + ', expected: 'goes', format: 'gap', prompt: 'It ___ home.' },
     ]);
-    expect(await waitTips(db)).toEqual([{ was: 'went', should: 'goes' }]);
+    const tips = (await waitTips(db)).sort((a, b) => a.was.localeCompare(b.was));
+    expect(tips).toEqual([
+      { was: 'He went home.', should: 'He goes home.' },
+      { was: 'It went home.', should: 'It goes home.' },
+      { was: 'She ___ home.', should: 'She goes home.' },
+    ].sort((a, b) => a.was.localeCompare(b.was)));
   });
 
   test('keeps spelling mnemonics even when they are a tick', async () => {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { t } from '@/core/i18n';
 import { getTopics } from '@/core/db/repos/programme';
 import { errorBank, type ErrorBankRow } from '@/core/progress/derive';
+import type { Snippet } from '@/core/progress/errorContext';
 import { loadGradedFacts } from '@/core/progress/history';
 import { useCore } from '@/ui/app/CoreProvider';
 import { useLoaded } from '@/ui/app/useLoaded';
@@ -10,6 +11,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Notice } from '@/ui/today/chips';
 
 const KINDS: ErrorBankRow['kind'][] = ['grammar', 'spelling', 'inattention'];
+
+function Context({ s, tone }: { s: Snippet; tone: string }) {
+  return (
+    <>
+      <span className="text-muted-foreground">{s.before}</span>
+      <span className={`font-semibold ${tone}`}>{s.changed}</span>
+      <span className="text-muted-foreground">{s.after}</span>
+    </>
+  );
+}
 
 export function ErrorBank() {
   const { deps, lang } = useCore();
@@ -69,8 +80,13 @@ export function ErrorBank() {
               <TableBody>
                 {shown.map((r) => (
                   <TableRow key={r.itemId}>
-                    <TableCell className="answer">{r.was}</TableCell>
-                    <TableCell className="answer">{r.shouldBe}</TableCell>
+                    <TableCell className="answer" title={r.sentence === '' ? undefined : r.sentence}>
+                      <Context s={r.was} tone="rounded-sm bg-destructive/10 text-destructive" />
+                      {r.hint !== null && <div className="mt-1 text-sm text-muted-foreground">{r.hint}</div>}
+                    </TableCell>
+                    <TableCell className="answer" title={r.sentence === '' ? undefined : r.sentence}>
+                      <Context s={r.shouldBe} tone="rounded-sm bg-success/10 text-success" />
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{t(lang, `kind.${r.kind}`)}</TableCell>
                     <TableCell className="text-muted-foreground">{r.topicId === null ? '' : (titles.get(r.topicId) ?? '')}</TableCell>
                     <TableCell className="tabular text-muted-foreground">{r.date}</TableCell>

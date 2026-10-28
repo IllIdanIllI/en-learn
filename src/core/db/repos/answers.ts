@@ -22,6 +22,9 @@ export interface GradedAnswerRow {
   itemStatus: ItemStatus;
   prompt: string;
   expected: string;
+  wrong: string | null;
+  paragraph: number | null;
+  passage: string | null;
   text: string;
   verdict: Verdict;
   fix: string | null;
@@ -43,6 +46,9 @@ interface RawRow {
   item_status: ItemStatus;
   prompt: string;
   expected: string;
+  wrong: string | null;
+  paragraph: number | null;
+  passage: string | null;
   text: string;
   verdict: Verdict | null;
   fix: string | null;
@@ -57,7 +63,7 @@ export async function listGradedAnswerRows(db: Db): Promise<GradedAnswerRow[]> {
   const rows = await db.select<RawRow>(
     `SELECT s.id AS session_id, s.date AS date, b.id AS block_id, b.kind AS block_kind, b.format AS format,
             i.id AS item_id, i.topic_id AS topic_id, i.is_check AS is_check, i.status AS item_status,
-            i.prompt AS prompt, i.expected AS expected,
+            i.prompt AS prompt, i.expected AS expected, i.wrong AS wrong, i.paragraph AS paragraph, b.passage AS passage,
             a.text AS text, a.verdict AS verdict, a.fix AS fix, a.is_inattention AS is_inattention,
             a.dispute_decision AS dispute_decision, g.status AS gap_status,
             EXISTS (SELECT 1 FROM session_support ss WHERE ss.session_id = s.id AND ss.topic_id = i.topic_id) AS supported
@@ -81,6 +87,9 @@ export async function listGradedAnswerRows(db: Db): Promise<GradedAnswerRow[]> {
     itemStatus: r.item_status,
     prompt: r.prompt,
     expected: r.expected,
+    wrong: r.wrong,
+    paragraph: r.paragraph,
+    passage: r.passage,
     text: r.text,
     verdict: r.verdict ?? 'skipped',
     fix: r.fix,

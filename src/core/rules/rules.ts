@@ -4,6 +4,7 @@ import { getTopics, getCurrentRules } from '@/core/db/repos/programme';
 import { callStructured } from '@/core/llm/call';
 import type { RuleDraft } from '@/core/llm/types';
 import { errorBank } from '@/core/progress/derive';
+import { snippetText } from '@/core/progress/errorContext';
 import { loadGradedFacts } from '@/core/progress/history';
 
 export type { Source } from '@/core/llm/types';
@@ -30,7 +31,7 @@ export async function draftRule(deps: Deps, topicId: number): Promise<LlmResult<
   const language = settings.nativeLanguage === 'ru' ? 'Russian' : 'English';
   const headings = SKELETON[settings.nativeLanguage].map((h) => `## ${h}`).join('\n');
   const errorLines = errors.length
-    ? errors.map((r) => `- was: ${JSON.stringify(r.was)} | should be: ${JSON.stringify(r.shouldBe)} | kind: ${r.kind}`).join('\n')
+    ? errors.map((r) => `- was: ${JSON.stringify(snippetText(r.was))} | should be: ${JSON.stringify(snippetText(r.shouldBe))} | kind: ${r.kind}`).join('\n')
     : '(none)';
   const message = [
     `Topic key: ${topic.key}`,

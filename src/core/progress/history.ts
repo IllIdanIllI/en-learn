@@ -14,6 +14,17 @@ export type GradedFacts = {
   errorRows: ErrorBankInput[];
 };
 
+function paragraphText(passage: string | null, index: number | null): string | null {
+  if (passage === null || index === null) return null;
+  try {
+    const paragraphs: unknown = JSON.parse(passage);
+    const text = Array.isArray(paragraphs) ? (paragraphs[index] as unknown) : null;
+    return typeof text === 'string' ? text : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function loadGradedFacts(db: Db): Promise<GradedFacts> {
   const rows = await listGradedAnswerRows(db);
   const topicFacts: TopicFact[] = [];
@@ -34,6 +45,8 @@ export async function loadGradedFacts(db: Db): Promise<GradedFacts> {
       format: r.format,
       prompt: r.prompt,
       expected: r.expected,
+      wrong: r.wrong,
+      paragraph: paragraphText(r.passage, r.paragraph),
       topicId: r.topicId,
       itemId: r.itemId,
       effective: verdict,

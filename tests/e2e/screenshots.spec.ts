@@ -613,6 +613,9 @@ test.describe('rules, error bank and progress', () => {
     await expect(rows.first()).toBeVisible();
     expect(await rows.count()).toBeGreaterThan(3);
     await expect(rows.first().locator('td').nth(0)).toHaveClass(/answer/);
+    await expect(rows.locator('td:nth-child(1) .font-semibold.text-destructive').first()).toBeVisible();
+    await expect(rows.locator('td:nth-child(2) .font-semibold.text-success').first()).toBeVisible();
+    await expect(rows.locator('td[title]').first()).toHaveAttribute('title', /\S/);
     const dates = await rows.locator('td:nth-child(5)').allTextContents();
     expect(dates).toEqual([...dates].sort().reverse());
     expect(await page.content()).not.toMatch(/streak/i);

@@ -19,3 +19,6 @@ Binding where it says something; otherwise the S1 spec and rounds 1–4 hold.
 - A new LLM kind `rule_chat`, with its own model and effort row in Settings → Models (default Sonnet, effort medium).
 - Prompt cache: the chat is one Claude Code conversation. The first message starts a persisted CLI session; each next message runs `--resume <session id> --fork-session` with the same system prompt and schema, so earlier turns are read from the cache (1-hour TTL). The new session id is kept only after a valid reply, so a failed or rejected reply never enters the history. CLI transcripts of these chats are stored by Claude Code under its own folder (`~/.claude/projects/…`).
 - Each reply is logged like other calls (cost, tokens incl. cache read and write). A failed reply shows the error with Retry; the chat stays usable.
+
+## L4. Rule draft without the learner's errors
+- "Draft a rule" no longer sends the learner's error-bank rows; the prompt drops the input line and the rule that the draft must explain every row. Rules stay general.

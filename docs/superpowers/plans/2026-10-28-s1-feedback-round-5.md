@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development. Steps use checkbox (`- [ ]`) syntax.
 
-**Goal:** L1–L3 of the spec.
+**Goal:** L1–L4 of the spec.
 
 **Spec:** `docs/superpowers/specs/2026-10-28-s1-feedback-round-5.md`
 
@@ -15,13 +15,17 @@
 1. Today's fresh added round is never counted or cleared; yesterday's unanswered items are; nothing reopened can be left unreachable (Task 2).
 2. The chat never stores a rule version without the learner's reason and Save; a failed reply never changes the stored CLI session id (Task 3, 4).
 3. Chat turns after the first use `--resume <id> --fork-session` with a byte-identical system prompt and schema; the Tauri capability allows exactly these new argument shapes (Task 3).
-4. The chat prompt never receives error-bank rows or learner answers (Task 3).
+4. Neither the chat nor the rule draft receives error-bank rows or learner answers (Tasks 1, 3).
 
 ---
 
 ### Task 1: Session log emphasis (Haiku)
 **Files:** `src/ui/progress/ProgressLog.tsx`, i18n if the score/total keys need splitting, e2e
 - [ ] Implement L1. e2e on `?state=progress`: block line has the prefix and both numbers in separate `<strong>`, "of" outside; total line likewise. Checks; commit `feat: bolder session log numbers`.
+
+### Task 1b: Rule draft without errors (Haiku)
+**Files:** `src/core/rules/rules.ts` (`draftRule`), `prompts/rule_draft.md`, `src/adapters/preview/previewLlm.ts` if it reads the rows, tests `tests/core/rules/*.test.ts`
+- [ ] Failing test: the rule-draft user message has no error-bank section even when the topic has errors. Implement L4 (drop the rows, the `errorBank`/`plainText` use if orphaned, the prompt's Input sentence about rows and the "check every error-bank row" sentence; keep every other rule). Checks; commit `feat: rule drafts no longer use the learner's errors`.
 
 ### Task 2: Skipped questions of added rounds (Sonnet)
 **Files:** `src/core/db/repos/answers.ts` (`SOLVABLE`, `countSkippedBySession`, `deleteSkippedAnswers`), `src/core/session/skipped.ts` (pass today's date for the exception), `src/core/session/view.ts` / `src/ui/today/SessionPage.tsx` only if solving mode needs it for round > 1, preview fixture state, tests `tests/core/session/skipped.test.ts`, e2e

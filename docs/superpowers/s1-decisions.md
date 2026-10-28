@@ -64,6 +64,16 @@ Spec `specs/2026-10-27-s1-feedback-round.md`, plan `plans/2026-10-27-s1-feedback
 - A spot paragraph left empty has its hidden errors stored as skipped (not counted), with or without Finish — every paragraph hides 5–7 errors, so empty means not attempted — cost if wrong: untouched paragraphs no longer feed the error bank.
 - Unsent dispute text is lost if the page remounts after "Add more questions" — rare — cost if wrong: retype.
 
+## Feedback round 2 decisions (2026-10-28)
+
+Spec `specs/2026-10-28-s1-feedback-round-2.md`, plan `plans/2026-10-28-s1-feedback-round-2.md`, cache findings `notes/2026-10-28-prompt-cache.md`.
+
+- Tips drop error-bank entries with ✓ or + on either side; spelling-mnemonic tips stay — cost if wrong: fewer tips.
+- `--effort` is always passed (default medium, grade high); verified on the real CLI with Haiku, Sonnet and Opus — cost if wrong: one setting change.
+- Pressed ✓ toggle is a solid success button (contrast checked in both themes); a hand-typed lone ✓ also presses it — cost if wrong: cosmetic.
+- Lesson stats are derived from the stored CLI envelopes (no migration); Russian plurals via `Intl.PluralRules` — cost if wrong: none.
+- Prompt caching postponed by the learner; findings kept in the notes file.
+
 ## Still open
 
 - **Mac-only checks** (`docs/macos-checklist.md`): `$HOME` in the shell permission, long multi-line arguments, plugin-sql migrations, the not-signed-in output, PATH/HOME when launched from Finder. Not verifiable in the Linux build container.
@@ -72,4 +82,5 @@ Spec `specs/2026-10-27-s1-feedback-round.md`, plan `plans/2026-10-27-s1-feedback
 - **Small known limitations**: a few rare error messages are still English (rebuild failure, missing session, boot "claude is not available"); rule-draft and dispute errors show the raw message with Retry; rule sources in the side panel are plain text, not links (Tauri webview).
 - **Feedback round, Mac-only checks**: moving the data folder (checklist G–J: move, restart, refusals, failure keeps the old folder), the folder picker and the confirm dialog.
 - **Feedback round, small known limitations** (from reviews, not fixed): moving prompts deletes the old `prompts/` folder recursively; once moved there is no "back to default" button; empty folders created by a failed move stay; Check/Finish are not disabled while a session is rebuilt; one e2e test is timing-sensitive under load.
+- **Round 2 small known limitations**: the Progress page loads full CLI responses for stats (fine now; `json_extract` later); the stats toggle is small (24px) with no `aria-controls`; evals now run with the default efforts (grade high).
 - **Design pass**: the learner noted the UI looks generic ("Claudified"); revisit after trying the app.

@@ -185,6 +185,19 @@ describe('skipped items of added rounds', () => {
     expect(await skippedToSolve(deps)).toBeNull();
   });
 
+  test('today: a round-2 of only skipped items is counted with round 1; after a reopen it counts as fresh, and every reopened item is still reachable', async () => {
+    const { db, deps } = await setup();
+    const { sid } = await addSession(db, '2026-10-20', ['skipped', 'correct', 'correct', 'correct', 'correct']);
+    await addRound2(db, sid, ['skipped', 'skipped']);
+    expect(await skippedToSolve(deps)).toEqual({ sessionId: sid, date: '2026-10-20', count: 3 });
+    expect(await reopenSkipped(db, sid, '2026-10-20')).toBe(3);
+    expect(await skippedToSolve(deps)).toBeNull();
+    const view = await loadSessionView(db, sid);
+    expect(view.open).toBe(true);
+    expect(view.blocks.find((b) => b.round === 1 && b.format === 'spelling')!.items.map((i) => i.prompt)).toEqual(['Not optional: ___']);
+    expect(view.blocks.find((b) => b.round === 2)!.items.map((i) => i.prompt)).toEqual(['I saw a owl 0.', 'I saw a owl 1.']);
+  });
+
   test('the view lists reopened round-2 items with their original numbers', async () => {
     const { db } = await setup();
     const { sid } = await addSession(db, '2026-10-20', ['correct', 'correct', 'correct', 'correct', 'correct']);

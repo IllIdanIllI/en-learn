@@ -100,6 +100,20 @@ describe('ruleChatTurn', () => {
     expect(res.sessionId).toBeUndefined();
   });
 
+  test('a failed turn keeps the last good id: the retry resumes it again', async () => {
+    const fail: LlmResult<unknown> = { ok: false, code: 'timeout', message: 't', costUsd: 0, durationMs: 1, raw: '' };
+    const llm = new FakeLlm({ rule_chat: [ok(reply('one'), 'sid-A'), fail, fail, ok(reply('two'), 'sid-B')] });
+    const { deps, ruleId } = await setup(llm);
+    const first = await ruleChatTurn(deps, ruleId, 'first', null);
+    expect(first).toMatchObject({ ok: true, sessionId: 'sid-A' });
+    const failed = await ruleChatTurn(deps, ruleId, 'second', 'sid-A');
+    expect(failed.ok).toBe(false);
+    expect(failed.sessionId).toBeUndefined();
+    const retried = await ruleChatTurn(deps, ruleId, 'second', 'sid-A');
+    expect(retried).toMatchObject({ ok: true, sessionId: 'sid-B' });
+    expect(llm.calls.map((c) => c.resume)).toEqual([null, 'sid-A', 'sid-A', 'sid-A']);
+  });
+
   test('unknown rule throws', async () => {
     const { deps } = await setup(new FakeLlm({}));
     await expect(ruleChatTurn(deps, 999, 'hi', null)).rejects.toThrow('Rule not found');

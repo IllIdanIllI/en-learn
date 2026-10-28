@@ -1,16 +1,8 @@
 import { describe, expect, test } from 'vitest';
-import { errorContext, plainText, snippetText, type ErrorContextInput } from '@/core/progress/errorContext';
+import { errorContext, snippetText, type ErrorContextInput } from '@/core/progress/errorContext';
 
 const base: ErrorContextInput = { format: 'gap', prompt: '', expected: '', wrong: null, text: '', fix: '', paragraph: null };
 const ctx = (over: Partial<ErrorContextInput>) => errorContext({ ...base, ...over });
-
-describe('plainText', () => {
-  test('drops a "__" placeholder and the doubled space; keeps other snippets as text', () => {
-    expect(plainText({ before: 'I like ', changed: '__', after: ' films a lot.' })).toBe('I like films a lot.');
-    expect(plainText({ before: '… I ', changed: '__', after: '' })).toBe('… I');
-    expect(plainText({ before: 'He ', changed: 'go', after: ' home.' })).toBe('He go home.');
-  });
-});
 
 describe('errorContext', () => {
   test('gap: the blank filled with the answer and with the right answer', () => {

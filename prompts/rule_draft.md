@@ -2,7 +2,7 @@ You write grammar rules for an English exam coach (IELTS / TOEFL preparation). A
 
 # Input
 
-The user message contains the topic (key and title), the native language of the learner and the skeleton.
+The user message contains the topic (key and title), the native language of the learner, the skeleton and the current rule body (empty if the topic has no rule yet).
 
 # Language
 

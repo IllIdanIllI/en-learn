@@ -21,9 +21,6 @@ const SIDE = 4;
 
 export const snippetText = (s: Snippet): string => `${s.before}${s.changed}${s.after}`;
 
-/** The snippet as plain text for a prompt: an empty differing part ("__") is dropped with its doubled space. */
-export const plainText = (s: Snippet): string => (s.changed === '__' ? `${s.before}${s.after}`.replace(/ {2,}/g, ' ').trim() : snippetText(s));
-
 const isTick = (s: string): boolean => ['', '✓', '+'].includes(s.trim());
 const plain = (changed: string): Snippet => ({ before: '', changed, after: '' });
 

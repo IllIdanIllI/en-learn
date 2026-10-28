@@ -74,6 +74,16 @@ Spec `specs/2026-10-28-s1-feedback-round-2.md`, plan `plans/2026-10-28-s1-feedba
 - Lesson stats are derived from the stored CLI envelopes (no migration); Russian plurals via `Intl.PluralRules` — cost if wrong: none.
 - Prompt caching postponed by the learner; findings kept in the notes file.
 
+## Feedback round 3 decisions (2026-10-28)
+
+Spec `specs/2026-10-28-s1-feedback-round-3.md`, plan `plans/2026-10-28-s1-feedback-round-3.md`.
+
+- The fix-block format example always shows an error sentence and its fix, not "→ верно": task content must stay English (a code check rejects Cyrillic) — cost if wrong: no example of the ✓ case.
+- "Not counted: TD-2…" items were sentences removed by the quality check; they are now never shown (scores were already right) — cost if wrong: none.
+- Every graded lesson gets the close button in the sticky bar; the added-round layout also applies while the round is still open — cost if wrong: layout only.
+- A wrong item answered ✓ still shows a struck "✓ → fix" in the lesson view (it shows what was pressed); the error bank shows the sentence fragment instead — cost if wrong: one more tick on screen.
+- The error-bank context is cut by code (4 words each side) from stored data, so old errors get it too; the rule-draft prompt now receives these snippets instead of bare answers — cost if wrong: rule drafts see slightly different input.
+
 ## Still open
 
 - **Mac-only checks** (`docs/macos-checklist.md`): `$HOME` in the shell permission, long multi-line arguments, plugin-sql migrations, the not-signed-in output, PATH/HOME when launched from Finder. Not verifiable in the Linux build container.

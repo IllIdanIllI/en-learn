@@ -1,6 +1,6 @@
 # Prompt cache and cost with `claude -p` (measured 2026-10-28, Claude Code 2.1.312)
 
-Postponed by the learner; kept here for when caching is picked up again.
+The rule chat (round 5) uses the conversation design below; the other calls (lesson generation, grading, disputes, rule draft) still do not cache across calls.
 
 ## Measurements (real CLI, flags as the app uses them)
 

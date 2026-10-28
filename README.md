@@ -4,7 +4,7 @@ A desktop app for daily IELTS and TOEFL English practice. Each day it builds a s
 
 ## Status
 
-Stage S1 (core loop): programme setup, rules, daily session, grading, disputes, error bank, progress, settings. Writing, speaking and vocabulary practice are not built yet.
+Stage S1 (core loop) is complete: programme setup, rules (with a chat to ask about a rule or propose a new version), daily session, grading, disputes, solving skipped questions, error bank, progress, settings. Writing, speaking and vocabulary practice are not built yet.
 
 ## Prerequisites
 
@@ -49,15 +49,15 @@ The prompts the app sends are bundled. To change one, put a file in `<app data>/
 - `<kind>.md` replaces the system prompt.
 - `<kind>.schema.json` replaces the response schema.
 
-`<kind>` is one of `generate_session`, `validate_session`, `grade`, `dispute`, `rule_draft`. A missing file falls back to the bundled copy. Restart the app after a change. The bundled files are in `prompts/`.
+`<kind>` is one of `generate_session`, `validate_session`, `grade`, `dispute`, `rule_draft`, `rule_chat`. A missing file falls back to the bundled copy. Restart the app after a change. The bundled files are in `prompts/`.
 
 ## What is sent to Anthropic
 
-Only what goes into the prompts: your rules, recent errors, the tasks and your answers. No audio is recorded or sent. This app has no telemetry and makes no network calls of its own. The Claude CLI talks to Anthropic under your own account and its own privacy settings.
+Only what goes into the prompts: your rules, recent errors (for review tasks), the tasks, your answers and your rule-chat messages. Rule drafts and the rule chat never get your errors. No audio is recorded or sent. This app has no telemetry and makes no network calls of its own. The Claude CLI talks to Anthropic under your own account and its own privacy settings. Rule-chat conversations are kept by Claude Code itself (under `~/.claude/projects/`), because each message continues the previous one; all other calls are not kept.
 
 ## Models and cost
 
-Settings has a model for each kind of call. The default is `claude-sonnet-5-5` for all of them. Pick a cheaper model for the calls you want to keep low. You can also set a budget per call in USD. Leave it empty for no limit. The CLI checks the budget after a turn, so a call can cost slightly more than the cap.
+Settings has a model for each kind of call. The default is `claude-sonnet-5-5` for all of them. Pick a cheaper model for the calls you want to keep low. The rule chat reuses its earlier messages from Claude's prompt cache (1 hour), so follow-up messages are cheaper. Rule-chat calls belong to no lesson, so the Progress log does not show them; their tokens are in the `llm_call` table (`response` holds the CLI envelope with `usage`). You can also set a budget per call in USD. Leave it empty for no limit. The CLI checks the budget after a turn, so a call can cost slightly more than the cap.
 
 ## Development
 

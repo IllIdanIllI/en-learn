@@ -1,6 +1,6 @@
 # macOS checklist
 
-Manual checks on a real Mac with `yarn tauri dev` (or a built bundle). They cover what the Linux container could not: the Tauri shell scope, the SQL plugin and Finder launch. Work in order. Each step has an action, the expected result and what to record if it fails.
+Manual checks on a real Mac with `yarn tauri dev` (or a built bundle). They cover what the Linux container could not: the Tauri shell scope, the SQL plugin, Finder launch and the rule chat's CLI conversation. Work in order. Each step has an action, the expected result and what to record if it fails.
 
 Setup: Claude Code installed at `~/.local/bin/claude` and signed in. Start with a fresh database: quit the app and delete `~/Library/Application Support/io.github.illidanilli.enlearn/enlearn.db`.
 
@@ -91,3 +91,25 @@ I. **Refusals.**
 J. **A failed move keeps the old folder.**
    - Action: pick a folder you cannot write to (for example make one with `chmod 555`), confirm.
    - Expected: the row shows "Could not move the data: …", no files are left in the target, the old folder still has everything, and the app keeps working without a reload (add an answer or change a setting to check the database).
+
+## Rule chat (round 5)
+
+K. **First message (shell scope `claude-local-chat`).**
+   - Action: Rules → open a rule → "Ask about this rule": ask a question (for example "When is the zero article used?") and press Send.
+   - Expected: "Thinking…", then a reply in the Settings language. No error line.
+   - If it fails: record the "No reply: …" text and the last row of `sqlite3 enlearn.db "select kind, ok, error from llm_call order by id desc limit 3"`. An error naming a validator or the scope means `src-tauri/capabilities/default.json` and `buildClaudeArgs` disagree.
+
+L. **Next message continues the conversation (`--resume … --fork-session`, scope `claude-local-chat-next`).**
+   - Action: in the same chat ask a follow-up that needs the first answer (for example "Give one more example of that").
+   - Expected: the reply follows on from the first one, and the second call reads the first one from the cache: `sqlite3 enlearn.db "select id, json_extract(response, '$.session_id'), json_extract(response, '$.usage.cache_read_input_tokens') from llm_call where kind = 'rule_chat' order by id desc limit 2"` shows two different session ids and a cache read on the newer row close to the older row's cache write.
+   - If it fails: record the error and the `llm_call` rows as in K.
+
+M. **Proposal and save.**
+   - Action: ask for a change (for example "Add a trap about 'the' with plural nouns"). Open both tabs, "New version" and "Changes". Press "Save version" without a reason, then with one.
+   - Expected: the diff shows added lines green and removed lines red; without a reason nothing is saved; with a reason a new version appears in the rule history and the chat is cleared.
+   - If it fails: record the step and the message.
+
+N. **Budget set.**
+   - Action: Settings → set a budget per call (for example 0.50), then repeat K and L in a new chat.
+   - Expected: same as K and L (scopes `claude-local-chat-budget` and `claude-local-chat-next-budget`).
+   - If it fails: record the error and the `llm_call` rows.

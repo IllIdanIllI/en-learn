@@ -321,7 +321,7 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
   return (
     <SessionActionsProvider value={actions}>
       <div ref={root}>
-        <SessionHeader view={view} lang={lang} rebuilding={rebuilding} onRebuild={rebuild} />
+        <SessionHeader view={view} lang={lang} rebuilding={rebuilding} solving={solving} onRebuild={rebuild} />
         {loader && <Loader lang={lang} {...loader} />}
         {solving ? (
           view.blocks.map((block, i) => !block.graded && block.items.length > 0 && renderBlock(block, i, false))

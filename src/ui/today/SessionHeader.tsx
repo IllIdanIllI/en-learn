@@ -4,11 +4,12 @@ import { LightToggle } from './LightToggle';
 import { useSessionActions } from './sessionActions';
 
 /** The link is the section, set in the line "Read § X before block N"; it opens the rule panel. */
-export function SessionHeader({ view, lang, rebuilding, onRebuild }: {
-  view: SessionView; lang: Lang; rebuilding: boolean; onRebuild?: (light: boolean) => void;
+export function SessionHeader({ view, lang, rebuilding, solving = false, onRebuild }: {
+  view: SessionView; lang: Lang; rebuilding: boolean; solving?: boolean; onRebuild?: (light: boolean) => void;
 }) {
   const { openRule } = useSessionActions();
-  const first = view.readFirst;
+  // Solving shows only the open items, so block N may be hidden.
+  const first = solving ? null : view.readFirst;
   // Split on a marker so the section can be a button inside the sentence.
   const [before = '', after = ''] = first ? t(lang, 'today.readFirst', { section: '\u0000', n: first.blockNumber }).split('\u0000') : [];
   return (

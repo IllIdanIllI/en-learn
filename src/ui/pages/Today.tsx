@@ -112,10 +112,13 @@ export function Today() {
   };
   const solve = (sessionId: number) => {
     setGenError(null);
-    reopenSkipped(deps.db, sessionId).then(
-      () => setSolving(sessionId),
-      (e: unknown) => setGenError({ message: e instanceof Error ? e.message : String(e) }),
-    );
+    reopenSkipped(deps.db, sessionId)
+      .then(async (n) => {
+        // A stale count (another window): with nothing left to solve, refresh instead of showing an empty page.
+        if (n === 0 && (await skippedToSolve(deps))?.sessionId !== sessionId) setReload((r) => r + 1);
+        else setSolving(sessionId);
+      })
+      .catch((e: unknown) => setGenError({ message: e instanceof Error ? e.message : String(e) }));
   };
   const lastLight = useRef(false);
   const rebuild = (sessionId: number, light: boolean) => {

@@ -116,6 +116,19 @@ describe('skippedToSolve edge cases', () => {
   });
 });
 
+describe('skipped items of added rounds', () => {
+  test('stay skipped: not offered, not counted, not reopened', async () => {
+    const { db, deps } = await setup();
+    const { sid } = await addSession(db, '2026-10-20', ['correct', 'correct', 'correct', 'correct', 'correct']);
+    const b = await insertBlock(db, sid, 4, { ...blk, kind: 'task', format: 'fix', title: 'More', passage: null }, 2);
+    await insertItem(db, b, 0, { ...base, prompt: 'I saw a owl.', expected: 'an' });
+    await db.execute("INSERT INTO answer (item_id, text, verdict) VALUES ((SELECT MAX(id) FROM item), '', 'skipped')");
+    expect(await skippedToSolve(deps)).toBeNull();
+    expect(await reopenSkipped(db, sid)).toBe(0);
+    expect(await db.select('SELECT 1 FROM answer WHERE verdict = ?', ['skipped'])).toHaveLength(1);
+  });
+});
+
 describe('reopenSkipped', () => {
   test('clears only the skipped gap, fix and spelling answers of that session', async () => {
     const { db } = await setup();

@@ -252,6 +252,22 @@ describe('draftRule', () => {
     expect(text).not.toContain('receive');
   });
 
+  test('the error lines carry plain sentences: an extra word leaves no "__" placeholder', async () => {
+    const db = await createTestDb();
+    const topicId = await insertTopic(db, 'art', 'Articles', 1);
+    await insertGradedAnswers(db, [{ topicId, prompt: 'I like the films a lot.', text: '✓', fix: 'films', isInattention: false }]);
+    await db.execute("UPDATE block SET format = 'fix'");
+    await db.execute("UPDATE item SET wrong = 'the films', expected = 'films'");
+    const llm = new FakeLlm({ rule_draft: [draftOk(bodyWith('draft'))] });
+
+    await draftRule(depsWith(db, llm), topicId);
+
+    const text = llm.calls[0]!.userPrompt;
+    expect(text).toContain('I like the films a lot.');
+    expect(text).toContain('I like films a lot.');
+    expect(text).not.toContain('__');
+  });
+
   test('does not save a rule version', async () => {
     const db = await createTestDb();
     const topicId = await insertTopic(db, 'cond', 'Conditionals', 1);

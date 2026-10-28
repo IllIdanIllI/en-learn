@@ -1,8 +1,16 @@
 import { describe, expect, test } from 'vitest';
-import { errorContext, snippetText, type ErrorContextInput } from '@/core/progress/errorContext';
+import { errorContext, plainText, snippetText, type ErrorContextInput } from '@/core/progress/errorContext';
 
 const base: ErrorContextInput = { format: 'gap', prompt: '', expected: '', wrong: null, text: '', fix: '', paragraph: null };
 const ctx = (over: Partial<ErrorContextInput>) => errorContext({ ...base, ...over });
+
+describe('plainText', () => {
+  test('drops a "__" placeholder and the doubled space; keeps other snippets as text', () => {
+    expect(plainText({ before: 'I like ', changed: '__', after: ' films a lot.' })).toBe('I like films a lot.');
+    expect(plainText({ before: '… I ', changed: '__', after: '' })).toBe('… I');
+    expect(plainText({ before: 'He ', changed: 'go', after: ' home.' })).toBe('He go home.');
+  });
+});
 
 describe('errorContext', () => {
   test('gap: the blank filled with the answer and with the right answer', () => {
@@ -47,6 +55,17 @@ describe('errorContext', () => {
     expect(c.shouldBe).toEqual({ before: 'Yesterday he ', changed: 'went', after: ' to school. Then he …' });
     expect(snippetText(c.shouldBe)).toBe('Yesterday he went to school. Then he …');
     expect(c.sentence).toBe(paragraph);
+  });
+
+  test('spot with an extra or a missed word shows "__" for the empty side', () => {
+    const paragraph = 'I like the films a lot. Then we left.';
+    const extra = ctx({ format: 'spot', prompt: 'the films', expected: 'films', text: 'x', paragraph });
+    expect(extra.was).toEqual({ before: 'I like ', changed: 'the', after: ' films a lot. Then …' });
+    expect(extra.shouldBe).toEqual({ before: 'I like ', changed: '__', after: ' films a lot. Then …' });
+    expect(snippetText(extra.shouldBe)).toBe('I like __ films a lot. Then …');
+    const missed = ctx({ format: 'spot', prompt: 'like films', expected: 'like the films', text: 'x', paragraph: 'I like films a lot. Then we left.' });
+    expect(missed.was.changed).toBe('__');
+    expect(missed.shouldBe.changed).toBe('the');
   });
 
   test('spot without a paragraph shows the plain texts', () => {

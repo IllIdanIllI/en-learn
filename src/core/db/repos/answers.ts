@@ -118,10 +118,10 @@ export async function listSkippedItems(
   return rows.map((r) => ({ prompt: r.prompt, expected: r.expected, topicId: r.topic_id }));
 }
 
-/** Active, solvable (gap, fix, spelling) items: answered `skipped` and not dropped, or never answered in the lesson itself (round 1). */
-const SOLVABLE = `b.format IN ('gap', 'fix', 'spelling') AND i.status = 'active'
+/** Active, solvable (gap, fix, spelling) items of the lesson itself (round 1): answered `skipped` and not dropped, or never answered. */
+const SOLVABLE = `b.format IN ('gap', 'fix', 'spelling') AND i.status = 'active' AND b.round = 1
        AND ((a.item_id IS NOT NULL AND a.verdict = 'skipped' AND (a.dispute_decision IS NULL OR a.dispute_decision != 'drop'))
-         OR (a.item_id IS NULL AND b.round = 1))`;
+         OR a.item_id IS NULL)`;
 
 /**
  * Graded sessions of a date range with solvable items, and how many. A session with an unanswered added round

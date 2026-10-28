@@ -96,6 +96,18 @@ Spec `specs/2026-10-28-s1-feedback-round-4.md`, plan `plans/2026-10-28-s1-feedba
 - The rule-draft prompt gets the sentences without the "__" marker — cost if wrong: none.
 - Skipped spelling items are solvable (K4) but, as before, only skipped gap and fix items return as review input in the next lesson — cost if wrong: a skipped spelling word is not reviewed unless solved.
 
+## Feedback round 5 decisions (2026-10-28)
+
+Spec `specs/2026-10-28-s1-feedback-round-5.md`, plan `plans/2026-10-28-s1-feedback-round-5.md`.
+
+- Session log: only the part of a block title before ": " is bold; titles without ": " stay plain — cost if wrong: none.
+- Skipped items of every round are solvable (supersedes round 4's "round 1 only"); yesterday's never-answered added round counts too — cost if wrong: none.
+- While today's lesson has an added round with no answers yet, "Solve skipped" is not offered for today; that round is answered first (supersedes the spec's first L2 wording) — cost if wrong: one extra step in a rare case.
+- Reopening an all-skipped added round of today and leaving mid-way makes it look new, so the button hides; the items stay answerable on today's page as the open round (pinned by a test) — cost if wrong: the learner answers via the page instead of the button.
+- Rule chat: the chat stays (hidden) while an older version or the manual editor is open, and is cleared on any version change; Save is labelled "Сохранить версию" — cost if wrong: small UI change.
+- Rule chat cache: `--resume <id> --fork-session`; a clean-environment check showed a new id per turn, full history and growing cache reads (`notes/2026-10-28-prompt-cache.md`) — cost if wrong: none (measured).
+- The rule draft no longer gets the learner's errors; the prompt sentences about them (incl. inattention errors) are gone — cost if wrong: drafts may miss a trap the learner hit.
+
 ## Still open
 
 - **Mac-only checks** (`docs/macos-checklist.md`): `$HOME` in the shell permission, long multi-line arguments, plugin-sql migrations, the not-signed-in output, PATH/HOME when launched from Finder. Not verifiable in the Linux build container.

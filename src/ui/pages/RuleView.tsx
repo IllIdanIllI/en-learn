@@ -8,6 +8,7 @@ import { Button } from '@/ui/components/ui/button';
 import { FieldInput } from '@/ui/components/ui/field-input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/ui/components/ui/table';
 import { Textarea } from '@/ui/components/ui/textarea';
+import { RuleChat } from '@/ui/rules/RuleChat';
 import { Notice } from '@/ui/today/chips';
 import { RuleBody } from '@/ui/today/RuleBody';
 import { SourceList } from '@/ui/today/RulePanel';
@@ -115,6 +116,10 @@ export function RuleView() {
           {!bodyHasSources(viewed.body) && <SourceList sources={viewed.sources} lang={lang} />}
         </>
       )}
+
+      <div hidden={!isCurrent || draft !== null}>
+        <RuleChat key={current.version} ruleId={ruleId} currentBody={current.body} lang={lang} onSaved={() => { setShown(null); setReload((n) => n + 1); }} />
+      </div>
 
       <section className="mt-12">
         <h2 className="title">{t(lang, 'rule.history')}</h2>

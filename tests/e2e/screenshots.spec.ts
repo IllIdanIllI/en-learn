@@ -63,7 +63,7 @@ test('settings page', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 1100 });
   await page.goto('/?state=no_session#/settings');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  await expect(page.locator('button[data-model-kind]')).toHaveCount(5);
+  await expect(page.locator('button[data-model-kind]')).toHaveCount(6);
   await expect(page.locator('#settings-budget')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Настройка программы' })).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/settings.png` });
@@ -103,7 +103,7 @@ test('settings changes save immediately', async ({ page }) => {
 
 test('an effort select saves', async ({ page }) => {
   await page.goto('/?state=no_session#/settings');
-  await expect(page.locator('button[data-effort-kind]')).toHaveCount(5);
+  await expect(page.locator('button[data-effort-kind]')).toHaveCount(6);
   const trigger = page.locator('#effort-grade');
   await expect(trigger).toHaveText('Высокое');
   await trigger.click();
@@ -644,7 +644,7 @@ test.describe('rules, error bank and progress', () => {
     await expect(page.getByRole('heading', { name: 'История версий' })).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/rule-view.png`, fullPage: true });
 
-    await page.getByRole('button', { name: 'Править' }).click();
+    await page.getByRole('button', { name: 'Править', exact: true }).click();
     const body = page.getByRole('textbox', { name: 'Текст правила (Markdown)' });
     await body.fill('## Формула\n\na / an + новая запись.');
     await expect(page.getByText('a / an + новая запись.', { exact: true }).last()).toBeVisible();
@@ -661,6 +661,44 @@ test.describe('rules, error bank and progress', () => {
     await expect(page.getByRole('columnheader', { name: 'Артикль' })).toBeVisible();
     await page.getByRole('button', { name: 'К текущей версии' }).click();
     await expect(page.getByText('a / an + новая запись.', { exact: true })).toBeVisible();
+  });
+
+  test('rule chat: a question gets a reply; a change request shows both tabs and saves only with a reason', async ({ page }) => {
+    await page.goto('/?state=no_session#/rules');
+    await page.getByRole('link', { name: 'Articles' }).click();
+    const input = page.getByRole('textbox', { name: 'Сообщение о правиле' });
+    await input.fill('Почему здесь a, а не the?');
+    await page.getByRole('button', { name: 'Отправить' }).click();
+    await expect(page.getByText('Правило описывает общий механизм')).toBeVisible();
+    await expect(page.getByRole('radio', { name: 'Изменения' })).toHaveCount(0);
+
+    await input.fill('Пожалуйста, измени раздел ловушек');
+    await page.getByRole('button', { name: 'Отправить' }).click();
+    await expect(page.getByText('Добавил строку в раздел «Ловушки».')).toBeVisible();
+    await expect(page.getByRole('radio', { name: 'Новая версия' })).toBeVisible();
+    await page.getByRole('radio', { name: 'Изменения' }).click();
+    await expect(page.getByTestId('diff-add')).toContainText('Added in chat');
+    await expect(page.getByTestId('diff-del')).toHaveCount(0);
+    for (const theme of ['light', 'dark'] as const) {
+      await page.evaluate((th) => document.documentElement.classList.toggle('dark', th === 'dark'), theme);
+      await page.screenshot({ path: `${SHOTS}/rule-chat-${theme}.png`, fullPage: true });
+    }
+
+    await page.getByRole('button', { name: 'Сохранить версию' }).click();
+    await expect(page.getByRole('alert')).toContainText('Укажите причину правки');
+    await expect(page.getByRole('row', { name: /Added in chat/ })).toHaveCount(0);
+    await page.getByRole('textbox', { name: 'Причина правки' }).fill('Добавил ловушку из чата');
+    await page.getByRole('button', { name: 'Сохранить версию' }).click();
+    await expect(page.getByText('Правило, версия 2')).toBeVisible();
+    await expect(page.getByRole('row', { name: /Добавил ловушку из чата/ })).toBeVisible();
+    await expect(page.getByText('Added in chat').first()).toBeVisible();
+    await expect(page.getByRole('radio', { name: 'Изменения' })).toHaveCount(0);
+    await expect(page.getByText('Добавил строку в раздел «Ловушки».')).toHaveCount(0);
+  });
+
+  test('settings lists the Rule chat model row', async ({ page }) => {
+    await page.goto('/?state=no_session#/settings');
+    await expect(page.getByText('Чат о правиле')).toBeVisible();
   });
 
   test('a topic without a rule is drafted from the rules list and saved only on confirm', async ({ page }) => {
@@ -897,7 +935,7 @@ test.describe('answers, earlier sessions, errors and fallbacks', () => {
     page.on('request', (r) => requests.push(r.url()));
     await page.goto('/?state=no_session#/rules');
     await page.getByRole('link', { name: 'Articles' }).click();
-    await page.getByRole('button', { name: 'Править' }).click();
+    await page.getByRole('button', { name: 'Править', exact: true }).click();
     await page.getByRole('textbox', { name: 'Текст правила (Markdown)' }).fill('## Формула\n\ntext ![x](https://example.invalid/pixel.png)');
     await expect(page.getByText('text', { exact: false }).last()).toBeVisible();
     await expect(page.locator('main img')).toHaveCount(0);

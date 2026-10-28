@@ -32,7 +32,7 @@ export function ItemRow({ item, number, lang, value, onChange, children }: {
               onClick={() => onChange(marked ? '' : '✓')}
               className={cn(
                 'absolute left-px top-1/2 inline-flex h-8 w-9 -translate-y-1/2 items-center justify-center rounded-sm text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                marked ? 'bg-success/35 text-success ring-1 ring-success/50' : 'bg-success/10 text-foreground hover:bg-success/15',
+                marked ? 'bg-success text-background' : 'bg-success/10 text-foreground hover:bg-success/15',
               )}
             >
               ✓

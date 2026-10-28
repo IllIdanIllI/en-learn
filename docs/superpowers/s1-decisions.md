@@ -91,6 +91,9 @@ Spec `specs/2026-10-28-s1-feedback-round-4.md`, plan `plans/2026-10-28-s1-feedba
 - Words shared by both fragments move into the muted context and count toward its 4-word window — cost if wrong: a little less outer context.
 - "Solve skipped" is not offered while the lesson has an unanswered added round; that round is answered first on the normal page — cost if wrong: skipped items wait a little.
 - Items left unanswered after "Solve skipped" (leaving mid-way) are still counted and offered, so yesterday's are never stranded — cost if wrong: none.
+- Only skipped items of the lesson itself (round 1) are solvable; skipped items of "Add more questions" rounds stay skipped — cost if wrong: those cannot be solved later.
+- A half-solved block shows only its unanswered items until it is finished, also on the normal page — cost if wrong: its graded items are out of sight for a while.
+- The rule-draft prompt gets the sentences without the "__" marker — cost if wrong: none.
 - Skipped spelling items are solvable (K4) but, as before, only skipped gap and fix items return as review input in the next lesson — cost if wrong: a skipped spelling word is not reviewed unless solved.
 
 ## Still open

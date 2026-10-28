@@ -303,5 +303,6 @@ export const ru: Record<keyof typeof en, string> = {
   'progress.tokens.cacheWrite': 'в кэш',
   'progress.tokens.output': 'вывод',
   'progress.score': '{x} из {y}',
+  'progress.total': '{x} из {y} · {p}%',
   'progress.loadError': 'Прогресс не загрузился: {message}',
 };

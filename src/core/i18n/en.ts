@@ -301,5 +301,6 @@ export const en = {
   'progress.tokens.cacheWrite': 'cache write',
   'progress.tokens.output': 'output',
   'progress.score': '{x} of {y}',
+  'progress.total': '{x} of {y} · {p}%',
   'progress.loadError': 'Progress could not be loaded: {message}',
 } as const;

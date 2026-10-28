@@ -652,20 +652,26 @@ test.describe('rules, error bank and progress', () => {
 
     const topics = page.getByRole('table', { name: 'Темы' });
     await expect(topics.getByText('Открыта').first()).toBeVisible();
-    await page.getByRole('table', { name: 'Журнал занятий' }).scrollIntoViewIfNeeded();
-    await expect(page.getByRole('table', { name: 'Журнал занятий' }).locator('tbody tr')).toHaveCount(6);
+    const logCards = page.getByRole('list', { name: 'Журнал занятий' });
+    await logCards.scrollIntoViewIfNeeded();
+    await expect(logCards.getByRole('listitem').filter({ has: page.getByRole('heading') })).toHaveCount(6);
+    await expect(logCards).toContainText(/\d+ из \d+ · \d+%/);
     await expect(page.getByText('Лёгкий день').first()).toBeVisible();
     await expect(page.getByText(/\$0\.\d{4}/).first()).toBeVisible();
-    await page.screenshot({ path: `${SHOTS}/progress.png`, fullPage: true });
+    for (const theme of ['light', 'dark'] as const) {
+      await page.evaluate((th) => document.documentElement.classList.toggle('dark', th === 'dark'), theme);
+      await page.screenshot({ path: `${SHOTS}/progress${theme === 'dark' ? '-dark' : ''}.png`, fullPage: true });
+    }
+    await page.evaluate(() => document.documentElement.classList.remove('dark'));
 
-    await expect(page.getByRole('table', { name: 'Журнал занятий' })).toContainText(/Повторение[^·]* 2 из 4/);
+    await expect(logCards).toContainText(/Повторение.*2 из 4 · 50%/);
     await topics.getByRole('link', { name: 'Правило: Articles' }).click();
     await expect(page).toHaveURL(/#\/rules\/\d+$/);
   });
 
   test('a lesson row expands to its models, calls and tokens', async ({ page }) => {
     await page.goto('/?state=progress#/progress');
-    const log = page.getByRole('table', { name: 'Журнал занятий' });
+    const log = page.getByRole('list', { name: 'Журнал занятий' });
     await log.scrollIntoViewIfNeeded();
     const toggle = log.getByRole('button', { name: 'Подробнее' }).first();
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');

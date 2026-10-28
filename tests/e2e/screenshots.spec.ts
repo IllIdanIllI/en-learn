@@ -217,13 +217,19 @@ test.describe('today session', () => {
     expect(bb!.x).toBeGreaterThanOrEqual(ib!.x);
     expect(bb!.x + bb!.width).toBeLessThanOrEqual(ib!.x + ib!.width);
 
+    const bgOf = () => mark.evaluate((el) => getComputedStyle(el).backgroundColor);
+    const bgBefore = await bgOf();
     await mark.click();
     const marked = page.getByPlaceholder('Верно как есть').first();
     await expect(marked).toBeDisabled();
     await expect(marked).toHaveValue('');
     await expect(mark).toHaveAttribute('aria-pressed', 'true');
     await expect(mark).toBeEnabled();
-    await page.screenshot({ path: `${SHOTS}/today-fix-marked.png`, fullPage: true });
+    expect(await bgOf()).not.toBe(bgBefore);
+    for (const theme of ['light', 'dark'] as const) {
+      await page.evaluate((th) => document.documentElement.classList.toggle('dark', th === 'dark'), theme);
+      await page.screenshot({ path: `${SHOTS}/today-fix-marked-${theme}.png`, fullPage: true });
+    }
 
     await mark.click();
     await expect(mark).toHaveAttribute('aria-pressed', 'false');

@@ -283,6 +283,19 @@ describe('gradeSession', () => {
     expect((await verdicts(db))[3]).toBe('correct');
   });
 
+  test('✓ from the mark-as-correct toggle: correct on a ✓ item without the LLM, sent to the LLM on an item that needs a fix', async () => {
+    const only3 = await setup('2026-10-20', '2026-10-20', []);
+    expect(await gradeSession(only3.deps, only3.sid, subm({ items: { 3: '✓', 4: 'an' } }), [])).toEqual({ kind: 'graded' });
+    expect(only3.llm.calls).toHaveLength(0);
+    expect((await verdicts(only3.db))[3]).toBe('correct');
+
+    const r = result({ items: [entry('b1.i0', 'wrong', { fix: 'an', ruleSection: 'Basics', explanation: 'Use an.' })] });
+    const fix = await setup('2026-10-20', '2026-10-20', [ok(r)]);
+    expect(await gradeSession(fix.deps, fix.sid, subm({ items: { 2: '✓', 4: 'an' } }), [])).toEqual({ kind: 'graded' });
+    expect(userPrompt(fix.llm).match(/^### b\d.*$/gm)).toEqual(['### b1.i0']);
+    expect((await verdicts(fix.db))[2]).toBe('wrong');
+  });
+
   test('~ confirmed as correct is stored in acceptedShorthands and graded as ✓', async () => {
     const { db, llm, deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(fullResult())]);
     const sub = subm({ items: { 3: '~' } });

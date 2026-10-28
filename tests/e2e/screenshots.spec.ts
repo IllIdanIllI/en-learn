@@ -202,13 +202,33 @@ test.describe('today session', () => {
     expect(await start.evaluate((el) => getComputedStyle(el).cursor)).toBe('not-allowed');
   });
 
-  test('the ✓ button on a fix item fills its answer with ✓', async ({ page }) => {
+  test('the ✓ toggle inside a fix input marks the item as correct and can be undone', async ({ page }) => {
     await page.goto('/?state=generated#/today');
     const inputs = page.getByPlaceholder('✓ или исправленный фрагмент');
     const marks = page.getByRole('button', { name: 'Отметить как верное' });
     await expect(marks).toHaveCount(await inputs.count());
-    await marks.first().click();
-    await expect(inputs.first()).toHaveValue('✓');
+    const first = inputs.first();
+    const mark = marks.first();
+    await expect(mark).toHaveAttribute('aria-pressed', 'false');
+
+    const [ib, bb] = [await first.boundingBox(), await mark.boundingBox()];
+    const padLeft = await first.evaluate((el) => parseFloat(getComputedStyle(el).paddingLeft));
+    expect(ib!.x + padLeft).toBeGreaterThanOrEqual(bb!.x + bb!.width);
+    expect(bb!.x).toBeGreaterThanOrEqual(ib!.x);
+    expect(bb!.x + bb!.width).toBeLessThanOrEqual(ib!.x + ib!.width);
+
+    await mark.click();
+    const marked = page.getByPlaceholder('Верно как есть').first();
+    await expect(marked).toBeDisabled();
+    await expect(marked).toHaveValue('');
+    await expect(mark).toHaveAttribute('aria-pressed', 'true');
+    await expect(mark).toBeEnabled();
+    await page.screenshot({ path: `${SHOTS}/today-fix-marked.png`, fullPage: true });
+
+    await mark.click();
+    await expect(mark).toHaveAttribute('aria-pressed', 'false');
+    await expect(first).toBeEnabled();
+    await expect(first).toHaveValue('');
   });
 
   test('graded session shows the feedback summary and verdicts with a mark, not only colour', async ({ page }) => {

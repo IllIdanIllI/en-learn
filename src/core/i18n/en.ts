@@ -144,6 +144,7 @@ export const en = {
   'grade.error': 'Checking failed: {message}',
   'input.fix': '✓ or the corrected fragment',
   'input.markCorrect': 'Mark as correct',
+  'input.correctAsIs': 'Correct as it is',
   'input.spot': 'wrong → right, one per line',
   'input.answer': 'Answer',
   'verdict.correct': 'Correct',

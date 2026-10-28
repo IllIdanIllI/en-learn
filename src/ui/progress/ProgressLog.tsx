@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronDownIcon } from 'lucide-react';
-import { pluralForm, t, type Lang } from '@/core/i18n';
+import { t, type Lang } from '@/core/i18n';
 import type { ProgressLogRow } from '@/core/progress/derive';
 import { Button } from '@/ui/components/ui/button';
 
@@ -23,25 +23,31 @@ function LogCard({ r, blockTitles, lang }: { r: ProgressLogRow; blockTitles: Map
   return (
     <li className="rounded-md border border-border bg-card px-4 py-3">
       <div className="flex items-baseline justify-between gap-4">
-        <h3 className="font-medium">
-          <span className="tabular text-muted-foreground">{r.date}</span> · {r.title}
-          {r.isLight && <span className="label ml-2 text-muted-foreground">{t(lang, 'today.light')}</span>}
+        <h3 className="font-bold">
+          {r.title} <span className="tabular font-normal text-muted-foreground">{r.date}</span>
+          {r.isLight && <span className="label ml-2 font-normal text-muted-foreground">{t(lang, 'today.light')}</span>}
         </h3>
         <span className="label tabular whitespace-nowrap text-muted-foreground">${r.costUsd.toFixed(4)}</span>
       </div>
       {counted > 0 && (
-        <p className="tabular mt-2 text-lg font-medium">
+        <p data-testid="log-total" className="tabular mt-2 text-lg font-bold">
           {t(lang, 'progress.total', { x: correct, y: counted, p: Math.round((correct * 100) / counted) })}
         </p>
       )}
-      <p className="label tabular mt-1 font-normal text-muted-foreground">
-        {r.scores.map((s) => `${blockTitles.get(s.blockId) ?? ''} ${t(lang, 'progress.score', { x: s.correct, y: s.counted })}`.trim()).join(' · ')}
-      </p>
-      <p className="label tabular mt-1 font-normal text-muted-foreground">
-        {t(lang, 'progress.col.errors')}: {r.errorCount}
+      {r.scores.length > 0 && (
+        <ul data-testid="log-blocks" className="tabular mt-2 flex flex-col gap-0.5">
+          {r.scores.map((s) => (
+            <li key={s.blockId}>
+              {blockTitles.get(s.blockId) ?? ''} — <strong>{t(lang, 'progress.score', { x: s.correct, y: s.counted })}</strong>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="tabular mt-2">
+        {t(lang, 'progress.col.errors')}: <strong>{r.errorCount}</strong>
       </p>
       {r.patterns.length > 0 && (
-        <ul className="label mt-2 font-normal text-muted-foreground">
+        <ul className="mt-1 list-disc pl-5 text-muted-foreground">
           {r.patterns.map((p) => (
             <li key={p}>{p}</li>
           ))}
@@ -69,16 +75,32 @@ function LogCard({ r, blockTitles, lang }: { r: ProgressLogRow; blockTitles: Map
 function Details({ r, lang }: { r: ProgressLogRow; lang: Lang }) {
   const u = r.usage;
   const num = new Intl.NumberFormat(lang);
-  const form = pluralForm(lang, u.calls);
-  const callsKey = form === 'one' || form === 'few' || form === 'many' ? (`progress.calls.${form}` as const) : 'progress.calls.other';
-  const calls = t(lang, callsKey, { n: u.calls });
-  const tokens = (['input', 'cacheRead', 'cacheWrite', 'output'] as const)
-    .map((k) => `${num.format(u.tokens[k])} ${t(lang, `progress.tokens.${k}`)}`)
-    .join(' · ');
+  const rows: [string, string][] = [
+    [t(lang, 'progress.col.disputes'), String(r.disputes)],
+    [t(lang, 'progress.col.defects'), String(r.defects)],
+  ];
+  if (u.calls > 0) {
+    rows.push(
+      [t(lang, 'progress.models'), u.models.map((m) => m.replace(/^claude-/, '')).join(', ')],
+      [t(lang, 'progress.calls'), `${u.calls}${u.failedCalls > 0 ? ` (${t(lang, 'progress.failed', { n: u.failedCalls })})` : ''}`],
+      ...(['input', 'cacheRead', 'cacheWrite', 'output'] as const).map((k): [string, string] => [
+        `${t(lang, 'progress.tokens')}: ${t(lang, `progress.tokens.${k}`)}`,
+        num.format(u.tokens[k]),
+      ]),
+    );
+  }
   return (
-    <p className="label tabular font-normal text-muted-foreground">
-      {t(lang, 'progress.col.disputes')}: {r.disputes} · {t(lang, 'progress.col.defects')}: {r.defects}
-      {u.calls > 0 && ` · ${t(lang, 'progress.models')}: ${u.models.map((m) => m.replace(/^claude-/, '')).join(', ')} · ${calls}${u.failedCalls > 0 ? ` (${t(lang, 'progress.failed', { n: u.failedCalls })})` : ''} · ${tokens}`}
-    </p>
+    <table className="tabular w-full max-w-md border-collapse text-sm">
+      <tbody>
+        {rows.map(([label, value]) => (
+          <tr key={label} className="border-t border-border first:border-t-0">
+            <th scope="row" className="py-1 pr-4 text-left font-normal text-muted-foreground">
+              {label}
+            </th>
+            <td className="py-1 text-right font-bold">{value}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

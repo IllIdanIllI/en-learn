@@ -686,6 +686,11 @@ test.describe('rules, error bank and progress', () => {
     await page.evaluate(() => document.documentElement.classList.remove('dark'));
 
     await expect(logCards).toContainText(/Повторение.*2 из 4 · 50%/);
+    const firstCard = logCards.getByRole('listitem').filter({ has: page.getByRole('heading') }).first();
+    await expect(firstCard.getByTestId('log-blocks').getByRole('listitem').first()).toContainText(/ — \d+ из \d+/);
+    expect(await firstCard.getByTestId('log-blocks').getByRole('listitem').count()).toBeGreaterThan(0);
+    expect(await firstCard.getByTestId('log-total').evaluate((el) => Number(getComputedStyle(el).fontWeight))).toBeGreaterThanOrEqual(600);
+    expect(await firstCard.getByRole('heading').evaluate((el) => Number(getComputedStyle(el).fontWeight))).toBeGreaterThanOrEqual(600);
     await topics.getByRole('link', { name: 'Правило: Articles' }).click();
     await expect(page).toHaveURL(/#\/rules\/\d+$/);
   });
@@ -699,10 +704,16 @@ test.describe('rules, error bank and progress', () => {
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     const details = log.getByTestId('log-details').first();
-    await expect(details).toContainText(/Модели: [a-z0-9-]+/);
+    await expect(details.getByRole('table')).toBeVisible();
+    await expect(details.getByRole('row', { name: /^Модели [a-z0-9-]+/ })).toBeVisible();
     await expect(details).not.toContainText('claude-');
-    await expect(details).toContainText(/\d+ вызов/);
-    await expect(details).toContainText(/[1-9]\d* ввод/);
+    await expect(details.getByRole('row', { name: /^Вызовы \d+/ })).toBeVisible();
+    await expect(details.getByRole('row', { name: /^Токены: ввод [1-9]/ })).toBeVisible();
+    await expect(details.getByRole('row', { name: /^Токены: из кэша/ })).toBeVisible();
+    await expect(details.getByRole('row', { name: /^Токены: в кэш/ })).toBeVisible();
+    await expect(details.getByRole('row', { name: /^Токены: вывод/ })).toBeVisible();
+    await expect(details.getByRole('row', { name: /^Споры/ })).toBeVisible();
+    await expect(details.getByRole('row', { name: /^Дефекты/ })).toBeVisible();
     await toggle.click();
     await expect(log.getByTestId('log-details')).toHaveCount(0);
   });

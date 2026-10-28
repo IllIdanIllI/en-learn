@@ -1,6 +1,6 @@
 import { t, type Lang, type MessageKey } from '@/core/i18n';
 import type { Slot } from '@/core/domain';
-import { NativeSelect } from '@/ui/components/ui/native-select';
+import { Select } from '@/ui/components/ui/select';
 import { FieldError } from '@/ui/components/FieldError';
 import { SLOTS, WEEKDAYS, type SetupErrors, type SetupForm, type Weekday } from './form';
 
@@ -26,20 +26,17 @@ export function SlotPicker({
               <label htmlFor={id} className="w-36 shrink-0 text-muted-foreground">
                 {t(lang, `weekday.${wd}` as MessageKey)}
               </label>
-              <NativeSelect
+              <Select
                 id={id}
                 value={slots[wd]}
                 aria-invalid={err ? true : undefined}
-                onChange={(e) => onChange(wd, e.target.value as Slot | '')}
+                onValueChange={(v) => onChange(wd, v as Slot | '')}
+                options={[
+                  { value: '', label: t(lang, 'setup.slotChoose') },
+                  ...SLOTS.map((s) => ({ value: s, label: t(lang, `slot.${s}` as MessageKey) })),
+                ]}
                 className="max-w-64"
-              >
-                <option value="">{t(lang, 'setup.slotChoose')}</option>
-                {SLOTS.map((s) => (
-                  <option key={s} value={s}>
-                    {t(lang, `slot.${s}` as MessageKey)}
-                  </option>
-                ))}
-              </NativeSelect>
+              />
             </div>
             {err && <FieldError className="ml-[168px]">{t(lang, err)}</FieldError>}
           </li>

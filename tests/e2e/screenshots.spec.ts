@@ -63,10 +63,32 @@ test('settings page', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 1100 });
   await page.goto('/?state=no_session#/settings');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  await expect(page.locator('select[data-model-kind]')).toHaveCount(5);
+  await expect(page.locator('button[data-model-kind]')).toHaveCount(5);
   await expect(page.locator('#settings-budget')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Настройка программы' })).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/settings.png` });
+});
+
+test('a model select works from the keyboard and renders in both themes', async ({ page }) => {
+  await page.goto('/?state=no_session#/settings');
+  const trigger = page.locator('#model-grade');
+  const before = await trigger.textContent();
+  await trigger.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('option', { name: before ?? '' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('option', { name: 'claude-haiku-5-5' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('listbox')).toHaveCount(0);
+  await expect(trigger).not.toHaveText(before ?? '');
+  for (const theme of ['light', 'dark'] as const) {
+    await page.evaluate((th) => document.documentElement.classList.toggle('dark', th === 'dark'), theme);
+    await trigger.click();
+    await expect(page.getByRole('option').first()).toBeVisible();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${SHOTS}/select-open-${theme}.png` });
+    await page.keyboard.press('Escape');
+  }
 });
 
 test('settings changes save immediately', async ({ page }) => {
@@ -516,11 +538,14 @@ test.describe('rules, error bank and progress', () => {
     await page.screenshot({ path: `${SHOTS}/errors.png`, fullPage: true });
 
     const all = await rows.count();
-    await page.getByLabel('Тип ошибки').selectOption('spelling');
+    await page.getByLabel('Тип ошибки').click();
+    await page.getByRole('option', { name: 'Орфография' }).click();
     await expect(rows).toHaveCount(all - 1);
     for (const kind of await rows.locator('td:nth-child(3)').allTextContents()) expect(kind).toBe('Орфография');
-    await page.getByLabel('Тип ошибки').selectOption('');
-    await page.getByLabel('Тема', { exact: true }).selectOption({ label: 'Articles' });
+    await page.getByLabel('Тип ошибки').click();
+    await page.getByRole('option', { name: 'Все' }).click();
+    await page.getByLabel('Тема', { exact: true }).click();
+    await page.getByRole('option', { name: 'Articles' }).click();
     await expect(rows).toHaveCount(1);
     for (const topic of await rows.locator('td:nth-child(4)').allTextContents()) expect(topic).toBe('Articles');
   });

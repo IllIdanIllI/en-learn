@@ -7,7 +7,7 @@ import { MoveRefused } from '@/core/dataFolder';
 import { Button } from '@/ui/components/ui/button';
 import { setSetting, type Settings as SettingsData } from '@/core/db/repos/settings';
 import { FieldInput } from '@/ui/components/ui/field-input';
-import { NativeSelect } from '@/ui/components/ui/native-select';
+import { Select } from '@/ui/components/ui/select';
 import { cn } from '@/lib/utils';
 import { FieldError } from '@/ui/components/FieldError';
 import { Segmented } from '@/ui/components/Segmented';
@@ -162,19 +162,14 @@ export function Settings() {
           const options = MODELS.includes(current) ? MODELS : [current, ...MODELS];
           return (
             <Row key={kind} label={t(lang, `llm.${kind}` as MessageKey)} htmlFor={`model-${kind}`}>
-              <NativeSelect
+              <Select
                 id={`model-${kind}`}
                 data-model-kind={kind}
                 value={current}
-                onChange={(e) => void save('models', { ...settings.models, [kind]: e.target.value })}
+                onValueChange={(v) => void save('models', { ...settings.models, [kind]: v })}
+                options={options.map((m) => ({ value: m, label: m }))}
                 className="max-w-64"
-              >
-                {options.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </NativeSelect>
+              />
             </Row>
           );
         })}

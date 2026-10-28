@@ -5,7 +5,7 @@ import { errorBank, type ErrorBankRow } from '@/core/progress/derive';
 import { loadGradedFacts } from '@/core/progress/history';
 import { useCore } from '@/ui/app/CoreProvider';
 import { useLoaded } from '@/ui/app/useLoaded';
-import { NativeSelect } from '@/ui/components/ui/native-select';
+import { Select } from '@/ui/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/ui/components/ui/table';
 import { Notice } from '@/ui/today/chips';
 
@@ -34,17 +34,26 @@ export function ErrorBank() {
             <div className="mt-6 flex flex-wrap gap-4">
               <div className="w-48">
                 <label htmlFor="errors-kind" className="label text-muted-foreground">{t(lang, 'errors.filter.kind')}</label>
-                <NativeSelect id="errors-kind" className="mt-1" value={kind} onChange={(e) => setKind(e.target.value)}>
-                  <option value="">{t(lang, 'errors.filter.all')}</option>
-                  {KINDS.map((k) => <option key={k} value={k}>{t(lang, `kind.${k}`)}</option>)}
-                </NativeSelect>
+                <Select
+                  id="errors-kind"
+                  className="mt-1"
+                  value={kind}
+                  onValueChange={setKind}
+                  options={[{ value: '', label: t(lang, 'errors.filter.all') }, ...KINDS.map((k) => ({ value: k, label: t(lang, `kind.${k}`) }))]}
+                />
               </div>
               <div className="w-56">
                 <label htmlFor="errors-topic" className="label text-muted-foreground">{t(lang, 'errors.filter.topic')}</label>
-                <NativeSelect id="errors-topic" className="mt-1" value={topic} onChange={(e) => setTopic(e.target.value)}>
-                  <option value="">{t(lang, 'errors.filter.all')}</option>
-                  {topics.filter((tp) => rows.some((r) => r.topicId === tp.id)).map((tp) => <option key={tp.id} value={tp.id}>{tp.title}</option>)}
-                </NativeSelect>
+                <Select
+                  id="errors-topic"
+                  className="mt-1"
+                  value={topic}
+                  onValueChange={setTopic}
+                  options={[
+                    { value: '', label: t(lang, 'errors.filter.all') },
+                    ...topics.filter((tp) => rows.some((r) => r.topicId === tp.id)).map((tp) => ({ value: String(tp.id), label: tp.title })),
+                  ]}
+                />
               </div>
             </div>
             <Table className="mt-6">

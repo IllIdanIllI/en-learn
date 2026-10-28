@@ -13,7 +13,7 @@ export const GENERATION_STAGES: readonly LoaderStage[] = ['writing', 'checking',
 export const GRADING_STAGES: readonly LoaderStage[] = ['grading'];
 
 const TICK_MS = 1000;
-const TIP_MS = 6000;
+const TIP_MS = 8000;
 /** The bar stops short of full until the job is actually done. */
 const CAP = 0.95;
 

@@ -16,15 +16,15 @@ describe('errorContext', () => {
   test('fix with an error, answered with a tick or a shorthand: the original fragment and the correction', () => {
     for (const text of ['✓', '+']) {
       const c = ctx({ format: 'fix', prompt: 'She is an teacher here.', wrong: 'an teacher', expected: 'a teacher', text });
-      expect(c.was).toEqual({ before: 'She is ', changed: 'an teacher', after: ' here.' });
-      expect(c.shouldBe).toEqual({ before: 'She is ', changed: 'a teacher', after: ' here.' });
+      expect(c.was).toEqual({ before: 'She is ', changed: 'an', after: ' teacher here.' });
+      expect(c.shouldBe).toEqual({ before: 'She is ', changed: 'a', after: ' teacher here.' });
     }
   });
 
   test('fix with an error, answered with a wrong fragment: the learner fragment in place of the wrong one', () => {
     const c = ctx({ format: 'fix', prompt: 'She is an teacher here.', wrong: 'an teacher', expected: 'a teacher', text: 'the teacher' });
     expect(snippetText(c.was)).toBe('She is the teacher here.');
-    expect(c.was.changed).toBe('the teacher');
+    expect(c.was.changed).toBe('the');
     expect(snippetText(c.shouldBe)).toBe('She is a teacher here.');
   });
 
@@ -43,8 +43,9 @@ describe('errorContext', () => {
   test('spot: the wrong text in its paragraph and the correction in its place', () => {
     const paragraph = 'Yesterday he go to school. Then he came back.';
     const c = ctx({ format: 'spot', prompt: 'he go to', expected: 'he went to', text: 'x', paragraph });
-    expect(c.was).toEqual({ before: 'Yesterday ', changed: 'he go to', after: ' school. Then he came …' });
-    expect(snippetText(c.shouldBe)).toBe('Yesterday he went to school. Then he came …');
+    expect(c.was).toEqual({ before: 'Yesterday he ', changed: 'go', after: ' to school. Then he …' });
+    expect(c.shouldBe).toEqual({ before: 'Yesterday he ', changed: 'went', after: ' to school. Then he …' });
+    expect(snippetText(c.shouldBe)).toBe('Yesterday he went to school. Then he …');
     expect(c.sentence).toBe(paragraph);
   });
 
@@ -57,7 +58,7 @@ describe('errorContext', () => {
   test('spot with a tick as stored correction never shows the tick', () => {
     const paragraph = 'Yesterday he go to school.';
     for (const expected of ['✓', '+']) {
-      expect(ctx({ format: 'spot', prompt: 'he go to', expected, paragraph, fix: 'he went to' }).shouldBe.changed).toBe('he went to');
+      expect(ctx({ format: 'spot', prompt: 'he go to', expected, paragraph, fix: 'he went to' }).shouldBe.changed).toBe('went');
       const c = ctx({ format: 'spot', prompt: 'he go to', expected, paragraph });
       expect(c.shouldBe.changed).toBe('he go to');
       expect(c.shouldBe.changed).not.toBe(expected);
@@ -111,5 +112,49 @@ describe('errorContext', () => {
   test('a gap answered with nothing shows the sentence in Было', () => {
     const c = ctx({ prompt: 'He ___ home.', expected: 'goes', text: '' });
     expect(c.was.changed).toBe('He ___ home.');
+  });
+
+  describe('word-level change (K2)', () => {
+    const fix = (prompt: string, wrong: string, expected: string) =>
+      ctx({ format: 'fix', prompt, wrong, expected, text: '✓' });
+
+    test('an extra word: Должно быть shows "__"', () => {
+      const c = fix('I like the films a lot.', 'the films', 'films');
+      expect(c.was).toEqual({ before: 'I like ', changed: 'the', after: ' films a lot.' });
+      expect(c.shouldBe).toEqual({ before: 'I like ', changed: '__', after: ' films a lot.' });
+    });
+
+    test('a missed word: Было shows "__"', () => {
+      const c = fix('He is going.', 'is going', 'is not going');
+      expect(c.was).toEqual({ before: 'He is ', changed: '__', after: ' going.' });
+      expect(c.shouldBe).toEqual({ before: 'He is ', changed: 'not', after: ' going.' });
+    });
+
+    test('a differing middle on both sides stays highlighted, shared ends move out', () => {
+      const c = fix('He has went to school today.', 'has went to school', 'has gone to school');
+      expect(c.was).toEqual({ before: 'He has ', changed: 'went', after: ' to school today.' });
+      expect(c.shouldBe).toEqual({ before: 'He has ', changed: 'gone', after: ' to school today.' });
+      const d = fix('Did it yesterday for them.', 'it yesterday for', 'we yesterday to');
+      expect(d.was.changed).toBe('it yesterday for');
+      expect(d.shouldBe.changed).toBe('we yesterday to');
+    });
+
+    test('words are compared case-insensitively, original text kept', () => {
+      const c = fix('Yes. The films are old.', 'The films', 'films');
+      expect(c.was).toEqual({ before: 'Yes. ', changed: 'The', after: ' films are old.' });
+      const d = fix('So Films are old.', 'Films', 'films were');
+      expect(d.was).toEqual({ before: 'So Films ', changed: '__', after: ' are old.' });
+    });
+
+    test('the four-word window still applies to the outer context', () => {
+      const c = fix('a b c d e f the films g h i j k l', 'the films', 'films');
+      expect(c.was).toEqual({ before: '… c d e f ', changed: 'the', after: ' films g h i …' });
+    });
+
+    test('a gap answered with extra shared words moves them out', () => {
+      const c = ctx({ prompt: 'He ___ now.', expected: 'is going', text: 'was going' });
+      expect(c.was).toEqual({ before: 'He ', changed: 'was', after: ' going now.' });
+      expect(c.shouldBe).toEqual({ before: 'He ', changed: 'is', after: ' going now.' });
+    });
   });
 });

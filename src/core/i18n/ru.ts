@@ -140,7 +140,7 @@ export const ru: Record<keyof typeof en, string> = {
   'loader.attempt': 'попытка {n}',
   'loader.left': '≈ {s} с',
   'loader.longer': 'Дольше обычного',
-  'loader.tip': 'Пока ждёте',
+  'loader.tip': 'Пока вы ждёте',
   'q.skip': 'Пропустить это задание?',
   'q.yes': 'Да',
   'q.no': 'Нет',

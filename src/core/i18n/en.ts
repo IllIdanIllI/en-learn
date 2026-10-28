@@ -138,7 +138,7 @@ export const en = {
   'loader.attempt': 'attempt {n}',
   'loader.left': '≈ {s} s left',
   'loader.longer': 'Taking longer than usual',
-  'loader.tip': 'While you wait',
+  'loader.tip': 'While you are waiting',
   'q.skip': 'Skip this item?',
   'q.yes': 'Yes',
   'q.no': 'No',

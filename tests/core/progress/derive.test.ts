@@ -68,8 +68,8 @@ describe('errorBank', () => {
   test('spot rows use prompt as was and expected as shouldBe', () => {
     const out = errorBank([row({ format: 'spot', prompt: 'He go', expected: 'He goes', text: 'x', fix: 'y', paragraph: 'Then He go home.' })]);
     expect(out[0]).toMatchObject({
-      was: { before: 'Then ', changed: 'He go', after: ' home.' },
-      shouldBe: { before: 'Then ', changed: 'He goes', after: ' home.' },
+      was: { before: 'Then He ', changed: 'go', after: ' home.' },
+      shouldBe: { before: 'Then He ', changed: 'goes', after: ' home.' },
       sentence: 'Then He go home.',
       kind: 'grammar',
     });

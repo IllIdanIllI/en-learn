@@ -3,6 +3,7 @@ import { Check } from 'lucide-react';
 import { t, type Lang } from '@/core/i18n';
 import type { GenStage } from '@/core/session/generate';
 import type { WaitTip } from '@/core/progress/tips';
+import { SHOULD_TONE, SnippetText, WAS_TONE } from '@/ui/components/SnippetText';
 
 export type LoaderStage = GenStage | 'grading';
 export type LoaderView = {
@@ -86,7 +87,13 @@ export function Loader({ lang, stages, current, attempt, estimateMs, tips }: Loa
       {tip !== undefined && (
         <section aria-live="off" className="rounded-md bg-card p-4">
           <h3 className="label text-muted-foreground">{t(lang, 'loader.tip')}</h3>
-          <p className="answer mt-2">{tip.was} → {tip.should}</p>
+          {tip.kind === 'error' ? (
+            <p className="answer mt-2">
+              <SnippetText s={tip.was} tone={WAS_TONE} /> → <SnippetText s={tip.should} tone={SHOULD_TONE} />
+            </p>
+          ) : (
+            <p className="answer mt-2">{tip.word} → {tip.mnemonic}</p>
+          )}
         </section>
       )}
     </div>

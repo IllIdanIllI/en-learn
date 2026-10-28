@@ -2,7 +2,8 @@ import { describe, expect, test } from 'vitest';
 import { createTestDb } from '@/adapters/test/sqliteDb';
 import { findOrCreateSpellingWord } from '@/core/db/repos/spelling';
 import type { Db } from '@/core/ports';
-import { waitTips } from '@/core/progress/tips';
+import { snippetText } from '@/core/progress/errorContext';
+import { waitTips, type WaitTip } from '@/core/progress/tips';
 
 async function seedWrongAnswers(db: Db, rows: { text: string; fix: string; expected: string; format: 'gap' | 'spot'; prompt?: string }[]) {
   await db.execute("INSERT INTO programme (title, start_date, end_date) VALUES ('P','2026-10-01','2026-12-01')");
@@ -37,7 +38,7 @@ describe('waitTips', () => {
     }
     const tips = await waitTips(db);
     expect(tips).toHaveLength(10);
-    expect(tips.every((t) => t.was.startsWith('word') && t.should.startsWith('mnemonic'))).toBe(true);
+    expect(tips.every((t) => t.kind === 'spelling' && t.word.startsWith('word') && t.mnemonic.startsWith('mnemonic'))).toBe(true);
     expect(await waitTips(db, 3)).toHaveLength(3);
   });
 
@@ -56,20 +57,22 @@ describe('waitTips', () => {
       { text: 'He go home', fix: '', expected: '✓', format: 'spot', prompt: 'He go home' },
       { text: 'x', fix: '', expected: '+', format: 'spot', prompt: 'He goes home' },
     ]);
-    const tips = (await waitTips(db)).sort((a, b) => a.was.localeCompare(b.was));
-    for (const tip of tips) for (const v of [tip.was, tip.should]) expect(['✓', '+', '']).not.toContain(v.trim());
-    expect(tips).toHaveLength(3);
-    expect(tips).toEqual([
-      { was: 'He went home.', should: 'He goes home.' },
-      { was: 'It went home.', should: 'It goes home.' },
-      { was: 'She ___ home.', should: 'She goes home.' },
-    ].sort((a, b) => a.was.localeCompare(b.was)));
+    const errors = (await waitTips(db)).filter((t): t is Extract<WaitTip, { kind: 'error' }> => t.kind === 'error');
+    const tips = errors.map((t) => ({ was: t.was, should: t.should })).sort((a, b) => snippetText(a.was).localeCompare(snippetText(b.was)));
+    for (const tip of tips) for (const v of [snippetText(tip.was), snippetText(tip.should)]) expect(['✓', '+', '']).not.toContain(v.trim());
+    expect(tips.map((t) => [snippetText(t.was), snippetText(t.should)])).toEqual([
+      ['He went home.', 'He goes home.'],
+      ['It went home.', 'It goes home.'],
+      ['She ___ home.', 'She goes home.'],
+    ]);
+    expect(tips[0]!.was).toEqual({ before: 'He ', changed: 'went', after: ' home.' });
+    expect(tips[0]!.should).toEqual({ before: 'He ', changed: 'goes', after: ' home.' });
   });
 
   test('keeps spelling mnemonics even when they are a tick', async () => {
     const db = await createTestDb();
     const id = await findOrCreateSpellingWord(db, 'receive', 'hint', '2026-10-01');
     await db.execute("UPDATE spelling_word SET mnemonic = '✓' WHERE id = ?", [id]);
-    expect(await waitTips(db)).toEqual([{ was: 'receive', should: '✓' }]);
+    expect(await waitTips(db)).toEqual([{ kind: 'spelling', word: 'receive', mnemonic: '✓' }]);
   });
 });

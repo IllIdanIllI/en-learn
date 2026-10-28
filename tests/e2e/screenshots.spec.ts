@@ -282,6 +282,17 @@ test.describe('today session', () => {
     await expect(page.getByRole('button', { name: 'Закрыть урок' })).toHaveCount(0);
   });
 
+  test('the loader tip card is headed "Пока вы ждёте" and highlights the changed part of an error', async ({ page }) => {
+    await page.goto('/?state=closed&delay=2500#/today');
+    await page.getByRole('button', { name: 'Добавить вопросы' }).click();
+    const card = page.locator('section[aria-live="off"]').filter({ has: page.getByRole('heading', { name: 'Пока вы ждёте' }) });
+    await expect(card).toBeVisible();
+    await expect(card.locator('span.font-semibold.text-destructive')).toHaveCount(1);
+    await expect(card.locator('span.font-semibold.text-success')).toHaveCount(1);
+    await page.screenshot({ path: `${SHOTS}/today-loader-tip.png` });
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
+  });
+
   test('an open round takes answers while the earlier blocks keep their results; grading it enables Close lesson', async ({ page }) => {
     await page.goto('/?state=open-round#/today');
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible();

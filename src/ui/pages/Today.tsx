@@ -112,7 +112,7 @@ export function Today() {
   };
   const solve = (sessionId: number) => {
     setGenError(null);
-    reopenSkipped(deps.db, sessionId)
+    reopenSkipped(deps.db, sessionId, deps.clock.today())
       .then(async (n) => {
         // A stale count (another window): with nothing left to solve, refresh instead of showing an empty page.
         if (n === 0 && (await skippedToSolve(deps))?.sessionId !== sessionId) setReload((r) => r + 1);

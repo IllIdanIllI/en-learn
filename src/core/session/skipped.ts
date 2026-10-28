@@ -6,11 +6,11 @@ import { countSkippedBySession, deleteSkippedAnswers } from '@/core/db/repos/ans
 /** The graded session of yesterday (first) or today with skipped gap, fix or spelling items, if any. */
 export async function skippedToSolve(deps: Deps): Promise<{ sessionId: number; date: ISODate; count: number } | null> {
   const today = deps.clock.today();
-  const found = await countSkippedBySession(deps.db, addDays(today, -1), today);
+  const found = await countSkippedBySession(deps.db, addDays(today, -1), today, today);
   return found[0] ?? null;
 }
 
-/** Makes the skipped items of a session unanswered again; returns how many were cleared. */
-export function reopenSkipped(db: Db, sessionId: number): Promise<number> {
-  return deleteSkippedAnswers(db, sessionId);
+/** Makes the skipped items of a session unanswered again (`today` as in the count); returns how many were cleared. */
+export function reopenSkipped(db: Db, sessionId: number, today: ISODate): Promise<number> {
+  return deleteSkippedAnswers(db, sessionId, today);
 }

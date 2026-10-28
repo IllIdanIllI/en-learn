@@ -22,7 +22,7 @@ test('shell collapses to icons below 1100px', async ({ page }) => {
   await page.screenshot({ path: `${SHOTS}/shell-collapsed.png` });
 });
 
-for (const state of ['empty', 'no_session', 'generated', 'questions', 'graded', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing', 'earlier_session', 'progress_archived', 'closed', 'open-round', 'round-graded', 'skipped']) {
+for (const state of ['empty', 'no_session', 'generated', 'questions', 'graded', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing', 'earlier_session', 'progress_archived', 'closed', 'open-round', 'round-graded', 'skipped', 'skipped-round']) {
   test(`today loads in state ${state}`, async ({ page }) => {
     const errors: string[] = [];
     page.on('console', (m) => {
@@ -372,6 +372,25 @@ test.describe('today session', () => {
     await expect(page.getByRole('button', { name: 'Закрыть урок' })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('heading', { name: 'Итоги' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Решить пропущенные/ })).toHaveCount(0);
+  });
+
+  test('Solve skipped also solves skipped questions of an added round, with their original numbers', async ({ page }) => {
+    await page.goto('/?state=skipped-round#/today');
+    const solve = page.getByRole('button', { name: /^Решить пропущенные \(\d+\)$/ });
+    await expect(solve).toBeVisible();
+    const count = Number(/\((\d+)\)/.exec(await solve.innerText())![1]);
+    await solve.click();
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible();
+    const rows = page.locator('ol > li');
+    await expect(rows).toHaveCount(count);
+    const numbers = await rows.evaluateAll((els) => els.map((el) => Number((el as HTMLElement).innerText.split('\n')[0])));
+    expect(Math.min(...numbers)).toBeGreaterThan(1);
+    await page.screenshot({ path: `${SHOTS}/today-skipped-round-solving.png`, fullPage: true });
+    const fields = page.locator('ol > li').locator('input:not([type="hidden"]), textarea');
+    for (let i = 0; i < count; i++) await fields.nth(i).fill('an');
+    await page.getByRole('button', { name: 'Проверить ответы' }).click();
+    await expect(page.getByRole('button', { name: 'Закрыть урок' })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('button', { name: /Решить пропущенные/ })).toHaveCount(0);
   });
 

@@ -118,37 +118,37 @@ export async function listSkippedItems(
   return rows.map((r) => ({ prompt: r.prompt, expected: r.expected, topicId: r.topic_id }));
 }
 
-/** Active, solvable (gap, fix, spelling) items of the lesson itself (round 1): answered `skipped` and not dropped, or never answered. */
-const SOLVABLE = `b.format IN ('gap', 'fix', 'spelling') AND i.status = 'active' AND b.round = 1
-       AND ((a.item_id IS NOT NULL AND a.verdict = 'skipped' AND (a.dispute_decision IS NULL OR a.dispute_decision != 'drop'))
-         OR a.item_id IS NULL)`;
-
 /**
- * Graded sessions of a date range with solvable items, and how many. A session with an unanswered added round
- * (round 2 and up) is left out: that round is answered first.
+ * Active, solvable (gap, fix, spelling) items in any round: answered `skipped` and not dropped, or never answered.
+ * Needs `s` (session) joined, and the date of today as its only parameter: an added round (round 2 and up) of today's
+ * session with no answer yet is still to be answered on the page, so its items are left out.
  */
-export async function countSkippedBySession(db: Db, from: ISODate, to: ISODate): Promise<{ sessionId: number; date: ISODate; count: number }[]> {
+const SOLVABLE = `b.format IN ('gap', 'fix', 'spelling') AND i.status = 'active'
+       AND ((a.item_id IS NOT NULL AND a.verdict = 'skipped' AND (a.dispute_decision IS NULL OR a.dispute_decision != 'drop'))
+         OR a.item_id IS NULL)
+       AND NOT (b.round > 1 AND s.date = ? AND NOT EXISTS (
+         SELECT 1 FROM block rb JOIN item ri ON ri.block_id = rb.id JOIN answer ra ON ra.item_id = ri.id
+         WHERE rb.session_id = b.session_id AND rb.round = b.round AND rb.format != 'question' AND ri.status = 'active'))`;
+
+/** Graded sessions of a date range with solvable items, and how many; `today` is the date for the fresh-round exception. */
+export async function countSkippedBySession(db: Db, from: ISODate, to: ISODate, today: ISODate): Promise<{ sessionId: number; date: ISODate; count: number }[]> {
   const rows = await db.select<{ session_id: number; date: string; n: number }>(
     `SELECT s.id AS session_id, s.date AS date, COUNT(*) AS n
      FROM session s JOIN block b ON b.session_id = s.id JOIN item i ON i.block_id = b.id LEFT JOIN answer a ON a.item_id = i.id
      WHERE s.status = 'graded' AND s.date BETWEEN ? AND ? AND ${SOLVABLE}
-       AND NOT EXISTS (
-         SELECT 1 FROM block rb JOIN item ri ON ri.block_id = rb.id
-         WHERE rb.session_id = s.id AND rb.round > 1 AND rb.format != 'question' AND ri.status = 'active'
-           AND NOT EXISTS (SELECT 1 FROM answer ra WHERE ra.item_id = ri.id))
      GROUP BY s.id ORDER BY s.date`,
-    [from, to],
+    [from, to, today],
   );
   return rows.map((r) => ({ sessionId: r.session_id, date: r.date, count: r.n }));
 }
 
 /** Deletes the `skipped` answers of a session's solvable items, so those items are unanswered again; returns how many. */
-export async function deleteSkippedAnswers(db: Db, sessionId: number): Promise<number> {
+export async function deleteSkippedAnswers(db: Db, sessionId: number, today: ISODate): Promise<number> {
   const res = await db.execute(
     `DELETE FROM answer WHERE item_id IN (
-       SELECT i.id FROM block b JOIN item i ON i.block_id = b.id JOIN answer a ON a.item_id = i.id
-       WHERE b.session_id = ? AND ${SOLVABLE})`,
-    [sessionId],
+       SELECT i.id FROM session s JOIN block b ON b.session_id = s.id JOIN item i ON i.block_id = b.id JOIN answer a ON a.item_id = i.id
+       WHERE s.id = ? AND ${SOLVABLE})`,
+    [sessionId, today],
   );
   return res.rowsAffected;
 }

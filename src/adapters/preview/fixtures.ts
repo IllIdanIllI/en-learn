@@ -16,7 +16,7 @@ import { MINI_PROGRAMME, MINI_RULES } from './miniSeed';
 
 export const PREVIEW_STATES = [
   'empty', 'no_session', 'generated', 'questions', 'graded', 'progress', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing',
-  'earlier_session', 'progress_archived', 'closed', 'open-round', 'round-graded', 'skipped',
+  'earlier_session', 'progress_archived', 'closed', 'open-round', 'round-graded', 'skipped', 'skipped-round',
 ] as const;
 export type PreviewState = (typeof PREVIEW_STATES)[number];
 
@@ -120,7 +120,8 @@ function requireOk(result: { ok: boolean; message?: string }, what: string): voi
 
 /**
  * Answers today's session: `graded` answers every second item right; `questions` leaves blanks that raise questions;
- * `skipped` is `graded` with every third gap, fix or spelling answer left blank and the lesson finished.
+ * `skipped` is `graded` with every third gap, fix or spelling answer left blank and the lesson finished
+ * (in `skipped-round` that is applied to the added round only: earlier answers stay as they are).
  */
 async function answerToday(deps: Deps, state: 'questions' | 'graded' | 'skipped'): Promise<void> {
   const session = await getSessionByDate(deps.db, deps.clock.today());
@@ -187,19 +188,21 @@ export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
     requireOk(await generateSession(deps, { light: false }), 'generateSession');
     clock.set(THURSDAY);
   }
-  const answered = state === 'graded' || state === 'closed' || state === 'open-round' || state === 'round-graded' || state === 'skipped';
+  const answered = state === 'graded' || state === 'closed' || state === 'open-round' || state === 'round-graded' || state === 'skipped' || state === 'skipped-round';
   if (state === 'generated' || state === 'questions' || answered || progressLike) {
     requireOk(await generateSession(deps, { light: false }), 'generateSession');
   }
   if (state === 'questions' || answered || progressLike) {
     await answerToday(deps, state === 'questions' || state === 'skipped' ? state : 'graded');
   }
-  if (state === 'closed' || state === 'open-round' || state === 'round-graded') {
+  if (state === 'closed' || state === 'open-round' || state === 'round-graded' || state === 'skipped-round') {
     const session = await getSessionByDate(deps.db, today);
     if (!session) throw new Error('Preview fixture: no session');
     if (state === 'closed') await closeSession(deps.db, session.id);
     else requireOk(await extendSession(deps, session.id), 'extendSession');
     if (state === 'round-graded') await answerToday(deps, 'graded');
+    // Round 2 answered with blanks and the lesson finished: the skipped items belong to the added round.
+    if (state === 'skipped-round') await answerToday(deps, 'skipped');
   }
   // A topic dropped from the programme while it still has history is kept, archived.
   if (state === 'progress_archived') await deps.db.execute("UPDATE topic SET archived = 1 WHERE key = 'articles'");

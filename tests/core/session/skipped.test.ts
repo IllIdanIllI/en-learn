@@ -101,31 +101,85 @@ describe('skippedToSolve edge cases', () => {
     const { db, deps } = await setup();
     const { sid } = await addSession(db, '2026-10-19', ['correct', null, 'correct', null, null]);
     expect(await skippedToSolve(deps)).toEqual({ sessionId: sid, date: '2026-10-19', count: 2 });
-    expect(await reopenSkipped(db, sid)).toBe(0);
+    expect(await reopenSkipped(db, sid, '2026-10-20')).toBe(0);
     expect(await skippedToSolve(deps)).toEqual({ sessionId: sid, date: '2026-10-19', count: 2 });
-  });
-
-  test('a session with an unanswered added round is not offered until the round is answered', async () => {
-    const { db, deps } = await setup();
-    const { sid } = await addSession(db, '2026-10-20', ['skipped', 'correct', 'correct', 'correct', 'correct']);
-    const b = await insertBlock(db, sid, 4, { ...blk, kind: 'task', format: 'fix', title: 'More', passage: null }, 2);
-    await insertItem(db, b, 0, { ...base, prompt: 'I saw a owl.', expected: 'an' });
-    expect(await skippedToSolve(deps)).toBeNull();
-    await db.execute("INSERT INTO answer (item_id, text, verdict) VALUES ((SELECT MAX(id) FROM item), 'an', 'correct')");
-    expect(await skippedToSolve(deps)).toMatchObject({ sessionId: sid, count: 1 });
   });
 });
 
 describe('skipped items of added rounds', () => {
-  test('stay skipped: not offered, not counted, not reopened', async () => {
+  /** Adds a round-2 fix block with one item per verdict (null = no answer row); returns the item ids. */
+  async function addRound2(db: Db, sid: number, verdicts: (string | null)[]) {
+    const b = await insertBlock(db, sid, 4, { ...blk, kind: 'task', format: 'fix', title: 'More', passage: null }, 2);
+    const ids: number[] = [];
+    for (const [k, v] of verdicts.entries()) {
+      await insertItem(db, b, k, { ...base, prompt: `I saw a owl ${k}.`, expected: 'an' });
+      const id = (await db.select<{ m: number }>('SELECT MAX(id) AS m FROM item'))[0]!.m;
+      ids.push(id);
+      if (v !== null) await db.execute('INSERT INTO answer (item_id, text, verdict) VALUES (?, ?, ?)', [id, v === 'skipped' ? '' : 'an', v]);
+    }
+    return ids;
+  }
+
+  test('a skipped round-2 item is counted and cleared', async () => {
     const { db, deps } = await setup();
     const { sid } = await addSession(db, '2026-10-20', ['correct', 'correct', 'correct', 'correct', 'correct']);
-    const b = await insertBlock(db, sid, 4, { ...blk, kind: 'task', format: 'fix', title: 'More', passage: null }, 2);
-    await insertItem(db, b, 0, { ...base, prompt: 'I saw a owl.', expected: 'an' });
-    await db.execute("INSERT INTO answer (item_id, text, verdict) VALUES ((SELECT MAX(id) FROM item), '', 'skipped')");
+    const [first] = await addRound2(db, sid, ['skipped', 'correct']);
+    expect(await skippedToSolve(deps)).toEqual({ sessionId: sid, date: '2026-10-20', count: 1 });
+    expect(await reopenSkipped(db, sid, '2026-10-20')).toBe(1);
+    expect(await db.select('SELECT 1 FROM answer WHERE item_id = ?', [first!])).toHaveLength(0);
+    expect(await skippedToSolve(deps)).toEqual({ sessionId: sid, date: '2026-10-20', count: 1 });
+  });
+
+  test('today: a round with no answers yet is not counted and not cleared; the session is still offered for its other items', async () => {
+    const { db, deps } = await setup();
+    const { sid } = await addSession(db, '2026-10-20', ['skipped', 'correct', 'correct', 'correct', 'correct']);
+    await addRound2(db, sid, [null, null]);
+    expect(await skippedToSolve(deps)).toEqual({ sessionId: sid, date: '2026-10-20', count: 1 });
+    expect(await reopenSkipped(db, sid, '2026-10-20')).toBe(1);
+    expect(await skippedToSolve(deps)).toEqual({ sessionId: sid, date: '2026-10-20', count: 1 });
+  });
+
+  test('today: a fresh added round alone does not offer the session', async () => {
+    const { db, deps } = await setup();
+    const { sid } = await addSession(db, '2026-10-20', ['correct', 'correct', 'correct', 'correct', 'correct']);
+    await addRound2(db, sid, [null, null]);
     expect(await skippedToSolve(deps)).toBeNull();
-    expect(await reopenSkipped(db, sid)).toBe(0);
-    expect(await db.select('SELECT 1 FROM answer WHERE verdict = ?', ['skipped'])).toHaveLength(1);
+    expect(await reopenSkipped(db, sid, '2026-10-20')).toBe(0);
+  });
+
+  test('yesterday: never-answered round-2 items are counted and cleared as a plain no-op', async () => {
+    const { db, deps } = await setup();
+    const { sid } = await addSession(db, '2026-10-19', ['correct', 'correct', 'correct', 'correct', 'correct']);
+    await addRound2(db, sid, [null, null]);
+    expect(await skippedToSolve(deps)).toEqual({ sessionId: sid, date: '2026-10-19', count: 2 });
+  });
+
+  test('a round left mid-solve (one answered, one not) stays counted today', async () => {
+    const { db, deps } = await setup();
+    const { sid } = await addSession(db, '2026-10-20', ['correct', 'correct', 'correct', 'correct', 'correct']);
+    await addRound2(db, sid, ['correct', null]);
+    expect(await skippedToSolve(deps)).toEqual({ sessionId: sid, date: '2026-10-20', count: 1 });
+  });
+
+  test('spot and question blocks of an added round stay excluded', async () => {
+    const { db, deps } = await setup();
+    const { sid } = await addSession(db, '2026-10-19', ['correct', 'correct', 'correct', 'correct', 'correct']);
+    const spot = await insertBlock(db, sid, 4, { ...blk, kind: 'task', format: 'spot', title: 'Spot', passage: JSON.stringify(['a apple']) }, 2);
+    await insertItem(db, spot, 0, { ...base, prompt: 'a apple', expected: 'an apple', paragraph: 0 });
+    const q = await insertBlock(db, sid, 5, { ...blk, kind: 'speaking', format: 'question', title: 'Speak', passage: 'Say it.' }, 2);
+    await insertItem(db, q, 0, { ...base, prompt: 'Say', expected: '' });
+    expect(await skippedToSolve(deps)).toBeNull();
+  });
+
+  test('the view lists reopened round-2 items with their original numbers', async () => {
+    const { db } = await setup();
+    const { sid } = await addSession(db, '2026-10-20', ['correct', 'correct', 'correct', 'correct', 'correct']);
+    await addRound2(db, sid, ['correct', 'skipped']);
+    await reopenSkipped(db, sid, '2026-10-20');
+    const view = await loadSessionView(db, sid);
+    expect(view.open).toBe(true);
+    const round2 = view.blocks.find((b) => b.round === 2)!;
+    expect(round2.items.map((i) => [i.prompt, i.number])).toEqual([['I saw a owl 1.', 2]]);
   });
 });
 
@@ -134,17 +188,17 @@ describe('reopenSkipped', () => {
     const { db } = await setup();
     const other = await addSession(db, '2026-10-19', ['skipped', 'skipped', 'skipped', 'skipped', 'skipped']);
     const { sid, ids } = await addSession(db, '2026-10-20', ['skipped', 'correct', 'skipped', 'wrong', 'skipped']);
-    expect(await reopenSkipped(db, sid)).toBe(2);
+    expect(await reopenSkipped(db, sid, '2026-10-20')).toBe(2);
     const left = (await db.select<{ item_id: number }>('SELECT item_id FROM answer ORDER BY item_id')).map((r) => r.item_id);
     expect(left.filter((id) => ids.includes(id))).toEqual([ids[1], ids[3], ids[4]]);
     expect(left.filter((id) => other.ids.includes(id))).toHaveLength(5);
-    expect(await reopenSkipped(db, sid)).toBe(0);
+    expect(await reopenSkipped(db, sid, '2026-10-20')).toBe(0);
   });
 
   test('the view then lists only the unanswered items of a block, with their original numbers and no answer key', async () => {
     const { db } = await setup();
     const { sid } = await addSession(db, '2026-10-20', ['skipped', 'correct', 'skipped', 'wrong', 'skipped']);
-    await reopenSkipped(db, sid);
+    await reopenSkipped(db, sid, '2026-10-20');
     const view = await loadSessionView(db, sid);
     expect(view.open).toBe(true);
     const [spelling, fix, spot] = view.blocks;
@@ -161,7 +215,7 @@ describe('reopenSkipped', () => {
     const { db, deps, llm } = await setup('2026-10-20', [ok({ items: [wrong], spot: [], patterns: [], tomorrow: [], spellingErrors: [], ruleGaps: [] })]);
     const { sid, ids } = await addSession(db, '2026-10-20', ['skipped', 'correct', 'skipped', 'correct', 'correct']);
     expect(await listSkippedItems(db, sid)).toHaveLength(1);
-    await reopenSkipped(db, sid);
+    await reopenSkipped(db, sid, '2026-10-20');
     expect(await listSkippedItems(db, sid)).toHaveLength(0);
 
     const sub = { items: { [ids[0]!]: 'necessary', [ids[2]!]: 'a' }, spot: {} };

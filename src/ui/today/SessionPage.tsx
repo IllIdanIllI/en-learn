@@ -33,7 +33,7 @@ const DRAFT_DELAY_MS = 300;
  */
 export function SessionPage({ sessionId, rebuilding, loader = null, onRebuild, onGraded, onClose }: {
   sessionId: number; rebuilding: boolean; loader?: LoaderView | null; onRebuild?: (light: boolean) => void; onGraded?: () => void;
-  /** Today's session only: shown in the header once everything is graded. */
+  /** Today's session only: a button in the action bar once everything is graded. */
   onClose?: () => void;
 }) {
   const { deps, lang } = useCore();
@@ -53,6 +53,7 @@ export function SessionPage({ sessionId, rebuilding, loader = null, onRebuild, o
   const [disputeBusy, setDisputeBusy] = useState(false);
   const [disputeError, setDisputeError] = useState<string | null>(null);
   const [panel, setPanel] = useState<RuleTarget | null>(null);
+  const [showPrevious, setShowPrevious] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const focusResults = useRef(false);
 
@@ -242,7 +243,7 @@ export function SessionPage({ sessionId, rebuilding, loader = null, onRebuild, o
   useEffect(() => {
     if (done && focusResults.current) {
       focusResults.current = false;
-      document.getElementById('feedback-title')?.focus();
+      (document.getElementById('latest-round') ?? document.getElementById('feedback-title'))?.focus();
     }
   }, [done]);
 
@@ -271,49 +272,77 @@ export function SessionPage({ sessionId, rebuilding, loader = null, onRebuild, o
     return q && <Questions question={q} reply={replies[id]} lang={lang} onChange={(r) => setReplies((prev) => ({ ...prev, [id]: r }))} />;
   };
 
+  const renderBlock = (block: SessionView['blocks'][number], i: number, hideTitle: boolean) => {
+    // An added round continues the numbering of the task blocks before it.
+    const offset = view.blocks.filter((b) => b.kind === 'task' && b.round < block.round).reduce((n, b) => n + b.items.length, 0);
+    return (
+        <Block key={block.id} block={block} number={i + 1} lang={lang} hideTitle={hideTitle}>
+          {block.format === 'question' ? (
+            <QuestionBlock block={block} />
+          ) : block.format === 'spot' ? (
+            <SpotBlock
+              block={block}
+              lang={lang}
+              values={spot}
+              graded={block.graded}
+              onChange={(key, value) => {
+                setFinish(false);
+                setSpot((prev) => ({ ...prev, [key]: value }));
+                const [blockId, paragraph] = key.split(':').map(Number) as [number, number];
+                persist(spotDraftKey(blockId, paragraph), value);
+              }}
+            />
+          ) : (
+            <ol className="flex flex-col gap-3">
+              {block.items.map((item, n) =>
+                block.graded ? (
+                  <GradedItem key={item.id} item={item} number={offset + n + 1} lang={lang} />
+                ) : block.format === 'spelling' ? (
+                  <SpellingRow key={item.id} item={item} number={offset + n + 1} lang={lang} value={items[item.id] ?? ''} onChange={(v) => setAnswer(item.id, v)}>
+                    {inline(item.id)}
+                  </SpellingRow>
+                ) : (
+                  <ItemRow key={item.id} item={item} number={offset + n + 1} lang={lang} value={items[item.id] ?? ''} onChange={(v) => setAnswer(item.id, v)}>
+                    {inline(item.id)}
+                  </ItemRow>
+                ),
+              )}
+            </ol>
+          )}
+        </Block>
+    );
+  };
+  const latestRound = Math.max(...view.blocks.map((b) => b.round));
+  const summary = graded && <FeedbackSummary view={view} lang={lang} />;
+  const showClose = done && onClose !== undefined;
+
   return (
     <SessionActionsProvider value={actions}>
       <div ref={root}>
-        <SessionHeader view={view} lang={lang} rebuilding={rebuilding} onRebuild={rebuild} onClose={onClose} />
+        <SessionHeader view={view} lang={lang} rebuilding={rebuilding} onRebuild={rebuild} />
         {loader && <Loader lang={lang} {...loader} />}
-        {graded && <FeedbackSummary view={view} lang={lang} />}
-        {view.blocks.map((block, i) => (
-          <Block key={block.id} block={block} number={i + 1} lang={lang}>
-            {block.format === 'question' ? (
-              <QuestionBlock block={block} />
-            ) : block.format === 'spot' ? (
-              <SpotBlock
-                block={block}
-                lang={lang}
-                values={spot}
-                graded={block.graded}
-                onChange={(key, value) => {
-                  setFinish(false);
-                  setSpot((prev) => ({ ...prev, [key]: value }));
-                  const [blockId, paragraph] = key.split(':').map(Number) as [number, number];
-                  persist(spotDraftKey(blockId, paragraph), value);
-                }}
-              />
-            ) : (
-              <ol className="flex flex-col gap-3">
-                {block.items.map((item, n) =>
-                  block.graded ? (
-                    <GradedItem key={item.id} item={item} number={n + 1} lang={lang} />
-                  ) : block.format === 'spelling' ? (
-                    <SpellingRow key={item.id} item={item} number={n + 1} lang={lang} value={items[item.id] ?? ''} onChange={(v) => setAnswer(item.id, v)}>
-                      {inline(item.id)}
-                    </SpellingRow>
-                  ) : (
-                    <ItemRow key={item.id} item={item} number={n + 1} lang={lang} value={items[item.id] ?? ''} onChange={(v) => setAnswer(item.id, v)}>
-                      {inline(item.id)}
-                    </ItemRow>
-                  ),
-                )}
-              </ol>
+        {latestRound > 1 ? (
+          <>
+            <div id="latest-round" tabIndex={-1} className="rounded-sm">
+              {view.blocks.map((block, i) => block.round === latestRound && renderBlock(block, i, true))}
+            </div>
+            <Button variant="secondary" className="mt-8" aria-expanded={showPrevious} onClick={() => setShowPrevious((v) => !v)}>
+              {t(lang, showPrevious ? 'today.hidePrevious' : 'today.showPrevious')}
+            </Button>
+            {showPrevious && (
+              <>
+                {summary}
+                {view.blocks.map((block, i) => block.round < latestRound && renderBlock(block, i, false))}
+              </>
             )}
-          </Block>
-        ))}
-        {(answerable || unsent.length > 0) && (
+          </>
+        ) : (
+          <>
+            {summary}
+            {view.blocks.map((block, i) => renderBlock(block, i, false))}
+          </>
+        )}
+        {(answerable || unsent.length > 0 || showClose) && (
           <>
             <div className="h-12" />
             {busy && <Loader lang={lang} stages={GRADING_STAGES} current="grading" attempt={1} {...waiting} />}
@@ -339,6 +368,7 @@ export function SessionPage({ sessionId, rebuilding, loader = null, onRebuild, o
                   </Button>
                 </>
               )}
+              {showClose && <Button onClick={onClose}>{t(lang, 'today.close')}</Button>}
               {unsent.length > 0 && (
                 <Button variant="secondary" disabled={disputeBusy} onClick={() => void sendAll()}>
                   {t(lang, disputeBusy ? 'dispute.sending' : 'dispute.sendAll', { n: unsent.length })}

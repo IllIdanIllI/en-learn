@@ -130,6 +130,8 @@ export const ru: Record<keyof typeof en, string> = {
   'today.closed': 'Урок завершён',
   'today.showResults': 'Показать результаты',
   'today.hideResults': 'Скрыть результаты',
+  'today.showPrevious': 'Показать предыдущие вопросы',
+  'today.hidePrevious': 'Скрыть предыдущие вопросы',
   'today.addMore': 'Добавить вопросы',
   'loader.writing': 'Составляю задания',
   'loader.checking': 'Проверяю задания',

@@ -22,7 +22,7 @@ test('shell collapses to icons below 1100px', async ({ page }) => {
   await page.screenshot({ path: `${SHOTS}/shell-collapsed.png` });
 });
 
-for (const state of ['empty', 'no_session', 'generated', 'questions', 'graded', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing', 'earlier_session', 'progress_archived', 'closed', 'open-round']) {
+for (const state of ['empty', 'no_session', 'generated', 'questions', 'graded', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing', 'earlier_session', 'progress_archived', 'closed', 'open-round', 'round-graded']) {
   test(`today loads in state ${state}`, async ({ page }) => {
     const errors: string[] = [];
     page.on('console', (m) => {
@@ -283,15 +283,52 @@ test.describe('today session', () => {
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Завершить урок' })).toBeVisible();
     const html = await page.content();
-    expect(html).toContain('a teacher');
+    expect(html).not.toContain('a teacher');
     for (const key of ['an honest', 'a nurse', 'an umbrella']) expect(html).not.toContain(key);
-    await expect(page.getByRole('heading', { name: 'Итоги' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Итоги' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Закрыть урок' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Завершить урок' }).click();
     await expect(page.getByRole('button', { name: 'Закрыть урок' })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toHaveCount(0);
     await expect(page.getByText('My sister is an nurse')).toBeVisible();
     await expect(page.getByText('Не засчитано').first()).toBeVisible();
+    await expect(page.locator('#latest-round')).toBeFocused();
+  });
+
+  test('an added round sits on top without a block title, continues the numbering, and folds the earlier blocks', async ({ page }) => {
+    await page.goto('/?state=open-round#/today');
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible();
+    await expect(page.getByText('My sister is an nurse')).toBeVisible();
+    await expect(page.locator('#latest-round h2')).toHaveCount(0);
+    const first = await page.locator('#latest-round ol > li').first().innerText();
+    // The lesson's task block has 3 items; the added round continues after them.
+    expect(first.split('\n')[0]).toBe('4');
+    const toggle = page.getByRole('button', { name: 'Показать предыдущие вопросы' });
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByRole('heading', { name: 'Итоги' })).toHaveCount(0);
+    expect(await page.content()).not.toContain('a teacher');
+    await toggle.click();
+    await expect(page.getByRole('button', { name: 'Скрыть предыдущие вопросы' })).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByRole('heading', { name: 'Итоги' })).toBeVisible();
+    expect(await page.content()).toContain('a teacher');
+    await page.getByRole('button', { name: 'Скрыть предыдущие вопросы' }).click();
+    await expect(page.getByRole('heading', { name: 'Итоги' })).toHaveCount(0);
+  });
+
+  test('Close lesson sits in the sticky action bar and stays in view after scrolling', async ({ page }) => {
+    await page.goto('/?state=round-graded#/today');
+    const close = page.getByRole('button', { name: 'Закрыть урок' });
+    await expect(close).toBeVisible();
+    await expect(page.locator('header').getByRole('button', { name: 'Закрыть урок' })).toHaveCount(0);
+    expect(await close.evaluate((el) => {
+      for (let n: Element | null = el.parentElement; n; n = n.parentElement) if (getComputedStyle(n).position === 'sticky') return true;
+      return false;
+    })).toBe(true);
+    await page.getByRole('button', { name: 'Показать предыдущие вопросы' }).click();
+    await page.mouse.wheel(0, 5000);
+    await expect(close).toBeInViewport();
+    await close.click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Урок завершён' })).toBeVisible();
   });
 
   test('Ctrl+Enter submits from anywhere on the page', async ({ page }) => {

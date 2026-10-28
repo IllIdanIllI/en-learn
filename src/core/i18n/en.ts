@@ -128,6 +128,8 @@ export const en = {
   'today.closed': 'Lesson finished',
   'today.showResults': 'Show results',
   'today.hideResults': 'Hide results',
+  'today.showPrevious': 'Show previous questions',
+  'today.hidePrevious': 'Hide previous questions',
   'today.addMore': 'Add more questions',
   'loader.writing': 'Writing tasks',
   'loader.checking': 'Checking tasks',

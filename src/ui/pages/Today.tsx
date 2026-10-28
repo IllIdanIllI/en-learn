@@ -210,7 +210,10 @@ export function Today() {
             rebuilding={generating}
             loader={shown.earlier || closed ? null : loader}
             onRebuild={shown.earlier ? undefined : (light) => rebuild(shown.id, light)}
-            onGraded={shown.earlier ? () => setPinned(shown.id) : undefined}
+            onGraded={() => {
+              if (shown.earlier) setPinned(shown.id);
+              setReload((n) => n + 1); // the skipped count changes with every grading
+            }}
             onClose={shown.earlier || closed ? undefined : () => close(shown.id)}
           />
         )}

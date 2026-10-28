@@ -375,6 +375,14 @@ test.describe('today session', () => {
     await expect(page.getByRole('button', { name: /Решить пропущенные/ })).toHaveCount(0);
   });
 
+  test('Finish lesson with blanks offers Solve skipped at once, without a reload', async ({ page }) => {
+    await page.goto('/?state=generated#/today');
+    await expect(page.getByRole('button', { name: /Решить пропущенные/ })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Завершить урок' }).click();
+    await expect(page.getByRole('button', { name: 'Закрыть урок' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('button', { name: /^Решить пропущенные \(\d+\)$/ })).toBeVisible();
+  });
+
   test('Ctrl+Enter submits from anywhere on the page', async ({ page }) => {
     await page.goto('/?state=generated#/today');
     await page.getByRole('button', { name: 'Проверить ответы' }).waitFor();

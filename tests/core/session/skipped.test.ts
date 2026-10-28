@@ -96,6 +96,26 @@ describe('skippedToSolve', () => {
   });
 });
 
+describe('skippedToSolve edge cases', () => {
+  test('items left unanswered after a reopen are still offered; unanswered spot items are not', async () => {
+    const { db, deps } = await setup();
+    const { sid } = await addSession(db, '2026-10-19', ['correct', null, 'correct', null, null]);
+    expect(await skippedToSolve(deps)).toEqual({ sessionId: sid, date: '2026-10-19', count: 2 });
+    expect(await reopenSkipped(db, sid)).toBe(0);
+    expect(await skippedToSolve(deps)).toEqual({ sessionId: sid, date: '2026-10-19', count: 2 });
+  });
+
+  test('a session with an unanswered added round is not offered until the round is answered', async () => {
+    const { db, deps } = await setup();
+    const { sid } = await addSession(db, '2026-10-20', ['skipped', 'correct', 'correct', 'correct', 'correct']);
+    const b = await insertBlock(db, sid, 4, { ...blk, kind: 'task', format: 'fix', title: 'More', passage: null }, 2);
+    await insertItem(db, b, 0, { ...base, prompt: 'I saw a owl.', expected: 'an' });
+    expect(await skippedToSolve(deps)).toBeNull();
+    await db.execute("INSERT INTO answer (item_id, text, verdict) VALUES ((SELECT MAX(id) FROM item), 'an', 'correct')");
+    expect(await skippedToSolve(deps)).toMatchObject({ sessionId: sid, count: 1 });
+  });
+});
+
 describe('reopenSkipped', () => {
   test('clears only the skipped gap, fix and spelling answers of that session', async () => {
     const { db } = await setup();

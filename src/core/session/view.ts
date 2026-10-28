@@ -21,6 +21,8 @@ export interface ViewAnswer {
 export interface ViewItem {
   id: number;
   ord: number;
+  /** 1-based position among the block's visible items; kept when answered items are left out. */
+  number: number;
   prompt: string;
   format: BlockFormat;
   topicId: number | null;
@@ -62,8 +64,10 @@ export interface ViewBlock {
   graded: boolean;
   /** Speaking blocks: the question to answer aloud. */
   question?: string;
-  /** Spot blocks keep their hidden errors under `paragraphs`, and only once graded. */
+  /** Spot blocks keep their hidden errors under `paragraphs`, and only once graded. A block still to be answered in a graded session lists only its unanswered items. */
   items: ViewItem[];
+  /** All visible items of the block, answered or not. */
+  itemCount: number;
   paragraphs: ViewParagraph[];
   score?: { correct: number; counted: number };
 }
@@ -144,9 +148,9 @@ export async function loadSessionView(db: Db, sessionId: number): Promise<Sessio
     feedback = { patterns: fb[0] ? (JSON.parse(fb[0].patterns) as string[]) : [], tomorrow: fb[0] ? (JSON.parse(fb[0].tomorrow) as string[]) : [] };
   }
 
-  const toItem = (r: ItemRow, format: BlockFormat, blockGraded: boolean): ViewItem => {
+  const toItem = (r: ItemRow, number: number, format: BlockFormat, blockGraded: boolean): ViewItem => {
     const item: ViewItem = {
-      id: r.id, ord: r.ord, prompt: r.prompt, format, topicId: r.topic_id, ruleId: r.rule_id, ruleSection: r.rule_section, status: r.status,
+      id: r.id, ord: r.ord, number, prompt: r.prompt, format, topicId: r.topic_id, ruleId: r.rule_id, ruleSection: r.rule_section, status: r.status,
     };
     if (!blockGraded) return item;
     const answer: ViewAnswer | null = r.has_answer === null ? null : {
@@ -174,18 +178,22 @@ export async function loadSessionView(db: Db, sessionId: number): Promise<Sessio
     const isQuestion = b.format === 'question';
     const blockGraded = graded && (isQuestion || rows.every((r) => r.status !== 'active' || r.has_answer !== null));
     const visible = rows.filter((r) => r.status !== 'defect');
+    const numberOf = new Map(visible.map((r, k) => [r.id, k + 1]));
+    const num = (r: ItemRow) => numberOf.get(r.id) ?? 0;
+    const listed = graded && !blockGraded ? visible.filter((r) => r.has_answer === null) : visible;
     const passage = b.passage === null || isQuestion ? [] : (JSON.parse(b.passage) as string[]);
     return {
       id: b.id, ord: b.ord, kind: b.kind, format: b.format, title: b.title, instruction: b.instruction,
       formatExample: b.format_example, minutes: b.minutes, round: b.round, graded: blockGraded,
       ...(isQuestion ? { question: b.passage ?? '' } : {}),
-      items: isSpot ? [] : visible.map((r) => toItem(r, b.format, blockGraded)),
+      itemCount: visible.length,
+      items: isSpot ? [] : listed.map((r) => toItem(r, num(r), b.format, blockGraded)),
       paragraphs: passage.map((text, index): ViewParagraph => {
         if (!blockGraded) return { index, text };
         const key = `${b.id}:${index}`;
         return {
           index, text, learnerText: spotTexts.get(key) ?? '',
-          errors: visible.filter((r) => r.paragraph === index).map((r) => toItem(r, b.format, blockGraded)),
+          errors: visible.filter((r) => r.paragraph === index).map((r) => toItem(r, num(r), b.format, blockGraded)),
           extra: extras.get(key) ?? [],
         };
       }),

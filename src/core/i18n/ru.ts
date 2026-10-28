@@ -133,6 +133,7 @@ export const ru: Record<keyof typeof en, string> = {
   'today.showPrevious': 'Показать предыдущие вопросы',
   'today.hidePrevious': 'Скрыть предыдущие вопросы',
   'today.addMore': 'Добавить вопросы',
+  'today.solveSkipped': 'Решить пропущенные ({n})',
   'loader.writing': 'Составляю задания',
   'loader.checking': 'Проверяю задания',
   'loader.saving': 'Сохраняю',

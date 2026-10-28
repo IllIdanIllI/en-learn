@@ -7,6 +7,7 @@ import { closeSession } from '@/core/db/repos/sessions';
 import { extendSession } from '@/core/session/extend';
 import { generateSession, rebuildSession, type GenerateResult, type GenStage, type OnStage } from '@/core/session/generate';
 import { getTodayState, type TodayState } from '@/core/session/plan';
+import { reopenSkipped, skippedToSolve } from '@/core/session/skipped';
 import { useCore } from '@/ui/app/CoreProvider';
 import { Button } from '@/ui/components/ui/button';
 import { Notice } from '@/ui/today/chips';
@@ -31,6 +32,9 @@ export function Today() {
   const [pinned, setPinned] = useState<number | null>(null);
   // A closed lesson shows its results below the card on request.
   const [showResults, setShowResults] = useState(false);
+  // Skipped questions of today or yesterday that can be solved, and the session being solved right now.
+  const [skipped, setSkipped] = useState<{ sessionId: number; count: number } | null>(null);
+  const [solving, setSolving] = useState<number | null>(null);
   const [reload, setReload] = useState(0);
   // Bumped after every build: a deleted session's id can be reused, and the page must not keep its answers.
   const [epoch, setEpoch] = useState(0);
@@ -44,6 +48,21 @@ export function Today() {
       },
       (e: unknown) => {
         if (live) setLoadError(e instanceof Error ? e.message : String(e));
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [deps, version, reload]);
+
+  useEffect(() => {
+    let live = true;
+    skippedToSolve(deps).then(
+      (s) => {
+        if (live) setSkipped(s);
+      },
+      () => {
+        if (live) setSkipped(null);
       },
     );
     return () => {
@@ -91,6 +110,13 @@ export function Today() {
       (e: unknown) => setGenError({ message: e instanceof Error ? e.message : String(e) }),
     );
   };
+  const solve = (sessionId: number) => {
+    setGenError(null);
+    reopenSkipped(deps.db, sessionId).then(
+      () => setSolving(sessionId),
+      (e: unknown) => setGenError({ message: e instanceof Error ? e.message : String(e) }),
+    );
+  };
   const lastLight = useRef(false);
   const rebuild = (sessionId: number, light: boolean) => {
     lastLight.current = light;
@@ -109,6 +135,25 @@ export function Today() {
     );
   }
   if (!state) return <h1 className="headline">{t(lang, 'nav.today')}</h1>;
+  if (solving !== null) {
+    return (
+      <SessionPage
+        key={`solving:${solving}:${epoch}`}
+        sessionId={solving}
+        rebuilding={false}
+        solving
+        onGraded={() => {
+          setSolving(null);
+          setReload((n) => n + 1);
+        }}
+      />
+    );
+  }
+  const solveButton = skipped !== null && (
+    <Button variant="secondary" disabled={generating} onClick={() => solve(skipped.sessionId)}>
+      {t(lang, 'today.solveSkipped', { n: skipped.count })}
+    </Button>
+  );
   // One layout for today's session and an earlier one, so the page below is never remounted when the day changes.
   const shown: { id: number; earlier: boolean; restDay: boolean; date?: ISODate } | null =
     state.kind === 'session' ? { id: state.sessionId, earlier: false, restDay: false }
@@ -119,6 +164,7 @@ export function Today() {
   if (shown) {
     return (
       <>
+        {!closed && solveButton && <div className="mb-6">{solveButton}</div>}
         {genError !== null && (
           <ErrorNotice
             kind="gen"
@@ -153,7 +199,9 @@ export function Today() {
             showingResults={showResults}
             onToggleResults={() => setShowResults((v) => !v)}
             onAddMore={() => addMore(shown.id)}
-          />
+          >
+            {solveButton}
+          </LessonClosed>
         )}
         {(!closed || showResults) && (
           <SessionPage
@@ -180,6 +228,7 @@ export function Today() {
   return (
     <>
       <h1 className="headline">{t(lang, state.kind === 'rest' ? 'today.rest' : 'nav.today')}</h1>
+      {solveButton && <div className="mt-6">{solveButton}</div>}
       {state.kind === 'no_programme' && (
         <p className="reading mt-6">
           {t(lang, 'today.noProgramme')}{' '}

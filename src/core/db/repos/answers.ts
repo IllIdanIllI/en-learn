@@ -118,6 +118,32 @@ export async function listSkippedItems(
   return rows.map((r) => ({ prompt: r.prompt, expected: r.expected, topicId: r.topic_id }));
 }
 
+const SKIPPED_SOLVABLE = `b.format IN ('gap', 'fix', 'spelling') AND i.status = 'active'
+       AND a.verdict = 'skipped' AND (a.dispute_decision IS NULL OR a.dispute_decision != 'drop')`;
+
+/** Graded sessions of a date range with gap, fix or spelling items left unanswered, and how many. */
+export async function countSkippedBySession(db: Db, from: ISODate, to: ISODate): Promise<{ sessionId: number; date: ISODate; count: number }[]> {
+  const rows = await db.select<{ session_id: number; date: string; n: number }>(
+    `SELECT s.id AS session_id, s.date AS date, COUNT(*) AS n
+     FROM session s JOIN block b ON b.session_id = s.id JOIN item i ON i.block_id = b.id JOIN answer a ON a.item_id = i.id
+     WHERE s.status = 'graded' AND s.date BETWEEN ? AND ? AND ${SKIPPED_SOLVABLE}
+     GROUP BY s.id ORDER BY s.date`,
+    [from, to],
+  );
+  return rows.map((r) => ({ sessionId: r.session_id, date: r.date, count: r.n }));
+}
+
+/** Deletes the answers counted by `countSkippedBySession` for one session, so those items are unanswered again. */
+export async function deleteSkippedAnswers(db: Db, sessionId: number): Promise<number> {
+  const rows = await db.select<{ id: number }>(
+    `SELECT i.id AS id FROM block b JOIN item i ON i.block_id = b.id JOIN answer a ON a.item_id = i.id
+     WHERE b.session_id = ? AND ${SKIPPED_SOLVABLE}`,
+    [sessionId],
+  );
+  for (const r of rows) await db.execute('DELETE FROM answer WHERE item_id = ?', [r.id]);
+  return rows.length;
+}
+
 /**
  * One fact per stored attempt. An attempt that comes from a spelling-block item of its session takes the item's
  * effective verdict (so a won dispute counts as correct, a dropped item or a lost dispute is skipped); a word the

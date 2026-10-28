@@ -22,7 +22,7 @@ test('shell collapses to icons below 1100px', async ({ page }) => {
   await page.screenshot({ path: `${SHOTS}/shell-collapsed.png` });
 });
 
-for (const state of ['empty', 'no_session', 'generated', 'questions', 'graded', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing', 'earlier_session', 'progress_archived', 'closed', 'open-round', 'round-graded']) {
+for (const state of ['empty', 'no_session', 'generated', 'questions', 'graded', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing', 'earlier_session', 'progress_archived', 'closed', 'open-round', 'round-graded', 'skipped']) {
   test(`today loads in state ${state}`, async ({ page }) => {
     const errors: string[] = [];
     page.on('console', (m) => {
@@ -347,6 +347,32 @@ test.describe('today session', () => {
     await expect(close).toBeInViewport();
     await close.click();
     await expect(page.getByRole('heading', { level: 1, name: 'Урок завершён' })).toBeVisible();
+  });
+
+  test('Solve skipped shows only the skipped items with their original numbers; grading them brings the usual page back', async ({ page }) => {
+    await page.goto('/?state=skipped#/today');
+    const solve = page.getByRole('button', { name: /^Решить пропущенные \(\d+\)$/ });
+    await expect(solve).toBeVisible();
+    const count = Number(/\((\d+)\)/.exec(await solve.innerText())![1]);
+    expect(count).toBeGreaterThanOrEqual(2);
+    await page.screenshot({ path: `${SHOTS}/today-skipped-button.png`, fullPage: true });
+    await solve.click();
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Решить пропущенные' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Итоги' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Закрыть урок' })).toHaveCount(0);
+    const rows = page.locator('ol > li');
+    await expect(rows).toHaveCount(count);
+    const numbers = await rows.evaluateAll((els) => els.map((el) => (el as HTMLElement).innerText.split('\n')[0]));
+    expect(numbers.some((n) => n !== '1')).toBe(true);
+    await page.screenshot({ path: `${SHOTS}/today-skipped-solving.png`, fullPage: true });
+    const fields = page.locator('ol > li').locator('input:not([type="hidden"]), textarea');
+    for (let i = 0; i < count; i++) await fields.nth(i).fill('an');
+    await page.getByRole('button', { name: 'Проверить ответы' }).click();
+    await expect(page.getByRole('button', { name: 'Закрыть урок' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: 'Итоги' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Решить пропущенные/ })).toHaveCount(0);
   });
 
   test('Ctrl+Enter submits from anywhere on the page', async ({ page }) => {

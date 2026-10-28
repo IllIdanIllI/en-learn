@@ -16,7 +16,7 @@ import { MINI_PROGRAMME, MINI_RULES } from './miniSeed';
 
 export const PREVIEW_STATES = [
   'empty', 'no_session', 'generated', 'questions', 'graded', 'progress', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing',
-  'earlier_session', 'progress_archived', 'closed', 'open-round', 'round-graded',
+  'earlier_session', 'progress_archived', 'closed', 'open-round', 'round-graded', 'skipped',
 ] as const;
 export type PreviewState = (typeof PREVIEW_STATES)[number];
 
@@ -118,24 +118,29 @@ function requireOk(result: { ok: boolean; message?: string }, what: string): voi
   if (!result.ok) throw new Error(`Preview fixture: ${what} failed: ${result.message ?? ''}`);
 }
 
-/** Answers today's session: `graded` answers every second item right; `questions` leaves blanks that raise questions. */
-async function answerToday(deps: Deps, state: 'questions' | 'graded'): Promise<void> {
+/**
+ * Answers today's session: `graded` answers every second item right; `questions` leaves blanks that raise questions;
+ * `skipped` is `graded` with every third gap, fix or spelling answer left blank and the lesson finished.
+ */
+async function answerToday(deps: Deps, state: 'questions' | 'graded' | 'skipped'): Promise<void> {
   const session = await getSessionByDate(deps.db, deps.clock.today());
   if (!session) throw new Error('Preview fixture: no session');
   const items = await listGradingItems(deps.db, session.id);
   const answers: Record<number, string> = {};
   const spot: Record<string, string> = {};
-  if (state === 'graded') {
+  if (state !== 'questions') {
     // Every second answer is right, the rest are wrong, so the page shows both verdicts.
     items.forEach((it, i) => {
       if (it.format === 'spot' && it.paragraph !== null) {
         const key = `${it.blockId}:${it.paragraph}`;
         spot[key] = `${spot[key] ?? ''}${i % 2 === 0 ? `${it.prompt} → ${it.expected}` : ''}\n`;
-      } else if (it.format !== 'question') answers[it.id] = ANSWERS[it.prompt] ?? (i % 2 === 0 ? it.expected : 'wrong answer');
+      } else if (it.format !== 'question') {
+        answers[it.id] = state === 'skipped' && i % 3 === 1 ? '' : (ANSWERS[it.prompt] ?? (i % 2 === 0 ? it.expected : 'wrong answer'));
+      }
     });
   }
-  const outcome = await gradeSession(deps, session.id, { items: answers, spot }, []);
-  if (state === 'graded' && outcome.kind !== 'graded') throw new Error(`Preview fixture: grading gave ${outcome.kind}`);
+  const outcome = await gradeSession(deps, session.id, { items: answers, spot }, [], { finish: state === 'skipped' });
+  if (state !== 'questions' && outcome.kind !== 'graded') throw new Error(`Preview fixture: grading gave ${outcome.kind}`);
   if (state === 'questions' && outcome.kind !== 'questions') throw new Error(`Preview fixture: expected questions, got ${outcome.kind}`);
 }
 
@@ -182,12 +187,12 @@ export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
     requireOk(await generateSession(deps, { light: false }), 'generateSession');
     clock.set(THURSDAY);
   }
-  const answered = state === 'graded' || state === 'closed' || state === 'open-round' || state === 'round-graded';
+  const answered = state === 'graded' || state === 'closed' || state === 'open-round' || state === 'round-graded' || state === 'skipped';
   if (state === 'generated' || state === 'questions' || answered || progressLike) {
     requireOk(await generateSession(deps, { light: false }), 'generateSession');
   }
   if (state === 'questions' || answered || progressLike) {
-    await answerToday(deps, state === 'questions' ? 'questions' : 'graded');
+    await answerToday(deps, state === 'questions' || state === 'skipped' ? state : 'graded');
   }
   if (state === 'closed' || state === 'open-round' || state === 'round-graded') {
     const session = await getSessionByDate(deps.db, today);

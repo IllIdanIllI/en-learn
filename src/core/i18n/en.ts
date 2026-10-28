@@ -131,6 +131,7 @@ export const en = {
   'today.showPrevious': 'Show previous questions',
   'today.hidePrevious': 'Hide previous questions',
   'today.addMore': 'Add more questions',
+  'today.solveSkipped': 'Solve skipped ({n})',
   'loader.writing': 'Writing tasks',
   'loader.checking': 'Checking tasks',
   'loader.saving': 'Saving',

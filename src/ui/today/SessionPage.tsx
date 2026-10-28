@@ -31,8 +31,10 @@ const DRAFT_DELAY_MS = 300;
  * Answers live in component state keyed by item id and `${blockId}:${paragraph}`, and are saved as drafts (debounced)
  * so a reload or another page does not lose them. Without `onRebuild` the session cannot be rebuilt (an earlier day).
  */
-export function SessionPage({ sessionId, rebuilding, loader = null, onRebuild, onGraded, onClose }: {
+export function SessionPage({ sessionId, rebuilding, loader = null, solving = false, onRebuild, onGraded, onClose }: {
   sessionId: number; rebuilding: boolean; loader?: LoaderView | null; onRebuild?: (light: boolean) => void; onGraded?: () => void;
+  /** Reopened skipped items of a graded session: only the blocks with unanswered items, nothing else. */
+  solving?: boolean;
   /** Today's session only: a button in the action bar once everything is graded. */
   onClose?: () => void;
 }) {
@@ -274,7 +276,7 @@ export function SessionPage({ sessionId, rebuilding, loader = null, onRebuild, o
 
   const renderBlock = (block: SessionView['blocks'][number], i: number, hideTitle: boolean) => {
     // An added round continues the numbering of the task blocks before it.
-    const offset = view.blocks.filter((b) => b.kind === 'task' && b.round < block.round).reduce((n, b) => n + b.items.length, 0);
+    const offset = view.blocks.filter((b) => b.kind === 'task' && b.round < block.round).reduce((n, b) => n + b.itemCount, 0);
     return (
       <Block key={block.id} block={block} number={i + 1} lang={lang} hideTitle={hideTitle}>
         {block.format === 'question' ? (
@@ -294,15 +296,15 @@ export function SessionPage({ sessionId, rebuilding, loader = null, onRebuild, o
           />
         ) : (
           <ol className="flex flex-col gap-3">
-            {block.items.map((item, n) =>
+            {block.items.map((item) =>
               block.graded ? (
-                <GradedItem key={item.id} item={item} number={offset + n + 1} lang={lang} />
+                <GradedItem key={item.id} item={item} number={offset + item.number} lang={lang} />
               ) : block.format === 'spelling' ? (
-                <SpellingRow key={item.id} item={item} number={offset + n + 1} lang={lang} value={items[item.id] ?? ''} onChange={(v) => setAnswer(item.id, v)}>
+                <SpellingRow key={item.id} item={item} number={offset + item.number} lang={lang} value={items[item.id] ?? ''} onChange={(v) => setAnswer(item.id, v)}>
                   {inline(item.id)}
                 </SpellingRow>
               ) : (
-                <ItemRow key={item.id} item={item} number={offset + n + 1} lang={lang} value={items[item.id] ?? ''} onChange={(v) => setAnswer(item.id, v)}>
+                <ItemRow key={item.id} item={item} number={offset + item.number} lang={lang} value={items[item.id] ?? ''} onChange={(v) => setAnswer(item.id, v)}>
                   {inline(item.id)}
                 </ItemRow>
               ),
@@ -321,7 +323,9 @@ export function SessionPage({ sessionId, rebuilding, loader = null, onRebuild, o
       <div ref={root}>
         <SessionHeader view={view} lang={lang} rebuilding={rebuilding} onRebuild={rebuild} />
         {loader && <Loader lang={lang} {...loader} />}
-        {latestRound > 1 ? (
+        {solving ? (
+          view.blocks.map((block, i) => !block.graded && block.items.length > 0 && renderBlock(block, i, false))
+        ) : latestRound > 1 ? (
           <>
             <div id="latest-round" tabIndex={-1} className="rounded-sm">
               {view.blocks.map((block, i) => block.round === latestRound && renderBlock(block, i, true))}

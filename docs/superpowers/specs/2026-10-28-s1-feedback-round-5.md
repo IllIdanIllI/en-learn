@@ -8,7 +8,7 @@ Binding where it says something; otherwise the S1 spec and rounds 1–4 hold.
 
 ## L2. Skipped questions of added rounds
 - Solvable = an active gap, fix or spelling item of a graded session of today or yesterday, in any round (main lesson or added), whose answer is `skipped` (not dropped by a dispute) or missing.
-- Exception: in today's session, an added round none of whose items has an answer yet is a new round still to be answered on the page; its items are not counted, and the session is offered only for its other solvable items. On yesterday's session every solvable item counts (that day's page is no longer shown, so nothing can be stranded).
+- Exception: in today's session, an added round none of whose items has an answer yet is a new round still to be answered on the page; while it is there, today's session is not offered (the round is answered first, then the button appears for the skips). On yesterday's session every solvable item counts (that day's page is no longer shown, so nothing can be stranded).
 - Solving mode stays as in K4: only the solvable items, original numbers, under the session title; "Проверить ответы" grades only them; late answers count normally.
 
 ## L3. Rule chat

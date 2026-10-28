@@ -27,6 +27,8 @@ export function buildClaudeArgs(req: LlmRequest): string[] {
     '',
     '--model',
     req.model,
+    '--effort',
+    req.effort,
     '--no-session-persistence',
     '--strict-mcp-config',
   ];

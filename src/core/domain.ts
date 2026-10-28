@@ -9,6 +9,7 @@ export type DisputeDecision = 'keep' | 'correct' | 'drop';
 export type GapStatus = 'pending' | 'approved' | 'rejected';
 export type SessionStatus = 'draft' | 'generated' | 'graded';
 export type EffectiveVerdict = 'correct' | 'wrong' | null;   // null = not counted
+export type Effort = 'low' | 'medium' | 'high';
 export type LlmKind = 'rule_draft' | 'generate_session' | 'validate_session' | 'grade' | 'dispute';
 export interface Topic { id: number; key: string; title: string; kind: TopicKind; weekNo: number | null; archived: boolean }
 export interface Programme { id: number; title: string; startDate: ISODate; endDate: ISODate }

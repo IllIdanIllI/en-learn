@@ -29,6 +29,7 @@ export async function callStructured<T>(
   const prompt = await deps.prompts.load(kind);
   const language = settings.nativeLanguage === 'ru' ? 'Russian' : 'English';
   const model = settings.models[kind];
+  const effort = settings.efforts[kind];
   const validate = validatorFor(prompt.schema);
 
   let last: LlmResult<T> | undefined;
@@ -39,6 +40,7 @@ export async function callStructured<T>(
       userPrompt,
       schema: prompt.schema,
       model,
+      effort,
       budgetUsd: settings.budgetUsd,
       timeoutMs: kind === 'generate_session' ? 300000 : 120000,
     });

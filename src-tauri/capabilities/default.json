@@ -51,6 +51,10 @@
             {
               "validator": "^[a-z0-9.\\-]+$"
             },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
             "--no-session-persistence",
             "--strict-mcp-config",
             "--",
@@ -80,6 +84,10 @@
             "--model",
             {
               "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
             },
             "--no-session-persistence",
             "--strict-mcp-config",
@@ -133,6 +141,10 @@
             {
               "validator": "^[a-z0-9.\\-]+$"
             },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
             "--no-session-persistence",
             "--strict-mcp-config",
             "--",
@@ -162,6 +174,10 @@
             "--model",
             {
               "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
             },
             "--no-session-persistence",
             "--strict-mcp-config",
@@ -215,6 +231,10 @@
             {
               "validator": "^[a-z0-9.\\-]+$"
             },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
             "--no-session-persistence",
             "--strict-mcp-config",
             "--",
@@ -244,6 +264,10 @@
             "--model",
             {
               "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
             },
             "--no-session-persistence",
             "--strict-mcp-config",
@@ -297,6 +321,10 @@
             {
               "validator": "^[a-z0-9.\\-]+$"
             },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
             "--no-session-persistence",
             "--strict-mcp-config",
             "--",
@@ -326,6 +354,10 @@
             "--model",
             {
               "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
             },
             "--no-session-persistence",
             "--strict-mcp-config",

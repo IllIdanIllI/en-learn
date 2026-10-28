@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { t, type MessageKey } from '@/core/i18n';
-import type { LlmKind } from '@/core/domain';
+import type { Effort, LlmKind } from '@/core/domain';
 import { CLAUDE_LOCATIONS } from '@/core/llm/claude';
 import { MoveRefused } from '@/core/dataFolder';
 import { Button } from '@/ui/components/ui/button';
@@ -15,6 +15,7 @@ import { useCore } from '@/ui/app/CoreProvider';
 import { Notice } from '@/ui/today/chips';
 
 const MODELS = ['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-opus-5-5'];
+const EFFORTS: Effort[] = ['low', 'medium', 'high'];
 const KINDS: LlmKind[] = ['rule_draft', 'generate_session', 'validate_session', 'grade', 'dispute'];
 
 function Row({ label, htmlFor, hint, children }: { label: string; htmlFor?: string; hint?: string; children: React.ReactNode }) {
@@ -156,20 +157,32 @@ export function Settings() {
       </div>
 
       <h2 className="title mt-10">{t(lang, 'settings.models')}</h2>
+      <p className="label mt-0.5 text-muted-foreground">{t(lang, 'settings.effortHint')}</p>
       <div className="mt-2 border-t border-border">
         {KINDS.map((kind) => {
           const current = settings.models[kind];
           const options = MODELS.includes(current) ? MODELS : [current, ...MODELS];
           return (
             <Row key={kind} label={t(lang, `llm.${kind}` as MessageKey)} htmlFor={`model-${kind}`}>
-              <Select
-                id={`model-${kind}`}
-                data-model-kind={kind}
-                value={current}
-                onValueChange={(v) => void save('models', { ...settings.models, [kind]: v })}
-                options={options.map((m) => ({ value: m, label: m }))}
-                className="max-w-64"
-              />
+              <div className="flex flex-wrap gap-3">
+                <Select
+                  id={`model-${kind}`}
+                  data-model-kind={kind}
+                  value={current}
+                  onValueChange={(v) => void save('models', { ...settings.models, [kind]: v })}
+                  options={options.map((m) => ({ value: m, label: m }))}
+                  className="max-w-64"
+                />
+                <Select
+                  id={`effort-${kind}`}
+                  data-effort-kind={kind}
+                  value={settings.efforts[kind]}
+                  onValueChange={(v) => void save('efforts', { ...settings.efforts, [kind]: v as Effort })}
+                  options={EFFORTS.map((e) => ({ value: e, label: t(lang, `settings.effort.${e}` as MessageKey) }))}
+                  aria-label={`${t(lang, `llm.${kind}` as MessageKey)}: ${t(lang, 'settings.effort')}`}
+                  className="w-36"
+                />
+              </div>
             </Row>
           );
         })}

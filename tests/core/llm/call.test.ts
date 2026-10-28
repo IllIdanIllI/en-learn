@@ -94,10 +94,13 @@ describe('callStructured', () => {
     await setSetting(deps.db, 'models', {
       rule_draft: 'm-r', generate_session: 'm-g', validate_session: 'm-v', grade: 'm-grade', dispute: 'm-d',
     });
+    await setSetting(deps.db, 'efforts', { rule_draft: 'low', generate_session: 'low', validate_session: 'low', grade: 'medium', dispute: 'low' });
     await setSetting(deps.db, 'budgetUsd', 0.5);
     await callStructured(deps, 'grade', 'p', { sessionId: undefined });
     await callStructured(deps, 'generate_session', 'p');
     expect(llm.calls[0]!.model).toBe('m-grade');
+    expect(llm.calls[0]!.effort).toBe('medium');
+    expect(llm.calls[1]!.effort).toBe('low');
     expect(llm.calls[0]!.budgetUsd).toBe(0.5);
     expect(llm.calls[0]!.timeoutMs).toBe(120000);
     expect(llm.calls[0]!.systemPrompt).toBe('Explain in Russian. Again Russian.');

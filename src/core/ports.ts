@@ -1,4 +1,4 @@
-import type { ISODate, LlmKind } from './domain';
+import type { Effort, ISODate, LlmKind } from './domain';
 
 export interface Db {
   execute(sql: string, params?: unknown[]): Promise<{ lastInsertId: number; rowsAffected: number }>;
@@ -31,6 +31,7 @@ export interface LlmRequest {
   userPrompt: string;
   schema: object;
   model: string;
+  effort: Effort;
   budgetUsd: number | null;
   timeoutMs: number;
 }

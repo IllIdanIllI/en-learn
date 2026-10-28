@@ -12,22 +12,23 @@ const req = (budgetUsd: number | null): LlmRequest => ({
   userPrompt: 'the user prompt',
   schema: { type: 'object' },
   model: 'claude-sonnet-5-5',
+  effort: 'high',
   budgetUsd,
   timeoutMs: 120000,
 });
 
 describe('buildClaudeArgs', () => {
-  test('13 flag args then -- and the prompt, without budget', () => {
+  test('15 flag args then -- and the prompt, without budget', () => {
     expect(buildClaudeArgs(req(null))).toEqual([
       '-p', '--output-format', 'json', '--json-schema', '{"type":"object"}',
-      '--system-prompt', 'line one\nline two', '--tools', '', '--model', 'claude-sonnet-5-5',
+      '--system-prompt', 'line one\nline two', '--tools', '', '--model', 'claude-sonnet-5-5', '--effort', 'high',
       '--no-session-persistence', '--strict-mcp-config', '--', 'the user prompt',
     ]);
   });
 
   test('budget appends two args', () => {
     const a = buildClaudeArgs(req(0.3));
-    expect(a).toHaveLength(17);
+    expect(a).toHaveLength(19);
     expect(a.slice(-4)).toEqual(['--max-budget-usd', '0.3', '--', 'the user prompt']);
   });
 });
@@ -42,7 +43,7 @@ describe('ClaudeCli', () => {
     if (r.ok) expect(r.data).toEqual({ word: 'cat', n: 3 });
     const c = runner.calls[0]!;
     expect(c.scope).toBe('claude-local-call');
-    expect(c.args).toHaveLength(15);
+    expect(c.args).toHaveLength(17);
     expect(c.args[8]).toBe('');
     expect(c.args.slice(-2)).toEqual(['--', 'the user prompt']);
     expect(c.opts.stdin).toBeUndefined();

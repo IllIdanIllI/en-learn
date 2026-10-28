@@ -14,6 +14,7 @@ describe('settings repo', () => {
         grade: 'claude-sonnet-5-5',
         dispute: 'claude-sonnet-5-5',
       },
+      efforts: { rule_draft: 'medium', generate_session: 'medium', validate_session: 'medium', grade: 'high', dispute: 'medium' },
       budgetUsd: null,
       acceptedShorthands: ['✓'],
       spellingVariant: 'british',
@@ -36,5 +37,15 @@ describe('settings repo', () => {
     const s = await getSettings(db);
     expect(s.models.grade).toBe('m-x');
     expect(s.models.dispute).toBe('claude-sonnet-5-5');
+  });
+
+  test('a row without efforts loads the defaults; a partial efforts object merges over them', async () => {
+    const db = await createTestDb();
+    await db.execute('INSERT INTO settings (key, value) VALUES (?, ?)', ['models', JSON.stringify({ grade: 'm-x' })]);
+    expect((await getSettings(db)).efforts.grade).toBe('high');
+    await db.execute('INSERT INTO settings (key, value) VALUES (?, ?)', ['efforts', JSON.stringify({ grade: 'low' })]);
+    const s = await getSettings(db);
+    expect(s.efforts.grade).toBe('low');
+    expect(s.efforts.dispute).toBe('medium');
   });
 });

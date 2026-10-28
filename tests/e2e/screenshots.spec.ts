@@ -101,6 +101,17 @@ test('settings changes save immediately', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Settings');
 });
 
+test('an effort select saves', async ({ page }) => {
+  await page.goto('/?state=no_session#/settings');
+  await expect(page.locator('button[data-effort-kind]')).toHaveCount(5);
+  const trigger = page.locator('#effort-grade');
+  await expect(trigger).toHaveText('Высокое');
+  await trigger.click();
+  await page.getByRole('option', { name: 'Низкое' }).click();
+  await expect(page.getByRole('status')).toContainText('Сохранено');
+  await expect(trigger).toHaveText('Низкое');
+});
+
 test('prerequisites lists the four checked locations', async ({ page }) => {
   await page.goto('/?state=prereq_missing#/prerequisites');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();

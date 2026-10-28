@@ -12,7 +12,8 @@ const caps = JSON.parse(readFileSync('src-tauri/capabilities/default.json', 'utf
 const spawn = caps.permissions.find((p) => typeof p !== 'string' && p.identifier === 'shell:allow-spawn');
 const entries = (spawn as { allow: Entry[] }).allow;
 
-const req = (budgetUsd: number | null): LlmRequest => ({
+const SID = '123e4567-e89b-42d3-a456-426614174000';
+const req = (budgetUsd: number | null, extra: Partial<LlmRequest> = {}): LlmRequest => ({
   kind: 'grade',
   systemPrompt: 'line one\nline two',
   userPrompt: 'the user prompt',
@@ -21,15 +22,24 @@ const req = (budgetUsd: number | null): LlmRequest => ({
   effort: 'medium',
   budgetUsd,
   timeoutMs: 1000,
+  ...extra,
 });
 
 describe('shell capability call shapes', () => {
   for (const { loc } of CLAUDE_LOCATIONS) {
-    for (const [shape, budget] of [['call', null], ['call-budget', 0.3]] as const) {
+    const shapes = [
+      ['call', null, {}],
+      ['call-budget', 0.3, {}],
+      ['chat', null, { persist: true, resume: null }],
+      ['chat-budget', 0.3, { persist: true, resume: null }],
+      ['chat-next', null, { persist: true, resume: SID }],
+      ['chat-next-budget', 0.3, { persist: true, resume: SID }],
+    ] as const;
+    for (const [shape, budget, extra] of shapes) {
       test(`${loc} ${shape} matches buildClaudeArgs`, () => {
         const entry = entries.find((e) => e.name === scopeName(loc, shape));
         expect(entry).toBeDefined();
-        const args = buildClaudeArgs(req(budget));
+        const args = buildClaudeArgs(req(budget, extra));
         expect(entry!.args).toHaveLength(args.length);
         entry!.args.forEach((slot, i) => {
           if (typeof slot === 'string') expect(args[i]).toBe(slot);

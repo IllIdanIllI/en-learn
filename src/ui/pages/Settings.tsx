@@ -16,7 +16,7 @@ import { Notice } from '@/ui/today/chips';
 
 const MODELS = ['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-opus-5-5'];
 const EFFORTS: Effort[] = ['low', 'medium', 'high'];
-const KINDS: LlmKind[] = ['rule_draft', 'generate_session', 'validate_session', 'grade', 'dispute'];
+const KINDS: LlmKind[] = ['rule_draft', 'rule_chat', 'generate_session', 'validate_session', 'grade', 'dispute'];
 
 function Row({ label, htmlFor, hint, children }: { label: string; htmlFor?: string; hint?: string; children: React.ReactNode }) {
   return (

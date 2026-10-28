@@ -14,6 +14,13 @@ describe('parseEnvelope', () => {
     }
   });
 
+  test('success envelope carries the session id; none when absent', () => {
+    const r = parseEnvelope(fixture('envelope-success.json'));
+    expect(r).toMatchObject({ ok: true, sessionId: '899551ba-7f2a-50d4-9014-08e79b4f3f71' });
+    const none = parseEnvelope(JSON.stringify({ structured_output: { a: 1 } }));
+    expect(none.ok && 'sessionId' in none).toBe(false);
+  });
+
   test('budget envelope maps to budget', () => {
     const r = parseEnvelope(fixture('envelope-budget.json'));
     expect(r.ok).toBe(false);

@@ -105,7 +105,7 @@ export async function seededDb(opts: { model: string; clock: Clock; seedToday: s
   await saveProgramme(db, seed.programme);
   await insertSeedRules(db, seed.rules, opts.clock.now());
   const m = opts.model;
-  await setSetting(db, 'models', { rule_draft: m, generate_session: m, validate_session: m, grade: m, dispute: m });
+  await setSetting(db, 'models', { rule_draft: m, rule_chat: m, generate_session: m, validate_session: m, grade: m, dispute: m });
   return db;
 }
 

@@ -1,7 +1,7 @@
 import type { Llm, LlmRequest, LlmResult } from '@/core/ports';
 import { MINI_RULES } from './miniSeed';
 import type {
-  DisputeBatchReply, GeneratedBlock, GeneratedItem, GeneratedParagraph, GeneratedSession, GradeResult, RuleDraft, ValidationResult,
+  DisputeBatchReply, GeneratedBlock, GeneratedItem, GeneratedParagraph, GeneratedSession, GradeResult, RuleChatReply, RuleDraft, ValidationResult,
 } from '@/core/llm/types';
 
 /** Canned, valid model outputs for preview mode. They are derived from the request text so they pass the code checks. */
@@ -306,6 +306,32 @@ function gapProposal(): string {
   return seed.body.replace('\n\n## Объяснение', '\n- I saw one elephant: one называет число, а не предмет.\n\n## Объяснение');
 }
 
+/** Rule of each fake CLI session: the first turn carries it, later turns only the learner's text. */
+const chatSessions = new Map<string, { body: string; sources: { title: string; url: string }[] }>();
+let chatCounter = 0;
+const CHANGE_REQUEST = /измени|change/i;
+
+/** A question gets a plain message; a change request gets the current body with one more line in Traps. */
+function ruleChat(userPrompt: string, resume: string | null): { reply: RuleChatReply; sessionId: string } {
+  let rule = resume === null ? undefined : chatSessions.get(resume);
+  let text = userPrompt;
+  if (resume === null) {
+    const body = /^Current rule body:\n([\s\S]*?)\nCurrent sources \(JSON\):\n/m.exec(userPrompt)?.[1] ?? '';
+    const sources = JSON.parse(/^Current sources \(JSON\):\n(.*)$/m.exec(userPrompt)?.[1] ?? '[]') as { title: string; url: string }[];
+    rule = { body, sources };
+    text = userPrompt.split("\nLearner's message:\n")[1] ?? '';
+  }
+  const sessionId = `preview-session-${++chatCounter}`;
+  chatSessions.set(sessionId, rule ?? { body: '', sources: [] });
+  if (!rule || !CHANGE_REQUEST.test(text)) {
+    return { reply: { message: 'Правило описывает общий механизм: выбор формы зависит от условия, а не от отдельных слов. Если нужно что-то поменять, напишите, что именно.', proposal: null }, sessionId };
+  }
+  const added = '- Added in chat: пример ловушки для проверки диффа.';
+  const traps = /(^## (?:Ловушки|Traps)[^\n]*\n[\s\S]*?)(\n\n## |\s*$)/m;
+  const body = traps.test(rule.body) ? rule.body.replace(traps, `$1\n${added}$2`) : `${rule.body.trimEnd()}\n${added}\n`;
+  return { reply: { message: 'Добавил строку в раздел «Ловушки».', proposal: { body, sources: rule.sources } }, sessionId };
+}
+
 /** One canned reply per `### d<k>` entry of the request. */
 const dispute = (userPrompt: string): DisputeBatchReply => ({
   replies: [...userPrompt.matchAll(/^### (d\d+)$/gm)].map((m) => ({
@@ -318,7 +344,8 @@ const dispute = (userPrompt: string): DisputeBatchReply => ({
 });
 
 /** Shaped like the CLI's JSON envelope so the Progress details show real numbers. */
-const envelope = (data: unknown) => ({
+const envelope = (data: unknown, sessionId?: string) => ({
+  ...(sessionId ? { session_id: sessionId } : {}),
   total_cost_usd: 0,
   usage: { input_tokens: 12, cache_creation_input_tokens: 3200, cache_read_input_tokens: 1450, output_tokens: 840 },
   structured_output: data,
@@ -327,13 +354,15 @@ const envelope = (data: unknown) => ({
 export const previewLlm: Llm = {
   async call(req: LlmRequest): Promise<LlmResult<unknown>> {
     let data: unknown;
+    let sessionId: string | undefined;
     switch (req.kind) {
       case 'generate_session': data = generate(req.userPrompt); break;
       case 'validate_session': data = validate(req.userPrompt); break;
       case 'grade': data = grade(req.userPrompt); break;
       case 'rule_draft': data = ruleDraft(req.userPrompt); break;
+      case 'rule_chat': ({ reply: data, sessionId } = ruleChat(req.userPrompt, req.resume ?? null)); break;
       case 'dispute': data = dispute(req.userPrompt); break;
     }
-    return { ok: true, data, costUsd: 0, durationMs: 5, raw: JSON.stringify(envelope(data)) };
+    return { ok: true, data, costUsd: 0, durationMs: 5, raw: JSON.stringify(envelope(data, sessionId)), ...(sessionId ? { sessionId } : {}) };
   },
 };

@@ -103,6 +103,156 @@
           "sidecar": false
         },
         {
+          "name": "claude-local-chat",
+          "cmd": "$HOME/.local/bin/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
+            "--strict-mcp-config",
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-local-chat-next",
+          "cmd": "$HOME/.local/bin/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
+            "--strict-mcp-config",
+            "--resume",
+            {
+              "validator": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "--fork-session",
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-local-chat-budget",
+          "cmd": "$HOME/.local/bin/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
+            "--strict-mcp-config",
+            "--max-budget-usd",
+            {
+              "validator": "^\\d+(\\.\\d+)?$"
+            },
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-local-chat-next-budget",
+          "cmd": "$HOME/.local/bin/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
+            "--strict-mcp-config",
+            "--resume",
+            {
+              "validator": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "--fork-session",
+            "--max-budget-usd",
+            {
+              "validator": "^\\d+(\\.\\d+)?$"
+            },
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
           "name": "claude-legacy-version",
           "cmd": "$HOME/.claude/local/claude",
           "args": [
@@ -181,6 +331,156 @@
             },
             "--no-session-persistence",
             "--strict-mcp-config",
+            "--max-budget-usd",
+            {
+              "validator": "^\\d+(\\.\\d+)?$"
+            },
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-legacy-chat",
+          "cmd": "$HOME/.claude/local/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
+            "--strict-mcp-config",
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-legacy-chat-next",
+          "cmd": "$HOME/.claude/local/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
+            "--strict-mcp-config",
+            "--resume",
+            {
+              "validator": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "--fork-session",
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-legacy-chat-budget",
+          "cmd": "$HOME/.claude/local/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
+            "--strict-mcp-config",
+            "--max-budget-usd",
+            {
+              "validator": "^\\d+(\\.\\d+)?$"
+            },
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-legacy-chat-next-budget",
+          "cmd": "$HOME/.claude/local/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
+            "--strict-mcp-config",
+            "--resume",
+            {
+              "validator": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "--fork-session",
             "--max-budget-usd",
             {
               "validator": "^\\d+(\\.\\d+)?$"
@@ -283,6 +583,156 @@
           "sidecar": false
         },
         {
+          "name": "claude-homebrew-chat",
+          "cmd": "/opt/homebrew/bin/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
+            "--strict-mcp-config",
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-homebrew-chat-next",
+          "cmd": "/opt/homebrew/bin/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
+            "--strict-mcp-config",
+            "--resume",
+            {
+              "validator": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "--fork-session",
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-homebrew-chat-budget",
+          "cmd": "/opt/homebrew/bin/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
+            "--strict-mcp-config",
+            "--max-budget-usd",
+            {
+              "validator": "^\\d+(\\.\\d+)?$"
+            },
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-homebrew-chat-next-budget",
+          "cmd": "/opt/homebrew/bin/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
+            "--strict-mcp-config",
+            "--resume",
+            {
+              "validator": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "--fork-session",
+            "--max-budget-usd",
+            {
+              "validator": "^\\d+(\\.\\d+)?$"
+            },
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
           "name": "claude-usr-local-version",
           "cmd": "/usr/local/bin/claude",
           "args": [
@@ -361,6 +811,156 @@
             },
             "--no-session-persistence",
             "--strict-mcp-config",
+            "--max-budget-usd",
+            {
+              "validator": "^\\d+(\\.\\d+)?$"
+            },
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-usr-local-chat",
+          "cmd": "/usr/local/bin/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
+            "--strict-mcp-config",
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-usr-local-chat-next",
+          "cmd": "/usr/local/bin/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
+            "--strict-mcp-config",
+            "--resume",
+            {
+              "validator": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "--fork-session",
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-usr-local-chat-budget",
+          "cmd": "/usr/local/bin/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
+            "--strict-mcp-config",
+            "--max-budget-usd",
+            {
+              "validator": "^\\d+(\\.\\d+)?$"
+            },
+            "--",
+            {
+              "validator": "^[\\s\\S]+$"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "claude-usr-local-chat-next-budget",
+          "cmd": "/usr/local/bin/claude",
+          "args": [
+            "-p",
+            "--output-format",
+            "json",
+            "--json-schema",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--system-prompt",
+            {
+              "validator": "^[\\s\\S]+$"
+            },
+            "--tools",
+            "",
+            "--model",
+            {
+              "validator": "^[a-z0-9.\\-]+$"
+            },
+            "--effort",
+            {
+              "validator": "^(low|medium|high)$"
+            },
+            "--strict-mcp-config",
+            "--resume",
+            {
+              "validator": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "--fork-session",
             "--max-budget-usd",
             {
               "validator": "^\\d+(\\.\\d+)?$"

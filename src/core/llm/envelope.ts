@@ -1,7 +1,7 @@
 import type { LlmErrorCode } from '@/core/ports';
 
 export type EnvelopeResult =
-  | { ok: true; data: unknown; costUsd: number }
+  | { ok: true; data: unknown; costUsd: number; sessionId?: string }
   | { ok: false; code: LlmErrorCode; message: string; costUsd: number };
 
 const NOT_SIGNED_IN = /not logged in|\blog ?in\b|authenticat|\/login/i;
@@ -40,7 +40,8 @@ export function parseEnvelope(stdout: string): EnvelopeResult {
     if (env.structured_output === undefined || env.structured_output === null) {
       return { ok: false, code: 'invalid_json', message: 'Envelope has no structured_output', costUsd };
     }
-    return { ok: true, data: env.structured_output, costUsd };
+    const sessionId = typeof env.session_id === 'string' && env.session_id !== '' ? env.session_id : undefined;
+    return { ok: true, data: env.structured_output, costUsd, ...(sessionId ? { sessionId } : {}) };
   }
   const errors = Array.isArray(env.errors) ? env.errors.filter((e): e is string => typeof e === 'string') : [];
   const text = [...errors, typeof env.result === 'string' ? env.result : ''].filter(Boolean).join('; ');

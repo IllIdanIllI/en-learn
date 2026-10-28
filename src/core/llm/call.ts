@@ -23,7 +23,7 @@ export async function callStructured<T>(
   deps: Deps,
   kind: LlmKind,
   userPrompt: string,
-  opts: { sessionId?: number; check?: (data: T) => string | null; maxAttempts?: number } = {},
+  opts: { sessionId?: number; check?: (data: T) => string | null; maxAttempts?: number; resume?: string | null; persist?: boolean } = {},
 ): Promise<LlmResult<T>> {
   const settings = await getSettings(deps.db);
   const prompt = await deps.prompts.load(kind);
@@ -43,6 +43,8 @@ export async function callStructured<T>(
       effort,
       budgetUsd: settings.budgetUsd,
       timeoutMs: kind === 'generate_session' ? 300000 : 120000,
+      ...(opts.persist ? { persist: true } : {}),
+      ...(opts.resume !== undefined ? { resume: opts.resume } : {}),
     });
     last = checked<T>(res, validate, opts.check);
     await insertLlmCall(deps.db, {
@@ -67,7 +69,7 @@ function checked<T>(
   check: ((data: T) => string | null) | undefined,
 ): LlmResult<T> {
   if (!res.ok) return res;
-  const base = { costUsd: res.costUsd, durationMs: res.durationMs, raw: res.raw };
+  const base = { costUsd: res.costUsd, durationMs: res.durationMs, raw: res.raw, ...(res.sessionId ? { sessionId: res.sessionId } : {}) };
   if (!validate(res.data)) {
     return { ok: false, code: 'schema', message: ajv.errorsText(validate.errors), ...base };
   }

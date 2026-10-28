@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS: Settings = {
   nativeLanguage: 'ru',
   models: {
     rule_draft: DEFAULT_MODEL,
+    rule_chat: DEFAULT_MODEL,
     generate_session: DEFAULT_MODEL,
     validate_session: DEFAULT_MODEL,
     grade: DEFAULT_MODEL,
@@ -26,6 +27,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   efforts: {
     rule_draft: 'medium',
+    rule_chat: 'medium',
     generate_session: 'medium',
     validate_session: 'medium',
     grade: 'high',

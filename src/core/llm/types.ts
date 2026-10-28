@@ -52,6 +52,8 @@ export interface GradeResult {
 
 export interface RuleDraft { body: string; sources: Source[] }
 
+export interface RuleChatReply { message: string; proposal: { body: string; sources: Source[] } | null }
+
 export interface DisputeReply {
   position: string;
   ruleSection: string;

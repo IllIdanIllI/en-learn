@@ -26,6 +26,29 @@ describe('buildClaudeArgs', () => {
     ]);
   });
 
+  const SID = '123e4567-e89b-42d3-a456-426614174000';
+
+  test('persist drops --no-session-persistence and keeps the rest in place', () => {
+    const a = buildClaudeArgs({ ...req(null), persist: true });
+    expect(a).toEqual([
+      '-p', '--output-format', 'json', '--json-schema', '{"type":"object"}',
+      '--system-prompt', 'line one\nline two', '--tools', '', '--model', 'claude-sonnet-5-5', '--effort', 'high',
+      '--strict-mcp-config', '--', 'the user prompt',
+    ]);
+  });
+
+  test('resume adds --resume <id> --fork-session after --strict-mcp-config, before the budget', () => {
+    const a = buildClaudeArgs({ ...req(0.3), persist: true, resume: SID });
+    expect(a.slice(11)).toEqual([
+      '--effort', 'high', '--strict-mcp-config', '--resume', SID, '--fork-session', '--max-budget-usd', '0.3', '--', 'the user prompt',
+    ]);
+    expect(a).not.toContain('--no-session-persistence');
+  });
+
+  test('resume null behaves like a first chat turn', () => {
+    expect(buildClaudeArgs({ ...req(null), persist: true, resume: null })).not.toContain('--resume');
+  });
+
   test('budget appends two args', () => {
     const a = buildClaudeArgs(req(0.3));
     expect(a).toHaveLength(19);
@@ -57,6 +80,24 @@ describe('ClaudeCli', () => {
     await new ClaudeCli(runner, 'local', '/work', '/home/u').call(req(0.3));
     expect(runner.calls[0]!.scope).toBe('claude-local-call-budget');
     expect(runner.calls[0]!.args.slice(-4)).toEqual(['--max-budget-usd', '0.3', '--', 'the user prompt']);
+  });
+
+  test('chat shapes: persist uses claude-local-chat, resume uses claude-local-chat-next, each with -budget', async () => {
+    const SID = '123e4567-e89b-42d3-a456-426614174000';
+    const runner = new FakeRunner([ok, ok, ok, ok]);
+    const cli = new ClaudeCli(runner, 'local', '/work', '/home/u');
+    await cli.call({ ...req(null), persist: true, resume: null });
+    await cli.call({ ...req(0.3), persist: true, resume: null });
+    await cli.call({ ...req(null), persist: true, resume: SID });
+    await cli.call({ ...req(0.3), persist: true, resume: SID });
+    expect(runner.calls.map((c) => c.scope)).toEqual([
+      'claude-local-chat', 'claude-local-chat-budget', 'claude-local-chat-next', 'claude-local-chat-next-budget',
+    ]);
+  });
+
+  test('returns the envelope session id', async () => {
+    const r = await new ClaudeCli(new FakeRunner([ok]), 'local', '/w', '/h').call({ ...req(null), persist: true });
+    expect(r).toMatchObject({ ok: true, sessionId: '899551ba-7f2a-50d4-9014-08e79b4f3f71' });
   });
 
   test('uses the given location in the scope name', async () => {

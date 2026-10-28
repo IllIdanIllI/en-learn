@@ -1,5 +1,5 @@
 import type { Llm, LlmRequest, LlmResult, ProcessRunner, RunResult } from '@/core/ports';
-import { buildClaudeArgs, scopeName, type ClaudeLocation } from '@/core/llm/claude';
+import { buildClaudeArgs, scopeName, shapeFor, type ClaudeLocation } from '@/core/llm/claude';
 import { failedRun, parseEnvelope } from '@/core/llm/envelope';
 
 export class ClaudeCli implements Llm {
@@ -11,7 +11,7 @@ export class ClaudeCli implements Llm {
   ) {}
 
   async call(req: LlmRequest): Promise<LlmResult<unknown>> {
-    const scope = scopeName(this.location, req.budgetUsd === null ? 'call' : 'call-budget');
+    const scope = scopeName(this.location, shapeFor(req));
     const env = { PATH: `${this.homeDir}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin` };
     const started = Date.now();
     let res: RunResult;
@@ -29,7 +29,7 @@ export class ClaudeCli implements Llm {
     if (failed) return fail(failed.code, failed.message, res.stdout, started);
     const parsed = parseEnvelope(res.stdout);
     const durationMs = Date.now() - started;
-    if (parsed.ok) return { ok: true, data: parsed.data, costUsd: parsed.costUsd, durationMs, raw: res.stdout };
+    if (parsed.ok) return { ok: true, data: parsed.data, costUsd: parsed.costUsd, durationMs, raw: res.stdout, ...(parsed.sessionId ? { sessionId: parsed.sessionId } : {}) };
     return { ok: false, code: parsed.code, message: parsed.message, costUsd: parsed.costUsd, durationMs, raw: res.stdout };
   }
 }

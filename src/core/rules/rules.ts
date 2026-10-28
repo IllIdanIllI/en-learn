@@ -6,7 +6,7 @@ import type { RuleDraft } from '@/core/llm/types';
 
 export type { Source } from '@/core/llm/types';
 
-const SKELETON: Record<'ru' | 'en', string[]> = {
+export const SKELETON: Record<'ru' | 'en', string[]> = {
   ru: ['Формула', 'Примеры', 'Объяснение', 'Ловушки', 'Источники'],
   en: ['Formula', 'Examples', 'Explanation', 'Traps', 'Sources'],
 };

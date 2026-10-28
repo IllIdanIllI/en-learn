@@ -22,3 +22,15 @@ Postponed by the learner; kept here for when caching is picked up again.
 - A hit needs an identical prefix: tools (the `--json-schema` structured-output tool) → system prompt → messages. Different call kinds have different schemas and prompts, so they can never share a cache. One conversation for all kinds of a day would re-send the growing history uncached and cost more.
 - Workable design: one CLI conversation **per day per call kind** (`--resume <id> --fork-session`, store the new `session_id` only after a successful, validated reply so failed attempts never enter the history; drop `--no-session-persistence`; +2 capability args per call shape). Gains appear only when a kind repeats in a day: a second grading round, "Add more questions", several dispute batches, retries.
 - Measure first: the lesson stats in the Progress log show input / cache read / cache write / output tokens per lesson.
+
+## Rule chat (measured)
+
+Real CLI 2.1.312, flags exactly as `buildClaudeArgs` builds them for `rule_chat` (persisted session, no `--no-session-persistence`), Haiku, effort low, empty cwd. Turn 1 sends the rule context and a question; turn 2 runs `--resume <id> --fork-session` and asks for a change (the reply carries a full proposal).
+
+| Turn | Input | Cache read | Cache write | Output | Cost |
+|---|---|---|---|---|---|
+| 1 (new session, question) | 2 | 0 | 6 384 | 999 | $0.0018 |
+| 2 (resume + fork, change request) | 2 | 6 384 | 1 054 | 2 331 | $0.0032 |
+
+- The whole first turn (CLI preamble, schema, system prompt, rule context, reply) is read from the cache on turn 2; only the new turn is written (1 054 tokens). The output of turn 2 is larger because it contains the complete proposed body.
+- In this sandbox `CLAUDE_CODE_SESSION_ID` is set in the environment and the CLI returned that same id for both turns, so a changed id after `--fork-session` was not observed here; the resume itself worked (cache read 6 384).

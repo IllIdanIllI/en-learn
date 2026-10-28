@@ -92,9 +92,9 @@ describe('callStructured', () => {
     const llm = new FakeLlm({ grade: [good({ word: 'a' })], generate_session: [good({ word: 'a' })] });
     const deps = await setup(llm);
     await setSetting(deps.db, 'models', {
-      rule_draft: 'm-r', generate_session: 'm-g', validate_session: 'm-v', grade: 'm-grade', dispute: 'm-d',
+      rule_draft: 'm-r', rule_chat: 'm-c', generate_session: 'm-g', validate_session: 'm-v', grade: 'm-grade', dispute: 'm-d',
     });
-    await setSetting(deps.db, 'efforts', { rule_draft: 'low', generate_session: 'low', validate_session: 'low', grade: 'medium', dispute: 'low' });
+    await setSetting(deps.db, 'efforts', { rule_draft: 'low', rule_chat: 'low', generate_session: 'low', validate_session: 'low', grade: 'medium', dispute: 'low' });
     await setSetting(deps.db, 'budgetUsd', 0.5);
     await callStructured(deps, 'grade', 'p', { sessionId: undefined });
     await callStructured(deps, 'generate_session', 'p');

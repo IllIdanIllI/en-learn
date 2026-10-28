@@ -34,6 +34,10 @@ export interface LlmRequest {
   effort: Effort;
   budgetUsd: number | null;
   timeoutMs: number;
+  /** Chat only: previous CLI session to continue (forked); null starts a new one. Implies persist. */
+  resume?: string | null;
+  /** Keep the CLI session on disk (omits --no-session-persistence). */
+  persist?: boolean;
 }
 
 export type LlmErrorCode =
@@ -47,7 +51,7 @@ export type LlmErrorCode =
   | 'spawn_failed';
 
 export type LlmResult<T> =
-  | { ok: true; data: T; costUsd: number; durationMs: number; raw: string }
+  | { ok: true; data: T; costUsd: number; durationMs: number; raw: string; sessionId?: string }
   | {
       ok: false;
       code: LlmErrorCode;

@@ -3,9 +3,9 @@ import { Ajv } from 'ajv';
 import { describe, expect, test } from 'vitest';
 import { bundledPrompts } from '@/core/llm/bundledPrompts';
 import type { LlmKind } from '@/core/domain';
-import type { DisputeBatchReply, GeneratedSession, GradeResult, RuleDraft, ValidationResult } from '@/core/llm/types';
+import type { DisputeBatchReply, GeneratedSession, GradeResult, RuleChatReply, RuleDraft, ValidationResult } from '@/core/llm/types';
 
-const kinds: LlmKind[] = ['rule_draft', 'generate_session', 'validate_session', 'grade', 'dispute'];
+const kinds: LlmKind[] = ['rule_draft', 'rule_chat', 'generate_session', 'validate_session', 'grade', 'dispute'];
 const ajv = new Ajv({ allErrors: true, strict: true });
 const fixture = (kind: string, which: 'valid' | 'invalid'): unknown =>
   JSON.parse(readFileSync(`tests/fixtures/llm/${kind}.${which}.json`, 'utf8'));
@@ -16,6 +16,7 @@ export const typedFixtures = [
   fixture('validate_session', 'valid') as ValidationResult,
   fixture('grade', 'valid') as GradeResult,
   fixture('rule_draft', 'valid') as RuleDraft,
+  fixture('rule_chat', 'valid') as RuleChatReply,
   fixture('dispute', 'valid') as DisputeBatchReply,
 ];
 
@@ -60,7 +61,7 @@ describe.each(kinds)('%s', (kind) => {
 });
 
 test('learner-facing prompts use the native language placeholder', () => {
-  for (const kind of ['rule_draft', 'grade', 'dispute'] as const) {
+  for (const kind of ['rule_draft', 'rule_chat', 'grade', 'dispute'] as const) {
     expect(bundledPrompts[kind].system).toContain('{{nativeLanguage}}');
   }
 });

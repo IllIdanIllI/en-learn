@@ -94,6 +94,7 @@ export const ru: Record<keyof typeof en, string> = {
   'settings.dataDir.err.failed': 'Не удалось перенести данные: {message}',
   'settings.dataDir.err.location': 'Файл location.json повреждён, используется папка по умолчанию: {message}',
   'llm.rule_draft': 'Черновики правил',
+  'llm.rule_chat': 'Чат о правиле',
   'llm.generate_session': 'Составление занятия',
   'llm.validate_session': 'Проверка занятия',
   'llm.grade': 'Проверка ответов',

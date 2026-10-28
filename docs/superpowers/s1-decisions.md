@@ -81,7 +81,7 @@ Spec `specs/2026-10-28-s1-feedback-round-3.md`, plan `plans/2026-10-28-s1-feedba
 - The fix-block format example always shows an error sentence and its fix, not "→ верно": task content must stay English (a code check rejects Cyrillic) — cost if wrong: no example of the ✓ case.
 - "Not counted: TD-2…" items were sentences removed by the quality check; they are now never shown (scores were already right) — cost if wrong: none.
 - Every graded lesson gets the close button in the sticky bar; the added-round layout also applies while the round is still open — cost if wrong: layout only.
-- A wrong item answered ✓ still shows a struck "✓ → fix" in the lesson view (it shows what was pressed); the error bank shows the sentence fragment instead — cost if wrong: one more tick on screen.
+- An item answered ✓ never shows the ✓ after the chip, right or wrong; a wrong one shows only "→ fix" — cost if wrong: the pressed ✓ is not echoed.
 - The error-bank context is cut by code (4 words each side) from stored data, so old errors get it too; the rule-draft prompt now receives these snippets instead of bare answers — cost if wrong: rule drafts see slightly different input.
 
 ## Still open
@@ -93,4 +93,5 @@ Spec `specs/2026-10-28-s1-feedback-round-3.md`, plan `plans/2026-10-28-s1-feedba
 - **Feedback round, Mac-only checks**: moving the data folder (checklist G–J: move, restart, refusals, failure keeps the old folder), the folder picker and the confirm dialog.
 - **Feedback round, small known limitations** (from reviews, not fixed): moving prompts deletes the old `prompts/` folder recursively; once moved there is no "back to default" button; empty folders created by a failed move stay; Check/Finish are not disabled while a session is rebuilt; one e2e test is timing-sensitive under load.
 - **Round 2 small known limitations**: the Progress page loads full CLI responses for stats (fine now; `json_extract` later); the stats toggle is small (24px) with no `aria-controls`; evals now run with the default efforts (grade high).
+- **Round 3 small known limitations** (from reviews, not fixed): the "previous questions" toggle has no `aria-controls`; a spelling error answered with nothing or ✓ shows the hint as "Было" and again under it; no e2e for a third added round or for disputing an earlier item after unfolding (logic checked by review).
 - **Design pass**: the learner noted the UI looks generic ("Claudified"); revisit after trying the app.

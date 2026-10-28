@@ -4,6 +4,7 @@ import { replayTopics, type TopicFact, type TopicState } from '@/core/schedule/t
 import { replaySpelling, type SpellingFact, type WordState } from '@/core/schedule/spelling';
 import { listGradedAnswerRows, listGradedSpellingAttempts } from '@/core/db/repos/answers';
 import { listGradedSessions, sessionCounts, sessionPatterns } from '@/core/db/repos/sessions';
+import { summarizeCalls } from './usage';
 import { progressLog, type ErrorBankInput, type ProgressLogRow, type ScoredItem } from './derive';
 
 export type GradedFacts = {
@@ -81,6 +82,7 @@ export async function loadProgressLog(db: Db): Promise<ProgressLogRow[]> {
       disputes: counts.get(s.id)?.disputes ?? 0,
       defects: counts.get(s.id)?.defects ?? 0,
       costUsd: counts.get(s.id)?.costUsd ?? 0,
+      usage: summarizeCalls(counts.get(s.id)?.calls ?? []),
     })),
   );
 }

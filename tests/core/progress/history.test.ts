@@ -91,10 +91,25 @@ describe('loadProgressLog', () => {
       costUsd: 0.75,
       errorCount: 3,
     });
+    expect(log[0]?.usage).toEqual({ models: ['m'], calls: 2, failedCalls: 0, tokens: { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 } });
     expect(log[0]?.scores).toEqual([
       { blockId: 1, correct: 1, counted: 3 },
       { blockId: 2, correct: 0, counted: 1 },
     ]);
+  });
+});
+
+describe('loadProgressLog usage', () => {
+  test('models in first-use order, failed calls and tokens come from the stored envelopes', async () => {
+    const db = await createTestDb();
+    await seed(db);
+    const env = JSON.stringify({ usage: { input_tokens: 3, cache_read_input_tokens: 4, cache_creation_input_tokens: 5, output_tokens: 6 } });
+    await db.execute(
+      "INSERT INTO llm_call (session_id, kind, model, cost_usd, duration_ms, ok, error, response, created_at) VALUES (1,'grade','claude-b',0,1,0,'x','', 'x'),(1,'grade','claude-b',0,1,1,NULL,?, 'x')",
+      [env],
+    );
+    const log = await loadProgressLog(db);
+    expect(log[0]?.usage).toEqual({ models: ['m', 'claude-b'], calls: 4, failedCalls: 1, tokens: { input: 3, cacheRead: 4, cacheWrite: 5, output: 6 } });
   });
 });
 

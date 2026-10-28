@@ -317,6 +317,13 @@ const dispute = (userPrompt: string): DisputeBatchReply => ({
   })),
 });
 
+/** Shaped like the CLI's JSON envelope so the Progress details show real numbers. */
+const envelope = (data: unknown) => ({
+  total_cost_usd: 0,
+  usage: { input_tokens: 12, cache_creation_input_tokens: 3200, cache_read_input_tokens: 1450, output_tokens: 840 },
+  structured_output: data,
+});
+
 export const previewLlm: Llm = {
   async call(req: LlmRequest): Promise<LlmResult<unknown>> {
     let data: unknown;
@@ -327,6 +334,6 @@ export const previewLlm: Llm = {
       case 'rule_draft': data = ruleDraft(req.userPrompt); break;
       case 'dispute': data = dispute(req.userPrompt); break;
     }
-    return { ok: true, data, costUsd: 0, durationMs: 5, raw: JSON.stringify(data) };
+    return { ok: true, data, costUsd: 0, durationMs: 5, raw: JSON.stringify(envelope(data)) };
   },
 };

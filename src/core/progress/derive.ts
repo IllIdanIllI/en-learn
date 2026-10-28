@@ -1,5 +1,6 @@
 import type { BlockFormat, BlockKind, EffectiveVerdict, ISODate, SessionStatus, Verdict } from '@/core/domain';
 import { addDays, daysBetween } from '@/core/dates';
+import type { SessionUsage } from './usage';
 
 export type ScoredItem = { blockId: number; blockKind: BlockKind; format: BlockFormat; verdict: EffectiveVerdict };
 export type BlockScore = { blockId: number; correct: number; counted: number };
@@ -102,6 +103,7 @@ export type ProgressLogInput = {
   disputes: number;
   defects: number;
   costUsd: number;
+  usage: SessionUsage;
 };
 
 export type ProgressLogRow = {
@@ -115,6 +117,7 @@ export type ProgressLogRow = {
   disputes: number;
   defects: number;
   costUsd: number;
+  usage: SessionUsage;
 };
 
 export function progressLog(input: ProgressLogInput[]): ProgressLogRow[] {
@@ -130,6 +133,7 @@ export function progressLog(input: ProgressLogInput[]): ProgressLogRow[] {
       disputes: s.disputes,
       defects: s.defects,
       costUsd: s.costUsd,
+      usage: s.usage,
     }))
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.sessionId - a.sessionId));
 }

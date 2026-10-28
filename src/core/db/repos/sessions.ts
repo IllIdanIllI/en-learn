@@ -1,5 +1,6 @@
 import type { Db } from '@/core/ports';
 import type { BlockFormat, BlockKind, ISODate, ItemStatus, SessionStatus } from '@/core/domain';
+import type { CallStat } from '@/core/progress/usage';
 import { getSettings, setSetting } from './settings';
 
 export interface GradedSession {
@@ -33,12 +34,12 @@ export async function sessionPatterns(db: Db): Promise<Map<number, string[]>> {
 
 export async function sessionCounts(
   db: Db,
-): Promise<Map<number, { disputes: number; defects: number; costUsd: number }>> {
-  const out = new Map<number, { disputes: number; defects: number; costUsd: number }>();
+): Promise<Map<number, { disputes: number; defects: number; costUsd: number; calls: CallStat[] }>> {
+  const out = new Map<number, { disputes: number; defects: number; costUsd: number; calls: CallStat[] }>();
   const get = (id: number) => {
     let v = out.get(id);
     if (!v) {
-      v = { disputes: 0, defects: 0, costUsd: 0 };
+      v = { disputes: 0, defects: 0, costUsd: 0, calls: [] };
       out.set(id, v);
     }
     return v;
@@ -58,6 +59,10 @@ export async function sessionCounts(
     'SELECT session_id, SUM(cost_usd) AS cost FROM llm_call WHERE session_id IS NOT NULL GROUP BY session_id',
   );
   for (const r of costs) get(r.session_id).costUsd = r.cost;
+  const calls = await db.select<{ session_id: number; model: string; ok: number; response: string | null }>(
+    'SELECT session_id, model, ok, response FROM llm_call WHERE session_id IS NOT NULL ORDER BY id',
+  );
+  for (const r of calls) get(r.session_id).calls.push({ model: r.model, ok: r.ok === 1, response: r.response });
   return out;
 }
 

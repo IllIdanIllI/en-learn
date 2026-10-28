@@ -620,6 +620,23 @@ test.describe('rules, error bank and progress', () => {
     await expect(page).toHaveURL(/#\/rules\/\d+$/);
   });
 
+  test('a lesson row expands to its models, calls and tokens', async ({ page }) => {
+    await page.goto('/?state=progress#/progress');
+    const log = page.getByRole('table', { name: 'Журнал занятий' });
+    await log.scrollIntoViewIfNeeded();
+    const toggle = log.getByRole('button', { name: 'Подробнее' }).first();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const details = log.getByTestId('log-details').first();
+    await expect(details).toContainText(/Модели: [a-z0-9-]+/);
+    await expect(details).not.toContainText('claude-');
+    await expect(details).toContainText(/\d+ вызов/);
+    await expect(details).toContainText(/[1-9]\d* ввод/);
+    await toggle.click();
+    await expect(log.getByTestId('log-details')).toHaveCount(0);
+  });
+
   test('progress in English', async ({ page }) => {
     await page.goto('/?state=progress#/settings');
     await page.getByRole('radio', { name: 'English' }).click();

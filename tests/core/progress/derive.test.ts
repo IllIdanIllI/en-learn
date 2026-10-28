@@ -100,6 +100,8 @@ describe('consistency', () => {
   });
 });
 
+const USAGE = { models: ['claude-m'], calls: 2, failedCalls: 1, tokens: { input: 1, cacheRead: 2, cacheWrite: 3, output: 4 } };
+
 describe('progressLog', () => {
   test('counts errors, scores and passes through extras', () => {
     const out = progressLog([
@@ -113,6 +115,7 @@ describe('progressLog', () => {
         disputes: 1,
         defects: 2,
         costUsd: 0.5,
+        usage: USAGE,
       },
     ]);
     expect(out).toEqual([
@@ -130,12 +133,13 @@ describe('progressLog', () => {
         disputes: 1,
         defects: 2,
         costUsd: 0.5,
+        usage: USAGE,
       },
     ]);
   });
 
   test('newest first', () => {
-    const base = { title: 'S', isLight: false, items: [], patterns: [], disputes: 0, defects: 0, costUsd: 0 };
+    const base = { title: 'S', isLight: false, items: [], patterns: [], disputes: 0, defects: 0, costUsd: 0, usage: USAGE };
     const out = progressLog([
       { ...base, sessionId: 1, date: '2026-10-01' },
       { ...base, sessionId: 2, date: '2026-10-02' },

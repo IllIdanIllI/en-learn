@@ -7,7 +7,6 @@ import { useSessionActions } from './sessionActions';
 
 function notCountedReason(item: ViewItem, lang: Lang): string | null {
   const a = item.answer;
-  if (item.status === 'defect') return item.note || t(lang, 'reason.defect');
   if (item.status === 'dropped' || a?.disputeDecision === 'drop') return t(lang, 'reason.dropped');
   if (a?.verdict === 'rule_gap' && item.effective === null) return t(lang, 'reason.ruleGap');
   if (a?.verdict === 'skipped') return t(lang, 'reason.skipped');
@@ -47,7 +46,7 @@ export function GradedItem({ item, number, lang }: { item: ViewItem; number?: nu
             </>
           ) : (
             <>
-              {a && a.text !== '' && <span className={cn(ok ? '' : 'text-muted-foreground', wrong && 'line-through')}>{a.text}</span>}
+              {a && a.text !== '' && !(ok && a.text.trim() === '✓') && <span className={cn(ok ? '' : 'text-muted-foreground', wrong && 'line-through')}>{a.text}</span>}
               {wrong && expected !== '' && <span className="font-semibold text-success">→ {expected}</span>}
             </>
           )}

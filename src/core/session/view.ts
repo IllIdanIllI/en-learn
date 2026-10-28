@@ -173,7 +173,7 @@ export async function loadSessionView(db: Db, sessionId: number): Promise<Sessio
     const isSpot = b.format === 'spot';
     const isQuestion = b.format === 'question';
     const blockGraded = graded && (isQuestion || rows.every((r) => r.status !== 'active' || r.has_answer !== null));
-    const visible = rows.filter((r) => blockGraded || r.status !== 'defect');
+    const visible = rows.filter((r) => r.status !== 'defect');
     const passage = b.passage === null || isQuestion ? [] : (JSON.parse(b.passage) as string[]);
     return {
       id: b.id, ord: b.ord, kind: b.kind, format: b.format, title: b.title, instruction: b.instruction,

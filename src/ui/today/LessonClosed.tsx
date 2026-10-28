@@ -12,7 +12,7 @@ export function LessonClosed({ lang, loader, showingResults, onToggleResults, on
       <h1 className="headline">{t(lang, 'today.closed')}</h1>
       <div className="mt-6 flex items-center gap-3">
         <Button variant="secondary" aria-expanded={showingResults} disabled={adding} onClick={onToggleResults}>
-          {t(lang, 'today.showResults')}
+          {t(lang, showingResults ? 'today.hideResults' : 'today.showResults')}
         </Button>
         <Button disabled={adding} onClick={onAddMore}>{t(lang, 'today.addMore')}</Button>
       </div>

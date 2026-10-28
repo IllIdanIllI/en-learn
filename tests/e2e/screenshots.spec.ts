@@ -155,7 +155,7 @@ test.describe('today session', () => {
     const html = await page.content();
     expect(html).not.toContain('an elephant');
     expect(html).not.toContain('a teacher');
-    const input = page.getByPlaceholder('✓ или исправленный фрагмент').first();
+    const input = page.getByPlaceholder('исправленный фрагмент').first();
     await expect(input).toHaveAttribute('spellcheck', 'false');
     await expect(input).toHaveAttribute('autocorrect', 'off');
     await expect(input).toHaveAttribute('autocapitalize', 'off');
@@ -175,7 +175,7 @@ test.describe('today session', () => {
 
   test('blank and shorthand answers raise inline questions', async ({ page }) => {
     await page.goto('/?state=questions#/today');
-    const inputs = page.getByPlaceholder('✓ или исправленный фрагмент');
+    const inputs = page.getByPlaceholder('исправленный фрагмент');
     await inputs.nth(1).fill('~');
     await page.getByRole('button', { name: 'Проверить ответы' }).click();
     await expect(page.getByText('Пропустить это задание?').first()).toBeVisible();
@@ -204,7 +204,7 @@ test.describe('today session', () => {
 
   test('the ✓ toggle inside a fix input marks the item as correct and can be undone', async ({ page }) => {
     await page.goto('/?state=generated#/today');
-    const inputs = page.getByPlaceholder('✓ или исправленный фрагмент');
+    const inputs = page.getByPlaceholder('исправленный фрагмент');
     const marks = page.getByRole('button', { name: 'Отметить как верное' });
     await expect(marks).toHaveCount(await inputs.count());
     const first = inputs.first();
@@ -242,8 +242,11 @@ test.describe('today session', () => {
     await page.goto('/?state=graded#/today');
     await expect(page.getByRole('heading', { name: 'Исправить' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Что повторить завтра' })).toBeVisible();
-    await expect(page.getByText('✗').first()).toBeVisible();
-    await expect(page.getByText('✓', { exact: false }).first()).toBeVisible();
+    const chips = page.locator('.label').filter({ hasText: /^(Верно|Неверно|Найдено|Не найдено)$/ });
+    await expect(chips.first()).toBeVisible();
+    const words = await chips.allTextContents();
+    expect(words).toContain('Неверно');
+    expect(words.filter((w) => /[✓✗]/.test(w))).toEqual([]);
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toHaveCount(0);
     expect(await page.content()).toContain('a teacher');
     await page.screenshot({ path: `${SHOTS}/today-graded.png`, fullPage: true });
@@ -259,6 +262,9 @@ test.describe('today session', () => {
     await expect(page.getByRole('heading', { name: 'Итоги' })).toBeVisible();
     expect(await page.content()).toContain('a teacher');
     await expect(page.getByRole('button', { name: 'Закрыть урок' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Скрыть результаты' }).click();
+    await expect(page.getByRole('heading', { name: 'Итоги' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Показать результаты' })).toBeVisible();
   });
 
   test('a closed lesson stays closed on a later visit; Add more questions opens a new round', async ({ page }) => {

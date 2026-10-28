@@ -94,10 +94,9 @@ describe('loadSessionView after grading', () => {
     expect(spelling!.items[0]).toMatchObject({ expected: 'necessary', effective: 'wrong', answer: { text: 'necesary', verdict: 'wrong', fix: 'necessary' } });
     expect(spelling!.score).toEqual({ correct: 0, counted: 1 });
 
-    expect(gap!.items.map((i) => i.effective)).toEqual(['correct', null, null]);
+    expect(gap!.items.map((i) => i.effective)).toEqual(['correct', null]);
     expect(gap!.items[0]!.expected).toBe('KEY-AN');
     expect(gap!.items[1]).toMatchObject({ answer: { verdict: 'rule_gap', vocabularyNote: 'best: superlative' }, gap: { status: 'pending', proposal: 'New rule body' } });
-    expect(gap!.items[2]).toMatchObject({ status: 'defect', note: 'two answers possible', answer: null, effective: null });
     expect(gap!.score).toEqual({ correct: 1, counted: 1 });
 
     expect(spot!.items).toEqual([]);
@@ -109,6 +108,20 @@ describe('loadSessionView after grading', () => {
 
     expect(speaking!.score).toBeUndefined();
     expect(view.feedback).toEqual({ patterns: ['Pattern one'], tomorrow: ['Review a/an'] });
+  });
+
+  test('removed (defect) items are not returned after grading and do not change the scores', async () => {
+    const db = await createTestDb();
+    const { sid, b2 } = await build(db);
+    await insertItem(db, b2, 2, { ...base, prompt: 'Removed', expected: 'KEY-SPOT-DEFECT', paragraph: 0, status: 'defect', note: 'two answers possible' });
+    await grade(db, sid);
+    const view = await loadSessionView(db, sid);
+    expect(JSON.stringify(view)).not.toContain('KEY-DEFECT');
+    expect(JSON.stringify(view)).not.toContain('KEY-SPOT-DEFECT');
+    expect(view.blocks[1]!.items.map((i) => i.prompt)).toEqual(['She bought ___ umbrella.', 'He is ___ best.']);
+    expect(view.blocks[1]!.score).toEqual({ correct: 1, counted: 1 });
+    expect(view.blocks[2]!.paragraphs[0]!.errors!.map((e) => e.prompt)).toEqual(['A old', 'a idea']);
+    expect(view.blocks[2]!.score).toEqual({ correct: 1, counted: 2 });
   });
 
   test('a dispute decision changes the effective verdict', async () => {

@@ -178,8 +178,8 @@ function reviewBlock(allowed: string[], due: string[]): GeneratedBlock {
   const items = keys.flatMap((k) => bankFor(k).fix.map((f) => item(f, k, f === bankFor(k).fix[0])));
   return {
     kind: 'review', format: 'fix', title: 'Повторение',
-    instruction: 'Напишите ✓, если предложение верно, иначе исправленный фрагмент.',
-    formatExample: 'If it rains, we stay at home. → ✓', minutes: 5,
+    instruction: 'Если предложение верно, нажмите ✓, иначе впишите исправленный фрагмент.',
+    formatExample: 'He go to work by bus. → goes', minutes: 5,
     items: items.slice(0, Math.max(12, keys.length)), paragraphs: [], question: '',
   };
 }
@@ -201,8 +201,8 @@ function taskBlock(format: string, key: string, extra = false): GeneratedBlock {
   if (format === 'fix') {
     return {
       ...base, format: 'fix', title: 'Задание дня',
-      instruction: 'Напишите ✓, если предложение верно, иначе исправленный фрагмент.',
-      formatExample: 'If it rains, we stay at home. → ✓',
+      instruction: 'Если предложение верно, нажмите ✓, иначе впишите исправленный фрагмент.',
+      formatExample: 'He go to work by bus. → goes',
       items: (extra ? (EXTRA_FIX[key] ?? (EXTRA_FIX[FALLBACK] as { prompt: string; expected: string; wrong?: string }[])) : bank.fix).map((f) => item(f, key, false)),
       paragraphs: [],
     };

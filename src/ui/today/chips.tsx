@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 
-/** Icon plus word, never colour alone. */
+/** The verdict word on a tinted chip; the word, not colour alone, carries the verdict. */
 export function VerdictChip({ ok, label }: { ok: boolean; label: string }) {
   return (
     <span
@@ -9,7 +9,6 @@ export function VerdictChip({ ok, label }: { ok: boolean; label: string }) {
         ok ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive',
       )}
     >
-      <span aria-hidden>{ok ? '✓' : '✗'}</span>
       {label}
     </span>
   );

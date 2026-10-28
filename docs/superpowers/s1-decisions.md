@@ -84,6 +84,15 @@ Spec `specs/2026-10-28-s1-feedback-round-3.md`, plan `plans/2026-10-28-s1-feedba
 - An item answered ✓ never shows the ✓ after the chip, right or wrong; a wrong one shows only "→ fix" — cost if wrong: the pressed ✓ is not echoed.
 - The error-bank context is cut by code (4 words each side) from stored data, so old errors get it too; the rule-draft prompt now receives these snippets instead of bare answers — cost if wrong: rule drafts see slightly different input.
 
+## Feedback round 4 decisions (2026-10-28)
+
+Spec `specs/2026-10-28-s1-feedback-round-4.md`, plan `plans/2026-10-28-s1-feedback-round-4.md`.
+
+- Words shared by both fragments move into the muted context and count toward its 4-word window — cost if wrong: a little less outer context.
+- "Solve skipped" is not offered while the lesson has an unanswered added round; that round is answered first on the normal page — cost if wrong: skipped items wait a little.
+- Items left unanswered after "Solve skipped" (leaving mid-way) are still counted and offered, so yesterday's are never stranded — cost if wrong: none.
+- Skipped spelling items are solvable (K4) but, as before, only skipped gap and fix items return as review input in the next lesson — cost if wrong: a skipped spelling word is not reviewed unless solved.
+
 ## Still open
 
 - **Mac-only checks** (`docs/macos-checklist.md`): `$HOME` in the shell permission, long multi-line arguments, plugin-sql migrations, the not-signed-in output, PATH/HOME when launched from Finder. Not verifiable in the Linux build container.

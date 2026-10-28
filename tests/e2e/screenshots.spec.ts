@@ -721,7 +721,11 @@ test.describe('rules, error bank and progress', () => {
 
     await expect(logCards).toContainText(/Повторение.*2 из 4 · 50%/);
     const firstCard = logCards.getByRole('listitem').filter({ has: page.getByRole('heading') }).first();
-    await expect(firstCard.getByTestId('log-blocks').getByRole('listitem').first()).toContainText(/ — \d+ из \d+/);
+    const blockLine = firstCard.getByTestId('log-blocks').getByRole('listitem').filter({ hasText: 'Орфография' });
+    await expect(blockLine).toHaveText('Орфография — 2 из 4');
+    await expect(blockLine.locator('strong')).toHaveText(['2', '4']);
+    await expect(firstCard.getByTestId('log-total')).toHaveText('3 из 6 · 50%');
+    await expect(firstCard.getByTestId('log-total').locator('strong')).toHaveText(['3', '6', '50%']);
     expect(await firstCard.getByTestId('log-blocks').getByRole('listitem').count()).toBeGreaterThan(0);
     expect(await firstCard.getByTestId('log-total').evaluate((el) => Number(getComputedStyle(el).fontWeight))).toBeGreaterThanOrEqual(600);
     expect(await firstCard.getByRole('heading').evaluate((el) => Number(getComputedStyle(el).fontWeight))).toBeGreaterThanOrEqual(600);

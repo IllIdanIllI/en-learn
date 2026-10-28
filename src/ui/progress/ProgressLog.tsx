@@ -4,6 +4,12 @@ import { t, type Lang } from '@/core/i18n';
 import type { ProgressLogRow } from '@/core/progress/derive';
 import { Button } from '@/ui/components/ui/button';
 
+/** Splits a block title at its first ": " so the part before it can be bold. */
+export function splitTitle(title: string): { head: string; tail: string } {
+  const i = title.indexOf(': ');
+  return i < 0 ? { head: '', tail: title } : { head: title.slice(0, i), tail: title.slice(i) };
+}
+
 /** One card per graded session, newest first. Numbers are tabular so they line up. */
 export function ProgressLog({ rows, blockTitles, lang }: { rows: ProgressLogRow[]; blockTitles: Map<number, string>; lang: Lang }) {
   if (rows.length === 0) return <p className="mt-4 text-muted-foreground">{t(lang, 'progress.log.empty')}</p>;
@@ -31,16 +37,20 @@ function LogCard({ r, blockTitles, lang }: { r: ProgressLogRow; blockTitles: Map
       </div>
       {counted > 0 && (
         <p data-testid="log-total" className="tabular mt-2 text-lg font-bold">
-          {t(lang, 'progress.total', { x: correct, y: counted, p: Math.round((correct * 100) / counted) })}
+          <Score x={correct} y={counted} lang={lang} /> · <strong>{Math.round((correct * 100) / counted)}%</strong>
         </p>
       )}
       {r.scores.length > 0 && (
         <ul data-testid="log-blocks" className="tabular mt-2 flex flex-col gap-0.5">
-          {r.scores.map((s) => (
-            <li key={s.blockId}>
-              {blockTitles.get(s.blockId) ?? ''} — <strong>{t(lang, 'progress.score', { x: s.correct, y: s.counted })}</strong>
-            </li>
-          ))}
+          {r.scores.map((s) => {
+            const { head, tail } = splitTitle(blockTitles.get(s.blockId) ?? '');
+            return (
+              <li key={s.blockId}>
+                {head && <strong>{head}</strong>}
+                {tail} — <Score x={s.correct} y={s.counted} lang={lang} />
+              </li>
+            );
+          })}
         </ul>
       )}
       <p className="tabular mt-2">
@@ -69,6 +79,14 @@ function LogCard({ r, blockTitles, lang }: { r: ProgressLogRow; blockTitles: Map
         </div>
       )}
     </li>
+  );
+}
+
+function Score({ x, y, lang }: { x: number; y: number; lang: Lang }) {
+  return (
+    <>
+      <strong>{x}</strong> {t(lang, 'progress.of')} <strong>{y}</strong>
+    </>
   );
 }
 

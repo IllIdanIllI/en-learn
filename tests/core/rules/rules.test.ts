@@ -220,7 +220,7 @@ describe('ruleSections', () => {
 });
 
 describe('draftRule', () => {
-  test('context excludes inattention and spelling rows, and carries topic, language, skeleton and existing body', async () => {
+  test('context carries topic, language, skeleton and existing body, never the learner error rows', async () => {
     const db = await createTestDb();
     const topicId = await insertTopic(db, 'cond', 'Conditionals', 1);
     const { ruleId } = await saveRuleVersion(db, { topicId }, 'EXISTING BODY MARK', [], 'seed', NOW);
@@ -245,14 +245,15 @@ describe('draftRule', () => {
     expect(text).toContain('Russian');
     for (const h of SKELETON_RU) expect(text).toContain(h);
     expect(text).toContain('EXISTING BODY MARK');
-    expect(text).toContain('will be');
-    expect(text).toContain('were');
+    expect(text).not.toContain("Learner's error-bank rows");
+    expect(text).not.toContain('will be');
+    expect(text).not.toContain('were');
     expect(text).not.toContain('wrt');
     expect(text).not.toContain('recieve');
     expect(text).not.toContain('receive');
   });
 
-  test('the error lines carry plain sentences: an extra word leaves no "__" placeholder', async () => {
+  test('the draft message has no error-bank section even when the topic has grammar errors', async () => {
     const db = await createTestDb();
     const topicId = await insertTopic(db, 'art', 'Articles', 1);
     await insertGradedAnswers(db, [{ topicId, prompt: 'I like the films a lot.', text: '✓', fix: 'films', isInattention: false }]);
@@ -263,8 +264,9 @@ describe('draftRule', () => {
     await draftRule(depsWith(db, llm), topicId);
 
     const text = llm.calls[0]!.userPrompt;
-    expect(text).toContain('I like the films a lot.');
-    expect(text).toContain('I like films a lot.');
+    expect(text).not.toContain("Learner's error-bank rows");
+    expect(text).not.toContain('I like the films a lot.');
+    expect(text).not.toContain('I like films a lot.');
     expect(text).not.toContain('__');
   });
 

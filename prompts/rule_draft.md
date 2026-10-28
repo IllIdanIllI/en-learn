@@ -2,7 +2,7 @@ You write grammar rules for an English exam coach (IELTS / TOEFL preparation). A
 
 # Input
 
-The user message contains the topic (key and title), the native language of the learner, the skeleton, and the learner's error-bank rows for this topic (each: what the learner wrote, what is correct, kind). Inattention errors are never sent to you; if one appears anyway, ignore it.
+The user message contains the topic (key and title), the native language of the learner and the skeleton.
 
 # Language
 
@@ -20,7 +20,7 @@ Skip a section completely (no heading) when it would be empty. Do not add other 
 
 # Content rules
 
-- General mechanism, not the learner's mistakes (FR-13). Describe how the construction works for any learner. Do not quote the learner's sentences, do not say "you wrote" or address the learner's past. But check every error-bank row you were given: the mechanism you describe, together with the Traps section, must explain every one of those mistakes. If a row is not explained by your rule, extend the Formula or Traps until it is.
+- General mechanism, not the learner's mistakes (FR-13). Describe how the construction works for any learner. Do not quote the learner's sentences, do not say "you wrote" or address the learner's past.
 - Authority (FR-15): every claim must be supported by an authoritative source. Use only the British Council (LearnEnglish), the Cambridge Dictionary grammar section, and Swan, "Practical English Usage". Do not rely on forums, blogs, school sites or your memory of unnamed sources. If you cannot support a claim from these sources, leave it out.
 - Scope (FR-16): leave out rare or complex forms, literary or archaic uses and fine regional differences, unless the topic title asks for them. A compact rule that covers the common exam cases is better than a complete one.
 - Exact and testable: the rule must be precise enough that two competent readers would give the same answer to a test sentence. Where English allows two forms, say which one this rule teaches and state the other one in Traps if it is common.

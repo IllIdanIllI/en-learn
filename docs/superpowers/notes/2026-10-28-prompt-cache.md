@@ -34,3 +34,4 @@ Real CLI 2.1.312, flags exactly as `buildClaudeArgs` builds them for `rule_chat`
 
 - The whole first turn (CLI preamble, schema, system prompt, rule context, reply) is read from the cache on turn 2; only the new turn is written (1 054 tokens). The output of turn 2 is larger because it contains the complete proposed body.
 - In this sandbox `CLAUDE_CODE_SESSION_ID` is set in the environment and the CLI returned that same id for both turns, so a changed id after `--fork-session` was not observed here; the resume itself worked (cache read 6 384).
+- Fork check (clean environment, `env -i`, Haiku, 3 turns, each `--resume <previous id> --fork-session`): every turn returned a new session id, turn 3 recalled both earlier turns, cache read 0 → 1 104 → 1 266 tokens. Inside a Claude Code session the inherited `CLAUDE_CODE_SESSION_ID` pins the id, which is why the first measurement saw the same id.

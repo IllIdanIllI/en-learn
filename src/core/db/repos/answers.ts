@@ -120,15 +120,19 @@ export async function listSkippedItems(
 
 /**
  * Active, solvable (gap, fix, spelling) items in any round: answered `skipped` and not dropped, or never answered.
- * Needs `s` (session) joined, and the date of today as its only parameter: an added round (round 2 and up) of today's
- * session with no answer yet is still to be answered on the page, so its items are left out.
+ * Needs `s` (session) joined, and the date of today as its only parameter: while today's session has a fresh added
+ * round (round 2 and up, no active non-question item answered yet) the round is answered first, so the session
+ * has no solvable items.
  */
 const SOLVABLE = `b.format IN ('gap', 'fix', 'spelling') AND i.status = 'active'
        AND ((a.item_id IS NOT NULL AND a.verdict = 'skipped' AND (a.dispute_decision IS NULL OR a.dispute_decision != 'drop'))
          OR a.item_id IS NULL)
-       AND NOT (b.round > 1 AND s.date = ? AND NOT EXISTS (
-         SELECT 1 FROM block rb JOIN item ri ON ri.block_id = rb.id JOIN answer ra ON ra.item_id = ri.id
-         WHERE rb.session_id = b.session_id AND rb.round = b.round AND rb.format != 'question' AND ri.status = 'active'))`;
+       AND NOT (s.date = ? AND EXISTS (
+         SELECT 1 FROM block rb JOIN item ri ON ri.block_id = rb.id
+         WHERE rb.session_id = s.id AND rb.round > 1 AND rb.format != 'question' AND ri.status = 'active'
+           AND NOT EXISTS (
+             SELECT 1 FROM block xb JOIN item xi ON xi.block_id = xb.id JOIN answer xa ON xa.item_id = xi.id
+             WHERE xb.session_id = rb.session_id AND xb.round = rb.round AND xb.format != 'question' AND xi.status = 'active')))`;
 
 /** Graded sessions of a date range with solvable items, and how many; `today` is the date for the fresh-round exception. */
 export async function countSkippedBySession(db: Db, from: ISODate, to: ISODate, today: ISODate): Promise<{ sessionId: number; date: ISODate; count: number }[]> {

@@ -130,12 +130,26 @@ describe('skipped items of added rounds', () => {
     expect(await skippedToSolve(deps)).toEqual({ sessionId: sid, date: '2026-10-20', count: 1 });
   });
 
-  test('today: a round with no answers yet is not counted and not cleared; the session is still offered for its other items', async () => {
+  test('today: while a round has no answers yet the session is not offered and nothing is cleared; after answering it, only the skips are', async () => {
     const { db, deps } = await setup();
     const { sid } = await addSession(db, '2026-10-20', ['skipped', 'correct', 'correct', 'correct', 'correct']);
-    await addRound2(db, sid, [null, null]);
+    const ids = await addRound2(db, sid, [null, null]);
+    expect(await skippedToSolve(deps)).toBeNull();
+    expect(await reopenSkipped(db, sid, '2026-10-20')).toBe(0);
+    expect(await db.select('SELECT 1 FROM answer WHERE verdict = ?', ['skipped'])).toHaveLength(1);
+    for (const id of ids) await db.execute("INSERT INTO answer (item_id, text, verdict) VALUES (?, 'an', 'correct')", [id]);
     expect(await skippedToSolve(deps)).toEqual({ sessionId: sid, date: '2026-10-20', count: 1 });
     expect(await reopenSkipped(db, sid, '2026-10-20')).toBe(1);
+  });
+
+  test('today: a fresh round with a question block next to its gap block is still fresh, and is answered by its gap items', async () => {
+    const { db, deps } = await setup();
+    const { sid } = await addSession(db, '2026-10-20', ['skipped', 'correct', 'correct', 'correct', 'correct']);
+    const ids = await addRound2(db, sid, [null]);
+    const q = await insertBlock(db, sid, 5, { ...blk, kind: 'speaking', format: 'question', title: 'Speak', passage: 'Say it.' }, 2);
+    await insertItem(db, q, 0, { ...base, prompt: 'Say', expected: '' });
+    expect(await skippedToSolve(deps)).toBeNull();
+    await db.execute("INSERT INTO answer (item_id, text, verdict) VALUES (?, 'an', 'correct')", [ids[0]!]);
     expect(await skippedToSolve(deps)).toEqual({ sessionId: sid, date: '2026-10-20', count: 1 });
   });
 

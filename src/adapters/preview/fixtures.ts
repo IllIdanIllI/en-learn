@@ -121,7 +121,7 @@ function requireOk(result: { ok: boolean; message?: string }, what: string): voi
 /**
  * Answers today's session: `graded` answers every second item right; `questions` leaves blanks that raise questions;
  * `skipped` is `graded` with every third gap, fix or spelling answer left blank and the lesson finished
- * (in `skipped-round` that is applied to the added round only: earlier answers stay as they are).
+ * (in `skipped-round` the earlier answers are already stored, so only the added round's items are still unanswered).
  */
 async function answerToday(deps: Deps, state: 'questions' | 'graded' | 'skipped'): Promise<void> {
   const session = await getSessionByDate(deps.db, deps.clock.today());

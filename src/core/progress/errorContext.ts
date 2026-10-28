@@ -57,7 +57,9 @@ function aroundMiddle(sentence: string): Snippet {
 
 /** What the error bank shows for one wrong answer, computed from stored data (spec H7). */
 export function errorContext(r: ErrorContextInput): ErrorContext {
-  const correction = r.format === 'spot' ? r.expected : r.fix !== '' && !isTick(r.fix) ? r.fix : r.expected;
+  const fixed = !isTick(r.fix) ? r.fix : '';
+  // A spot item whose stored correction is a tick has nothing better than its own text to show.
+  const correction = r.format === 'spot' ? (!isTick(r.expected) ? r.expected : fixed !== '' ? fixed : r.prompt) : fixed !== '' ? fixed : r.expected;
   const hint = r.format === 'spelling' ? r.prompt : null;
 
   if (r.format === 'spelling') {

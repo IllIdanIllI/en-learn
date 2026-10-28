@@ -53,9 +53,15 @@ describe('waitTips', () => {
       { text: 'went', fix: 'goes', expected: 'goes', format: 'gap', prompt: 'He ___ home.' },
       { text: '✓', fix: '✓', expected: 'goes', format: 'gap', prompt: 'She ___ home.' },
       { text: 'went', fix: ' + ', expected: 'goes', format: 'gap', prompt: 'It ___ home.' },
+      { text: 'He go home', fix: '', expected: '✓', format: 'spot', prompt: 'He go home' },
+      { text: 'x', fix: '', expected: '+', format: 'spot', prompt: 'He goes home' },
     ]);
     const tips = (await waitTips(db)).sort((a, b) => a.was.localeCompare(b.was));
+    for (const tip of tips) for (const v of [tip.was, tip.should]) expect(['✓', '+', '']).not.toContain(v.trim());
+    expect(tips).toHaveLength(5);
     expect(tips).toEqual([
+      { was: 'He go home', should: 'He go home' },
+      { was: 'He goes home', should: 'He goes home' },
       { was: 'He went home.', should: 'He goes home.' },
       { was: 'It went home.', should: 'It goes home.' },
       { was: 'She ___ home.', should: 'She goes home.' },

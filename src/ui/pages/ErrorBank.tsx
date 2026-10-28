@@ -89,7 +89,7 @@ export function ErrorBank() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">{t(lang, `kind.${r.kind}`)}</TableCell>
                     <TableCell className="text-muted-foreground">{r.topicId === null ? '' : (titles.get(r.topicId) ?? '')}</TableCell>
-                    <TableCell className="tabular text-muted-foreground">{r.date}</TableCell>
+                    <TableCell className="tabular whitespace-nowrap text-muted-foreground">{r.date}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

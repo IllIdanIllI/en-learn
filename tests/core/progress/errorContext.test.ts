@@ -54,6 +54,16 @@ describe('errorContext', () => {
     expect(c.shouldBe).toEqual({ before: '', changed: 'he goes', after: '' });
   });
 
+  test('spot with a tick as stored correction never shows the tick', () => {
+    const paragraph = 'Yesterday he go to school.';
+    for (const expected of ['✓', '+']) {
+      expect(ctx({ format: 'spot', prompt: 'he go to', expected, paragraph, fix: 'he went to' }).shouldBe.changed).toBe('he went to');
+      const c = ctx({ format: 'spot', prompt: 'he go to', expected, paragraph });
+      expect(c.shouldBe.changed).toBe('he go to');
+      expect(c.shouldBe.changed).not.toBe(expected);
+    }
+  });
+
   test('spelling: the learner spelling, the word and the hint', () => {
     const c = ctx({ format: 'spelling', prompt: 'to get', expected: 'receive', text: 'recieve' });
     expect(c.was).toEqual({ before: '', changed: 'recieve', after: '' });

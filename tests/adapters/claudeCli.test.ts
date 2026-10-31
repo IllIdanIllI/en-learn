@@ -18,11 +18,11 @@ const req = (budgetUsd: number | null): LlmRequest => ({
 });
 
 describe('buildClaudeArgs', () => {
-  test('15 flag args then -- and the prompt, without budget', () => {
+  test('17 flag args then -- and the prompt, without budget', () => {
     expect(buildClaudeArgs(req(null))).toEqual([
       '-p', '--output-format', 'json', '--json-schema', '{"type":"object"}',
       '--system-prompt', 'line one\nline two', '--tools', '', '--model', 'claude-sonnet-5-5', '--effort', 'high',
-      '--no-session-persistence', '--strict-mcp-config', '--', 'the user prompt',
+      '--no-session-persistence', '--strict-mcp-config', '--safe-mode', '--disable-slash-commands', '--', 'the user prompt',
     ]);
   });
 
@@ -33,14 +33,14 @@ describe('buildClaudeArgs', () => {
     expect(a).toEqual([
       '-p', '--output-format', 'json', '--json-schema', '{"type":"object"}',
       '--system-prompt', 'line one\nline two', '--tools', '', '--model', 'claude-sonnet-5-5', '--effort', 'high',
-      '--strict-mcp-config', '--', 'the user prompt',
+      '--strict-mcp-config', '--safe-mode', '--disable-slash-commands', '--', 'the user prompt',
     ]);
   });
 
   test('resume adds --resume <id> --fork-session after --strict-mcp-config, before the budget', () => {
     const a = buildClaudeArgs({ ...req(0.3), persist: true, resume: SID });
     expect(a.slice(11)).toEqual([
-      '--effort', 'high', '--strict-mcp-config', '--resume', SID, '--fork-session', '--max-budget-usd', '0.3', '--', 'the user prompt',
+      '--effort', 'high', '--strict-mcp-config', '--safe-mode', '--disable-slash-commands', '--resume', SID, '--fork-session', '--max-budget-usd', '0.3', '--', 'the user prompt',
     ]);
     expect(a).not.toContain('--no-session-persistence');
   });
@@ -51,7 +51,7 @@ describe('buildClaudeArgs', () => {
 
   test('budget appends two args', () => {
     const a = buildClaudeArgs(req(0.3));
-    expect(a).toHaveLength(19);
+    expect(a).toHaveLength(21);
     expect(a.slice(-4)).toEqual(['--max-budget-usd', '0.3', '--', 'the user prompt']);
   });
 });
@@ -59,14 +59,14 @@ describe('buildClaudeArgs', () => {
 describe('ClaudeCli', () => {
   const ok = { code: 0, stdout: success, stderr: '', timedOut: false };
 
-  test('no budget uses claude-local-call, 15 args, prompt after --, no stdin', async () => {
+  test('no budget uses claude-local-call, 19 args, prompt after --, no stdin', async () => {
     const runner = new FakeRunner([ok]);
     const r = await new ClaudeCli(runner, 'local', '/work', '/home/u').call(req(null));
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.data).toEqual({ word: 'cat', n: 3 });
     const c = runner.calls[0]!;
     expect(c.scope).toBe('claude-local-call');
-    expect(c.args).toHaveLength(17);
+    expect(c.args).toHaveLength(19);
     expect(c.args[8]).toBe('');
     expect(c.args.slice(-2)).toEqual(['--', 'the user prompt']);
     expect(c.opts.stdin).toBeUndefined();

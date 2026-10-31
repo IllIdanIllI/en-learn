@@ -53,7 +53,7 @@ The prompts the app sends are bundled. To change one, put a file in `<app data>/
 
 ## What is sent to Anthropic
 
-Only what goes into the prompts: your rules, recent errors (for review tasks), the tasks, your answers and your rule-chat messages. Rule drafts and the rule chat never get your errors. No audio is recorded or sent. This app has no telemetry and makes no network calls of its own. The Claude CLI talks to Anthropic under your own account and its own privacy settings. Rule-chat conversations are kept by Claude Code itself (under `~/.claude/projects/`), because each message continues the previous one; all other calls are not kept.
+Only what goes into the prompts: your rules, recent errors (for review tasks), the tasks, your answers and your rule-chat messages. Rule drafts and the rule chat never get your errors. No audio is recorded or sent. This app has no telemetry and makes no network calls of its own. The Claude CLI talks to Anthropic under your own account and its own privacy settings. Rule-chat conversations are kept by Claude Code itself (under `~/.claude/projects/`), because each message continues the previous one; all other calls are not kept. The app's calls do not use your own CLAUDE.md, hooks, skills, plugins or slash commands, and the CLI runs in an empty folder (`cli` inside the app data folder).
 
 ## Models and cost
 

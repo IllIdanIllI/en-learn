@@ -25,6 +25,16 @@ const req = (budgetUsd: number | null, extra: Partial<LlmRequest> = {}): LlmRequ
   ...extra,
 });
 
+test('every call and chat shape carries --safe-mode --disable-slash-commands right after --strict-mcp-config', () => {
+  const shaped = entries.filter((e) => /-(call|chat)/.test(e.name));
+  expect(shaped).toHaveLength(CLAUDE_LOCATIONS.length * 6);
+  for (const e of shaped) {
+    const i = e.args.indexOf('--strict-mcp-config');
+    expect(e.args.slice(i + 1, i + 3), e.name).toEqual(['--safe-mode', '--disable-slash-commands']);
+  }
+  expect(buildClaudeArgs(req(null)).join(' ')).toContain('--strict-mcp-config --safe-mode --disable-slash-commands');
+});
+
 describe('shell capability call shapes', () => {
   for (const { loc } of CLAUDE_LOCATIONS) {
     const shapes = [

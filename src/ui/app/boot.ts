@@ -7,11 +7,12 @@ import type { CoreInit } from './CoreProvider';
 
 /** Real app: Tauri adapters, SQLite file, the installed `claude` CLI. */
 export async function bootTauri(): Promise<CoreInit> {
-  const [{ appDataDir, appConfigDir, homeDir }, { openTauriDb }, { readDataDir, moveDataDir }, { TauriClock }, { TauriProcessRunner }, { TauriPromptStore }, { ClaudeCli }] =
+  const [{ appDataDir, appConfigDir, homeDir }, { openTauriDb }, { readDataDir, moveDataDir }, { ensureCliDir }, { TauriClock }, { TauriProcessRunner }, { TauriPromptStore }, { ClaudeCli }] =
     await Promise.all([
       import('@tauri-apps/api/path'),
       import('@/adapters/tauri/db'),
       import('@/adapters/tauri/dataFolder'),
+      import('@/adapters/tauri/cliDir'),
       import('@/adapters/tauri/clock'),
       import('@/adapters/tauri/processRunner'),
       import('@/adapters/tauri/promptStore'),
@@ -29,11 +30,12 @@ export async function bootTauri(): Promise<CoreInit> {
   const db = await openTauriDb(custom);
   await startApp({ db });
 
+  const cliDir = await ensureCliDir(appData);
   const runner = new TauriProcessRunner();
   const prereq = await checkPrerequisites(runner);
   // Without a usable `claude` Today shows a notice instead of building and no call is made, so this Llm is not reached.
   const llm: Llm = prereq.ok
-    ? new ClaudeCli(runner, prereq.location, appData, home)
+    ? new ClaudeCli(runner, prereq.location, cliDir, home)
     : { call: () => Promise.reject(new Error('claude is not available')) };
   const clock = new TauriClock();
   const deps: Deps = { db, llm, clock, prompts: new TauriPromptStore(dataDir) };
@@ -53,7 +55,7 @@ export async function bootTauri(): Promise<CoreInit> {
     ...(dataDirError === undefined ? {} : { dataDirError }),
     moveDataDir: (target) => moveDataDir({ appDataDir: appData, appConfigDir: appConfig, custom }, target, () => db.close()),
     reopenDb: () => openTauriDb(custom),
-    makeLlm: (location) => new ClaudeCli(runner, location, appData, home),
+    makeLlm: (location) => new ClaudeCli(runner, location, cliDir, home),
   };
 }
 

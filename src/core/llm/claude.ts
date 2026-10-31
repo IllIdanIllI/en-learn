@@ -37,7 +37,7 @@ export function buildClaudeArgs(req: LlmRequest): string[] {
     req.effort,
   ];
   if (!req.persist && !req.resume) args.push('--no-session-persistence');
-  args.push('--strict-mcp-config');
+  args.push('--strict-mcp-config', '--safe-mode', '--disable-slash-commands');
   if (req.resume) args.push('--resume', req.resume, '--fork-session');
   if (req.budgetUsd !== null) args.push('--max-budget-usd', String(req.budgetUsd));
   args.push('--', req.userPrompt);

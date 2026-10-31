@@ -256,6 +256,26 @@ test.describe('today session', () => {
     await page.screenshot({ path: `${SHOTS}/today-graded.png`, fullPage: true });
   });
 
+  test('a wrong item has a full border and no strike-through', async ({ page }) => {
+    for (const design of [
+      { radio: 'Лампа', attr: 'lamp' },
+      { radio: 'Ночная роща', attr: 'grove' },
+    ]) {
+      await page.goto('/?state=graded#/settings');
+      await page.getByRole('radio', { name: design.radio }).click();
+      await expect(page.locator('html')).toHaveAttribute('data-design', design.attr);
+      await page.goto('/?state=graded#/today');
+      const wrongItem = page.locator('main li > div.min-w-0').filter({ has: page.locator('.label', { hasText: /^(Неверно|Не найдено)$/ }) }).first();
+      await expect(wrongItem).toBeVisible();
+      const borders = await wrongItem.evaluate((el) => {
+        const style = getComputedStyle(el);
+        return { left: style.borderLeftWidth, top: style.borderTopWidth };
+      });
+      expect(borders, design.attr).toEqual({ left: '1px', top: '1px' });
+      await expect(page.locator('main .line-through'), design.attr).toHaveCount(0);
+    }
+  });
+
   test('Close lesson on the graded page leads to the closed card, which can show the results again', async ({ page }) => {
     await page.goto('/?state=graded#/today');
     await page.getByRole('button', { name: 'Закрыть урок' }).click();

@@ -29,7 +29,7 @@ export function GradedItem({ item, number, lang }: { item: ViewItem; number?: nu
   return (
     <li className="flex gap-3">
       <span className="label tabular mt-1.5 w-6 shrink-0 text-right text-faint">{number ?? ''}</span>
-      <div className={cn('min-w-0 flex-1', wrong && 'rounded-md border-l-[3px] border-destructive bg-destructive/8 px-3 py-2')}>
+      <div className={cn('min-w-0 flex-1', wrong && 'rounded-md border border-destructive/40 bg-destructive/8 px-3 py-2')}>
         {!spot && <p className="reading">{item.prompt}</p>}
         <p className={`answer flex flex-wrap items-center gap-x-2.5 gap-y-1 ${spot ? '' : 'mt-2'}`}>
           {reason !== null ? (
@@ -42,11 +42,11 @@ export function GradedItem({ item, number, lang }: { item: ViewItem; number?: nu
           )}
           {spot ? (
             <>
-              <span className={wrong ? 'line-through text-muted-foreground' : ''}>{item.prompt}</span> → <span className={wrong ? 'font-semibold text-success' : ''}>{item.expected}</span>
+              <span className={wrong ? 'text-muted-foreground' : ''}>{item.prompt}</span> → <span className={wrong ? 'font-semibold text-success' : ''}>{item.expected}</span>
             </>
           ) : (
             <>
-              {a && a.text !== '' && a.text.trim() !== '✓' && <span className={cn(ok ? '' : 'text-muted-foreground', wrong && 'line-through')}>{a.text}</span>}
+              {a && a.text !== '' && a.text.trim() !== '✓' && <span className={cn(ok ? '' : 'text-muted-foreground')}>{a.text}</span>}
               {wrong && expected !== '' && <span className="font-semibold text-success">→ {expected}</span>}
             </>
           )}

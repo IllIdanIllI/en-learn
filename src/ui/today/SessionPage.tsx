@@ -18,6 +18,8 @@ import { Questions, type Reply } from './Questions';
 import { SessionHeader } from './SessionHeader';
 import { SpellingRow } from './SpellingRow';
 import { SpotBlock } from './SpotBlock';
+import { AnswerMeter } from '@/ui/grove/AnswerMeter';
+import { answerSegments } from '@/ui/grove/segments';
 import { Notice } from './chips';
 import { RulePanel, type RuleTarget } from './RulePanel';
 import { SessionActionsProvider, type SessionActions } from './sessionActions';
@@ -38,7 +40,7 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
   /** Today's session only: a button in the action bar once everything is graded. */
   onClose?: () => void;
 }) {
-  const { deps, lang } = useCore();
+  const { deps, lang, settings } = useCore();
   const [view, setView] = useState<SessionView | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
@@ -278,7 +280,7 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
     // An added round continues the numbering of the task blocks before it.
     const offset = view.blocks.filter((b) => b.kind === 'task' && b.round < block.round).reduce((n, b) => n + b.itemCount, 0);
     return (
-      <Block key={block.id} block={block} number={i + 1} lang={lang} hideTitle={hideTitle}>
+      <Block key={block.id} block={block} number={i + 1} lang={lang} hideTitle={hideTitle} divider={i > 0}>
         {block.format === 'question' ? (
           <QuestionBlock block={block} />
         ) : block.format === 'spot' ? (
@@ -322,6 +324,7 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
     <SessionActionsProvider value={actions}>
       <div ref={root}>
         <SessionHeader view={view} lang={lang} rebuilding={rebuilding} solving={solving} onRebuild={rebuild} />
+        {settings.design === 'grove' && answerable && !solving && <AnswerMeter filled={answerSegments(view, items, spot)} lang={lang} />}
         {loader && <Loader lang={lang} {...loader} />}
         {solving ? (
           view.blocks.map((block, i) => !block.graded && block.items.length > 0 && renderBlock(block, i, false))

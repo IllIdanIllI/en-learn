@@ -173,6 +173,8 @@ export const en = {
   'spot.notError': 'Not an error: {text}. {explanation}',
   'feedback.title': 'Results',
   'feedback.score': '{correct} of {counted}',
+  'grove.answered': 'Answered: {n} of {m}',
+  'grove.correct': 'Correct: {n} of {m}',
   'feedback.correct': 'Correct',
   'feedback.fix': 'To fix',
   'feedback.tomorrow': "Tomorrow's review",

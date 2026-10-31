@@ -6,6 +6,8 @@ import { loadGradedFacts } from '@/core/progress/history';
 import { useCore } from '@/ui/app/CoreProvider';
 import { useLoaded } from '@/ui/app/useLoaded';
 import { SHOULD_TONE, SnippetText, WAS_TONE } from '@/ui/components/SnippetText';
+import { Pixel } from '@/ui/grove/Pixel';
+import { DRY_LEAF } from '@/ui/grove/sprites';
 import { Select } from '@/ui/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/ui/components/ui/table';
 import { Notice } from '@/ui/today/chips';
@@ -13,7 +15,7 @@ import { Notice } from '@/ui/today/chips';
 const KINDS: ErrorBankRow['kind'][] = ['grammar', 'spelling', 'inattention'];
 
 export function ErrorBank() {
-  const { deps, lang } = useCore();
+  const { deps, lang, settings } = useCore();
   const [kind, setKind] = useState('');
   const [topic, setTopic] = useState('');
   const loaded = useLoaded(async () => {
@@ -71,6 +73,7 @@ export function ErrorBank() {
                 {shown.map((r) => (
                   <TableRow key={r.itemId}>
                     <TableCell className="answer" title={r.sentence === '' ? undefined : r.sentence}>
+                      {settings.design === 'grove' && <Pixel rows={DRY_LEAF} className="mr-2 inline-block" />}
                       <SnippetText s={r.was} tone={WAS_TONE} />
                       {r.hint !== null && <div className="mt-1 text-sm text-muted-foreground">{r.hint}</div>}
                     </TableCell>

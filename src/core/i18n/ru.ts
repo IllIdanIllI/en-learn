@@ -175,6 +175,8 @@ export const ru: Record<keyof typeof en, string> = {
   'spot.notError': 'Это не ошибка: {text}. {explanation}',
   'feedback.title': 'Итоги',
   'feedback.score': '{correct} из {counted}',
+  'grove.answered': 'Ответов: {n} из {m}',
+  'grove.correct': 'Верно {n} из {m}',
   'feedback.correct': 'Верно',
   'feedback.fix': 'Исправить',
   'feedback.tomorrow': 'Что повторить завтра',

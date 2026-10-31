@@ -165,3 +165,77 @@ test.describe('sidebar garden', () => {
     await expect(page.locator('[data-garden]')).toHaveAttribute('data-night', 'true');
   });
 });
+
+test.describe('lesson details', () => {
+  const setDesign = async (page: import('@playwright/test').Page, state: string, design: 'Ночная роща' | 'Лампа') => {
+    await page.goto(`/?state=${state}#/settings`);
+    await page.getByRole('radio', { name: design }).click();
+  };
+
+  test('grove: leaf before block headings, dividers, answer meter counts filled fields', async ({ page }) => {
+    await page.goto('/?state=generated#/today');
+    const titles = page.locator('section h2.title');
+    await expect(titles.first()).toBeVisible();
+    const count = await titles.count();
+    for (let i = 0; i < count; i++) await expect(titles.nth(i).locator('svg').first()).toBeVisible();
+    await expect(page.locator('[data-divider]')).toHaveCount(count - 1);
+
+    const fields = await page.locator('section input[type="text"], section input:not([type]), section textarea').count();
+    expect(fields).toBeGreaterThan(0);
+    const meter = page.locator('[data-answer-meter]');
+    await expect(meter).toContainText(`Ответов: 0 из ${fields}`);
+    await page.locator('section input[type="text"], section input:not([type])').first().fill('word');
+    await expect(meter).toContainText(`Ответов: 1 из ${fields}`);
+    await page.screenshot({ path: 'test-results/screens/grove-lesson-answering-dark.png' });
+  });
+
+  test('grove: score bar after checking, dry leaves in the error bank', async ({ page }) => {
+    await page.goto('/?state=graded#/today');
+    const bar = page.locator('[data-score-bar]');
+    await expect(bar).toBeVisible();
+    // The bar must agree with the per-block scores printed in the summary.
+    const rows = await page.locator('#feedback-title ~ ul li span:last-child').allTextContents();
+    const pairs = rows.map((r) => /(\d+) из (\d+)/.exec(r)!.slice(1).map(Number) as [number, number]);
+    const right = pairs.reduce((n, [c]) => n + c, 0);
+    const counted = pairs.reduce((n, [, m]) => n + m, 0);
+    expect(counted).toBeGreaterThan(0);
+    await expect(bar).toContainText(`${right} / ${counted}`);
+    await expect(bar).toContainText(`Верно ${right} из ${counted}`);
+    await expect(bar.locator('svg')).toHaveCount(1);
+    await page.screenshot({ path: 'test-results/screens/grove-lesson-checked-dark.png' });
+
+    await page.goto('/?state=graded#/errors');
+    const rowsEl = page.locator('tbody tr');
+    await expect(rowsEl.first()).toBeVisible();
+    for (let i = 0; i < (await rowsEl.count()); i++) await expect(rowsEl.nth(i).locator('td').first().locator('svg')).toHaveCount(1);
+  });
+
+  test('grove light screenshots', async ({ page }) => {
+    await setDesign(page, 'generated', 'Ночная роща');
+    await page.getByRole('radio', { name: 'Светлая' }).click();
+    await page.goto('/?state=generated#/today');
+    await expect(page.locator('[data-answer-meter]')).toBeVisible();
+    await page.screenshot({ path: 'test-results/screens/grove-lesson-answering-light.png' });
+    await page.goto('/?state=graded#/settings');
+    await page.getByRole('radio', { name: 'Светлая' }).click();
+    await page.getByRole('navigation').getByRole('link', { name: 'Сегодня' }).click();
+    await expect(page.locator('[data-score-bar]')).toBeVisible();
+    await page.screenshot({ path: 'test-results/screens/grove-lesson-checked-light.png' });
+  });
+
+  test('lamp: none of the grove details', async ({ page }) => {
+    const nav = (name: string) => page.getByRole('navigation').getByRole('link', { name }).click();
+    await setDesign(page, 'generated', 'Лампа');
+    await nav('Сегодня');
+    await expect(page.locator('section h2.title').first()).toBeVisible();
+    await expect(page.locator('section h2.title svg')).toHaveCount(0);
+    await expect(page.locator('[data-divider], [data-answer-meter]')).toHaveCount(0);
+    await setDesign(page, 'graded', 'Лампа');
+    await nav('Сегодня');
+    await expect(page.locator('#feedback-title')).toBeVisible();
+    await expect(page.locator('[data-score-bar]')).toHaveCount(0);
+    await nav('Банк ошибок');
+    await expect(page.locator('tbody tr').first()).toBeVisible();
+    await expect(page.locator('tbody svg')).toHaveCount(0);
+  });
+});

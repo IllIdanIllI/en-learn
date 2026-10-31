@@ -225,7 +225,7 @@ test.describe('today session', () => {
     await expect(marked).toHaveValue('');
     await expect(mark).toHaveAttribute('aria-pressed', 'true');
     await expect(mark).toBeEnabled();
-    expect(await bgOf()).not.toBe(bgBefore);
+    await expect.poll(bgOf).not.toBe(bgBefore);
     await page.addStyleTag({ content: '*{transition:none!important}' });
     for (const theme of ['light', 'dark'] as const) {
       await page.evaluate((th) => document.documentElement.classList.toggle('dark', th === 'dark'), theme);

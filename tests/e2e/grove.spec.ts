@@ -78,8 +78,8 @@ test.describe('sidebar garden', () => {
     await page.screenshot({ path: 'test-results/screens/grove-garden-dark.png' });
   });
 
-  test('firefly glow animates, and stops under reduced motion', async ({ page }) => {
-    // No fixture has a session yesterday, so probe the style on a stand-in element.
+  test('firefly CSS rule: glow animates, and stops under reduced motion', async ({ page }) => {
+    // Probes the style rule on a stand-in element; the real fireflies are covered by the next test.
     const animationOf = () =>
       page.evaluate(() => {
         const el = document.createElement('span');
@@ -95,6 +95,25 @@ test.describe('sidebar garden', () => {
     expect(await animationOf()).toEqual({ name: 'grove-blink', position: 'absolute' });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     expect((await animationOf()).name).toBe('none');
+  });
+
+  test('fireflies: one per correct answer yesterday, night only', async ({ page }) => {
+    // The session log of the same fixture shows yesterday's score as "N из M"; N is the correct count.
+    await page.goto('/?state=fireflies#/progress');
+    const card = (await page.getByText(/\d+ из \d+ · \d+%/).first().textContent()) ?? '';
+    const expected = Math.min(Number(/^\D*(\d+)/.exec(card)![1]), 12);
+    expect(expected).toBeGreaterThan(0);
+    await page.goto('/?state=fireflies#/settings');
+    await page.getByRole('radio', { name: 'Тёмная' }).click();
+    await page.goto('/?state=fireflies#/today');
+    await expect(page.locator('[data-garden]')).toHaveAttribute('data-night', 'true');
+    await expect(page.locator('[data-garden] [data-firefly]')).toHaveCount(expected);
+    await page.screenshot({ path: 'test-results/screens/grove-garden-fireflies-dark.png' });
+    await page.getByRole('navigation').getByRole('link', { name: 'Настройки' }).click();
+    await page.getByRole('radio', { name: 'Светлая' }).click();
+    await page.getByRole('navigation').getByRole('link', { name: 'Сегодня' }).click();
+    await expect(page.locator('[data-garden]')).toHaveAttribute('data-night', 'false');
+    await expect(page.locator('[data-garden] [data-firefly]')).toHaveCount(0);
   });
 
   test('day: no moon, no fireflies, unlit lantern; screenshot', async ({ page }) => {

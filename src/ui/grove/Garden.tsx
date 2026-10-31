@@ -5,7 +5,7 @@ import { Pixel } from './Pixel';
 import { fence, grove, GETA, lantern, moon, SHOOT } from './sprites';
 import { useGarden } from './useGarden';
 
-const COLS = 109; // 218px at scale 2, the sidebar's inner width
+const COLS = 101; // 202px at scale 2: the nav's 220px less 2 x 8px padding and the 1px border is 203px
 const GROVE = grove(COLS, 78);
 const FENCE = fence(COLS);
 const OUTLINE = 'drop-shadow(2px 0 0 var(--background)) drop-shadow(-2px 0 0 var(--background)) drop-shadow(0 -2px 0 var(--background))';

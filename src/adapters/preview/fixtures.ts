@@ -16,7 +16,7 @@ import { MINI_PROGRAMME, MINI_RULES } from './miniSeed';
 
 export const PREVIEW_STATES = [
   'empty', 'no_session', 'generated', 'questions', 'graded', 'progress', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing',
-  'earlier_session', 'progress_archived', 'closed', 'open-round', 'round-graded', 'skipped', 'skipped-round',
+  'earlier_session', 'progress_archived', 'closed', 'open-round', 'round-graded', 'skipped', 'skipped-round', 'fireflies',
 ] as const;
 export type PreviewState = (typeof PREVIEW_STATES)[number];
 
@@ -175,6 +175,12 @@ export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
   for (const [word, hint] of SPELLING_WORDS) await findOrCreateSpellingWord(deps.db, word, hint, clock.now());
 
   const today = clock.today();
+  if (state === 'fireflies') {
+    // Yesterday's lesson was played, so the sidebar garden has fireflies; today has no session yet.
+    clock.set('2026-10-19');
+    await playDay(deps, false);
+    clock.set(today);
+  }
   const progressLike = state === 'progress' || state === 'progress_archived';
   if (progressLike) {
     for (const day of EARLIER_DAYS) {

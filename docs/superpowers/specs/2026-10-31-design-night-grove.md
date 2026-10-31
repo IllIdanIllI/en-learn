@@ -1,6 +1,6 @@
 # Design: Night grove (2026-10-31)
 
-A second visual design, "Night grove", chosen over six lookbook rounds, plus a Settings switch back to the current design ("Lamp", `app-design/DESIGN.md`). It also redesigns the "Find the errors" block (open item in `s1-decisions.md`). Binding where it says something; otherwise the S1 spec, its feedback rounds and `app-design/DESIGN.md` hold.
+A second visual design, "Night grove", chosen over six lookbook rounds, plus a Settings switch back to the current design ("Lamp", `app-design/DESIGN.md`). Binding where it says something; otherwise the S1 spec, its feedback rounds and `app-design/DESIGN.md` hold.
 
 - Final lookbook: https://claude.ai/artifact/UwEKuQU2Cb6WVDJqWaGMWa (round 6). Earlier rounds 1 to 5 led here.
 - Prototype code (CSS overrides, pixel sprites, DOM decoration used for the lookbook): `notes/2026-10-31-night-grove-prototype/`. The pixel maps and colours there are the reference; the DOM-injection code is not to be reused.
@@ -77,37 +77,19 @@ A small pixel-art scene at the foot of the sidebar: a short bamboo grove behind 
 - A wrong graded item has no coloured left stripe: it gets a tinted background with a full 1px border in `--destructive` at 40%.
 - The learner's wrong text is no longer struck through; it stays in muted ink.
 
-## N8. "Find the errors": select the fragment, fix it in a field
-Replaces the textarea where the learner typed `wrong → right` lines.
-
-**Answering**
-- The paragraph is plain selectable text. When the learner selects a fragment inside it (mouse or touch), the selection snaps to whole words and a fix row is added under the paragraph: the selected fragment, an arrow, and an input prefilled with the fragment, focused, with its text selected. The fragment is highlighted in the paragraph (underline in `--note`).
-- The learner edits the input. Enter or leaving the field keeps the row. A row has a remove button (×), which also removes the highlight.
-- Selecting a fragment that overlaps an existing row's fragment replaces that row.
-- Keyboard path (no mouse): an "Добавить исправление" / "Add a fix" button under the paragraph adds a row with two inputs: the fragment as written in the text, and the correction.
-- Answers persist in the existing per-paragraph answer text as `wrong → right` lines, so storage, drafts and the graded view keep working without a migration.
-
-**Checking: no LLM call**
-- Spot paragraphs are graded only against the key, never sent to the grading model:
-  - A row pairs with a hidden error when the selected fragment and the error's wrong text overlap (one contains the other, case-insensitive), and with exactly one error.
-  - A paired row is correct when its correction passes the existing `autoCorrect` check against the key (normalised equal to the expected text, or the corrected sentence contains it). Correct means the error is found.
-  - A paired row with another correction leaves the error "not found" and shows the learner's text next to the expected fix.
-  - A row that pairs with no hidden error, or with two at once, is listed as "Нет в ключе" / "Not in the key" without an explanation. It does not change the score.
-  - Hidden errors without a row are shown as missed, as now. A paragraph without rows is skipped, as now.
-- The learner can still use "Оспорить" (Dispute) on any spot result; a dispute uses the LLM as it does today. That is the route for a correct fix the key did not foresee.
-
-## N9. Documentation
+## N8. Documentation
 - `app-design/DESIGN.md` gets a short note at the top: two designs exist; this file describes Lamp; Night grove is in `app-design/DESIGN-night-grove.md`.
 - New `app-design/DESIGN-night-grove.md`: tokens, fonts, the garden and its drivers, sprites, do's and don'ts. Same shape as `DESIGN.md`.
-- `s1-decisions.md`: the spot-block open item and the "design pass" open item are closed by this spec.
+- `s1-decisions.md`: the "design pass" open item is closed by this spec. The spot-block item stays open.
 
-## N10. Verification
-- Unit tests: the design setting (default `grove`, persistence), the moon phase function (known new and full moon dates), the yesterday-correct count (no session yesterday gives 0; cap at 12), spot selection to `wrong → right` lines, and deterministic spot grading (found, wrong fix, not in key, two errors at once, empty paragraph).
-- Existing tests keep passing. Where the spot grading path changes (it no longer calls the LLM), the affected grading tests are updated to the new behaviour, not deleted.
+## N9. Verification
+- Unit tests: the design setting (default `grove`, persistence), the moon phase function (known new and full moon dates), the yesterday-correct count (no session yesterday gives 0; cap at 12), and the sidebar garden rendering only in Night grove (and the geta only for a closed lesson).
+- Existing tests keep passing.
 - Playwright: screenshots of Today (answering and checked), Lesson closed, Progress, Error bank, Settings and the loader, in both designs and both themes; the Settings switch changes the design immediately.
 - tsc, eslint, Vitest, Playwright and cargo check clean before reporting.
 
 ## Out of scope
+- The "Find the errors" block redesign (select a fragment, fix it in a field, grade against the key without the LLM): discussed later, in its own spec.
 - Sidebar options B and C, the katana, seal, ensō, kanji labels, bamboo regularity and moon phase on the title or log cards (all tried in the lookbook and dropped).
 - Changing the Progress page layout beyond tokens and fonts.
 - Tooltips explaining the garden.

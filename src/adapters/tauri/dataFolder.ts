@@ -31,9 +31,10 @@ async function listFiles(dir: string, rel: string): Promise<string[]> {
 
 /** Copy, verify sizes, write location.json, remove the old files. The caller reloads on success; on failure the old folder is still in use. */
 export async function moveDataDir(cur: DataLocation, picked: string, closeDb: () => Promise<void>): Promise<void> {
-  const refused = refusePicked(picked, cur.home, cur.appDataDir);
-  if (refused) throw new MoveRefused(refused);
   const target = moveTarget(picked);
+  // The target is checked too: Rust only grants what passes the rules, so /Volumes (target /Volumes/EnglishExamCoach) must not get this far.
+  const refused = refusePicked(picked, cur.home, cur.appDataDir) ?? refusePicked(target, cur.home, cur.appDataDir);
+  if (refused) throw new MoveRefused(refused);
   const dbBase = cur.custom ?? cur.appConfigDir;
   const promptsBase = cur.custom ?? cur.appDataDir;
   const scanDb = async () => {

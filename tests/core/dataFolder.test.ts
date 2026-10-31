@@ -47,6 +47,10 @@ test('picked folders that must be refused', () => {
   expect(refusePicked('/Volumes/Backup/', home, appData)).toBe('volume');
 });
 
+test('a picked /Volumes is refused through its target', () => {
+  expect(refusePicked(moveTarget('/Volumes'), home, appData)).toBe('volume');
+});
+
 test('other picked folders pass, including the app data folder and below it', () => {
   expect(refusePicked('/Users/me/Documents', home, appData)).toBeNull();
   expect(refusePicked('/Users/me/Libraryx', home, appData)).toBeNull();

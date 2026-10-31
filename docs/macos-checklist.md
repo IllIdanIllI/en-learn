@@ -94,7 +94,8 @@ J. **A failed move keeps the old folder.**
 
 J2. **Access to the custom folder after a move and a restart (security round 1).**
    - Action: after a move (G), put a changed `grade.md` into `<new folder>/prompts/` and grade or generate something without restarting. Then quit, start the app again and repeat.
-   - Expected: both times the changed prompt is used and the data loads. A folder you picked earlier that is not the current data folder is not accessible to the app after the restart.
+   - Expected: both times the changed prompt is used and the data loads. A folder you picked earlier that is not the current data folder is not accessible to the app after the restart. After a second move, the previous folder stays reachable until the restart.
+   - Also: a custom folder chosen before this round (not named `EnglishExamCoach`) keeps its database, but its prompt overrides are not used until you move the data once more.
    - If it fails: record whether it failed right after the move or only after the restart, and the console error.
 
 ## Rule chat (round 5)

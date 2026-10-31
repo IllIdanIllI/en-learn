@@ -1,5 +1,8 @@
 use std::path::PathBuf;
 
+/// Same as DATA_SUBDIR in src/core/dataFolder.ts.
+const DATA_SUBDIR: &str = "EnglishExamCoach";
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum Refusal {
   Root,
@@ -40,12 +43,19 @@ pub fn parse_data_dir(contents: &str) -> Option<String> {
   value.get("dataDir")?.as_str().filter(|d| !d.is_empty()).map(String::from)
 }
 
-/// The custom data folder to grant access to: named by location.json and not refused. None means nothing to grant.
-pub fn folder_to_grant(location_json: Option<&str>, home: &str, app_data: &str) -> Option<PathBuf> {
-  let dir = parse_data_dir(location_json?)?;
+/// The custom data folder to grant access to: named by location.json, an absolute path without `..` whose last segment is `EnglishExamCoach`, and not refused.
+/// Ok(None) means a default location (no file, malformed, no `dataDir`): nothing to grant. Err means location.json names a folder that is refused.
+pub fn folder_to_grant(location_json: Option<&str>, home: &str, app_data: &str) -> Result<Option<PathBuf>, String> {
+  let Some(dir) = location_json.and_then(parse_data_dir) else {
+    return Ok(None);
+  };
+  let trimmed = dir.trim_end_matches('/');
+  if !dir.starts_with('/') || trimmed.split('/').any(|seg| seg == "..") || !trimmed.rsplit('/').next().is_some_and(|last| last.eq_ignore_ascii_case(DATA_SUBDIR)) {
+    return Err(format!("data folder is not an absolute {DATA_SUBDIR} folder: {dir}"));
+  }
   match refuse_picked(&dir, home, app_data) {
-    Some(_) => None,
-    None => Some(PathBuf::from(dir)),
+    Some(r) => Err(format!("data folder refused: {r:?}")),
+    None => Ok(Some(PathBuf::from(dir))),
   }
 }
 
@@ -97,12 +107,37 @@ mod tests {
 
   #[test]
   fn grants_only_a_valid_custom_folder() {
-    let ok = r#"{"dataDir": "/Users/Ann/Documents/EnglishExamCoach"}"#;
-    assert_eq!(folder_to_grant(Some(ok), HOME, APP), Some(PathBuf::from("/Users/Ann/Documents/EnglishExamCoach")));
-    assert_eq!(folder_to_grant(None, HOME, APP), None);
-    assert_eq!(folder_to_grant(Some("{"), HOME, APP), None);
-    assert_eq!(folder_to_grant(Some("{}"), HOME, APP), None);
-    assert_eq!(folder_to_grant(Some(r#"{"dataDir": "/Users/Ann"}"#), HOME, APP), None);
-    assert_eq!(folder_to_grant(Some(r#"{"dataDir": "/Users/Ann/Library/Mail"}"#), HOME, APP), None);
+    let ok = "/Users/Ann/Documents/EnglishExamCoach";
+    let loc = |d: &str| format!(r#"{{"dataDir": "{d}"}}"#);
+    assert_eq!(folder_to_grant(Some(&loc(ok)), HOME, APP), Ok(Some(PathBuf::from(ok))));
+    assert_eq!(folder_to_grant(Some(&loc("/Users/Ann/.ssh/EnglishExamCoach")), HOME, APP), Ok(Some(PathBuf::from("/Users/Ann/.ssh/EnglishExamCoach"))));
+    assert_eq!(folder_to_grant(Some(&loc("/Users/Ann/Documents/englishexamcoach/")), HOME, APP), Ok(Some(PathBuf::from("/Users/Ann/Documents/englishexamcoach/"))));
+  }
+
+  #[test]
+  fn default_location_grants_nothing() {
+    assert_eq!(folder_to_grant(None, HOME, APP), Ok(None));
+    assert_eq!(folder_to_grant(Some("{"), HOME, APP), Ok(None));
+    assert_eq!(folder_to_grant(Some("{}"), HOME, APP), Ok(None));
+  }
+
+  #[test]
+  fn refuses_folders_a_planted_location_could_name() {
+    let loc = |d: &str| format!(r#"{{"dataDir": "{d}"}}"#);
+    for d in [
+      "/Users/Ann",
+      "/Users/Ann/Library/Mail",
+      "/Volumes/EnglishExamCoach",
+      "/Users/Ann/.ssh",
+      "/etc",
+      "/Users/Ann/Documents/other",
+      "/Users/Ann/Documents/EnglishExamCoach/sub",
+      "EnglishExamCoach",
+      "Documents/EnglishExamCoach",
+      "/Users/Ann/../Bob/EnglishExamCoach",
+      "/Users/Ann/Documents/EnglishExamCoach/..",
+    ] {
+      assert!(folder_to_grant(Some(&loc(d)), HOME, APP).is_err(), "{d}");
+    }
   }
 }

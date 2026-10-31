@@ -120,3 +120,27 @@
   font-size: 1.125rem;
   line-height: 1.55;
 }
+
+/* Sidebar garden fireflies: a slow glow; still drawn, but not animated, under reduced motion. */
+[data-design='grove'] .grove-firefly {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: var(--firefly);
+  box-shadow: 0 0 6px 2px color-mix(in oklch, var(--firefly) 60%, transparent);
+  animation: grove-blink 3.2s ease-in-out infinite;
+}
+@keyframes grove-blink {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-design='grove'] .grove-firefly {
+    animation: none;
+  }
+}

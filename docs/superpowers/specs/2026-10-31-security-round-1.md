@@ -20,8 +20,9 @@ Fixes from `notes/2026-10-30-security-audit.md` (M2, L1, L2, L3, L4 and the like
 
 ## P4. File access only for the current data folder (L1, I4)
 - Folder grants are no longer remembered across restarts (the persisted-scope plugin is removed).
-- At start, Rust reads `location.json` and, if it names a custom data folder that passes the P3 refusal rules, grants the app access to that folder and everything under it (so `prompts/<kind>.md` overrides there can be read and copied).
-- After a move, the webview calls a Rust command without arguments that does the same from `location.json`, so the new folder works without a restart.
+- At start, Rust reads `location.json` and, if it names a custom data folder that is an absolute path without `..` segments, is named `EnglishExamCoach` (so a planted `location.json` can only open such a folder) and passes the P3 refusal rules, grants the app access to that folder and everything under it (so `prompts/<kind>.md` overrides there can be read and copied).
+- After a move, the webview calls a Rust command without arguments that does the same from `location.json`, so the new folder works without a restart; it fails when `location.json` names a folder it refuses, and the move is rolled back.
+- A custom folder chosen before this round (not named `EnglishExamCoach`) keeps its database, but prompt overrides there are not readable until the data is moved once more.
 
 ## P5. Rule-gap proposals (L4)
 - The grade reply check rejects a rule-gap proposal whose headings are not skeleton headings in skeleton order (same rule as the rule chat).

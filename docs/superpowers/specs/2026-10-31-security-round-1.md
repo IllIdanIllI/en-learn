@@ -7,6 +7,8 @@ Fixes from `notes/2026-10-30-security-audit.md` (M2, L1, L2, L3, L4 and the like
 - `font-src` allows `data:` because the build inlines three font faces as data URIs (fonts cannot run script).
 - `devCsp` is the same plus what `yarn tauri dev` needs for Vite (its http and ws origin in `connect-src`, and whatever else the dev server needs, nothing broader).
 
+- The app must not need `eval`/`new Function` under this policy: JSON-schema validation of LLM replies uses a validator that does not generate code (Ajv compiles with `new Function`, which the policy blocks).
+
 ## P2. Clean CLI calls (L2, I1)
 - Every `claude -p` call (all call and chat shapes) adds the fixed arguments `--safe-mode --disable-slash-commands`, so the learner's CLAUDE.md, hooks, skills, plugins, output styles and slash commands never apply. Verified with Claude Code 2.1.312: sign-in, `--resume … --fork-session` and the cache still work.
 - The CLI runs in a dedicated empty folder `<app data>/cli` (created at start), not in the app data folder.
@@ -22,7 +24,8 @@ Fixes from `notes/2026-10-30-security-audit.md` (M2, L1, L2, L3, L4 and the like
 - Folder grants are no longer remembered across restarts (the persisted-scope plugin is removed).
 - At start, Rust reads `location.json` and, if it names a custom data folder that is an absolute path without `..` segments, is named `EnglishExamCoach` (so a planted `location.json` can only open such a folder) and passes the P3 refusal rules, grants the app access to that folder and everything under it (so `prompts/<kind>.md` overrides there can be read and copied).
 - After a move, the webview calls a Rust command without arguments that does the same from `location.json`, so the new folder works without a restart; it fails when `location.json` names a folder it refuses, and the move is rolled back.
-- A custom folder chosen before this round (not named `EnglishExamCoach`) keeps its database, but prompt overrides there are not readable until the data is moved once more.
+- A custom folder chosen before this round (not named `EnglishExamCoach`) is still granted when it passes the refusal rules and already contains `enlearn.db` (a planted `location.json` cannot create that file), so it keeps working and can be moved.
+- A prompt override that cannot be read (for example a forbidden path) counts as no override: the bundled prompt is used.
 
 ## P5. Rule-gap proposals (L4)
 - The grade reply check rejects a rule-gap proposal whose headings are not skeleton headings in skeleton order (same rule as the rule chat).

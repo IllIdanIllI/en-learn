@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs';
-import { Ajv } from 'ajv';
+import { Validator } from '@cfworker/json-schema';
 import { describe, expect, test } from 'vitest';
 import { bundledPrompts } from '@/core/llm/bundledPrompts';
 import type { LlmKind } from '@/core/domain';
 import type { DisputeBatchReply, GeneratedSession, GradeResult, RuleChatReply, RuleDraft, ValidationResult } from '@/core/llm/types';
 
 const kinds: LlmKind[] = ['rule_draft', 'rule_chat', 'generate_session', 'validate_session', 'grade', 'dispute'];
-const ajv = new Ajv({ allErrors: true, strict: true });
+const validator = (schema: object) => new Validator(schema, '2019-09', false);
 const fixture = (kind: string, which: 'valid' | 'invalid'): unknown =>
   JSON.parse(readFileSync(`tests/fixtures/llm/${kind}.${which}.json`, 'utf8'));
 
@@ -37,7 +37,7 @@ describe.each(kinds)('%s', (kind) => {
   const { system, schema } = bundledPrompts[kind];
 
   test('schema compiles and is a strict top-level object', () => {
-    expect(() => ajv.compile(schema)).not.toThrow();
+    expect(() => validator(schema)).not.toThrow();
     expect((schema as { type?: string }).type).toBe('object');
     const problems: string[] = [];
     strictObjects(schema, '$', problems);
@@ -45,12 +45,12 @@ describe.each(kinds)('%s', (kind) => {
   });
 
   test('valid fixture passes', () => {
-    const validate = ajv.compile(schema);
-    expect(validate(fixture(kind, 'valid')), ajv.errorsText(validate.errors)).toBe(true);
+    const result = validator(schema).validate(fixture(kind, 'valid'));
+    expect(result.valid, JSON.stringify(result.errors)).toBe(true);
   });
 
   test('invalid fixture fails', () => {
-    expect(ajv.compile(schema)(fixture(kind, 'invalid'))).toBe(false);
+    expect(validator(schema).validate(fixture(kind, 'invalid')).valid).toBe(false);
   });
 
   test('prompt is complete', () => {

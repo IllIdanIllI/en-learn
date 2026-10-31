@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Same as DATA_SUBDIR in src/core/dataFolder.ts.
 const DATA_SUBDIR: &str = "EnglishExamCoach";
@@ -43,15 +43,23 @@ pub fn parse_data_dir(contents: &str) -> Option<String> {
   value.get("dataDir")?.as_str().filter(|d| !d.is_empty()).map(String::from)
 }
 
-/// The custom data folder to grant access to: named by location.json, an absolute path without `..` whose last segment is `EnglishExamCoach`, and not refused.
+/// True when `dir` holds a regular file `enlearn.db` (a symlink does not count).
+pub fn has_regular_db(dir: &Path) -> bool {
+  std::fs::symlink_metadata(dir.join("enlearn.db")).is_ok_and(|m| m.is_file())
+}
+
+/// The custom data folder to grant access to: named by location.json, an absolute path without empty, `.` or `..` segments, not refused, and either
+/// named `EnglishExamCoach` or (a folder chosen before this round) already holding `enlearn.db` (`has_db`, checked by the caller on disk).
 /// Ok(None) means a default location (no file, malformed, no `dataDir`): nothing to grant. Err means location.json names a folder that is refused.
-pub fn folder_to_grant(location_json: Option<&str>, home: &str, app_data: &str) -> Result<Option<PathBuf>, String> {
+pub fn folder_to_grant(location_json: Option<&str>, home: &str, app_data: &str, has_db: bool) -> Result<Option<PathBuf>, String> {
   let Some(dir) = location_json.and_then(parse_data_dir) else {
     return Ok(None);
   };
   let trimmed = dir.trim_end_matches('/');
-  if !dir.starts_with('/') || trimmed.split('/').any(|seg| seg == "..") || !trimmed.rsplit('/').next().is_some_and(|last| last.eq_ignore_ascii_case(DATA_SUBDIR)) {
-    return Err(format!("data folder is not an absolute {DATA_SUBDIR} folder: {dir}"));
+  let named = trimmed.rsplit('/').next().is_some_and(|last| last.eq_ignore_ascii_case(DATA_SUBDIR));
+  let clean = dir.starts_with('/') && trimmed.split('/').skip(1).all(|seg| !matches!(seg, "" | "." | ".."));
+  if !clean || !(named || has_db) {
+    return Err(format!("data folder is not an absolute {DATA_SUBDIR} folder or an existing data folder: {dir}"));
   }
   match refuse_picked(&dir, home, app_data) {
     Some(r) => Err(format!("data folder refused: {r:?}")),
@@ -109,16 +117,16 @@ mod tests {
   fn grants_only_a_valid_custom_folder() {
     let ok = "/Users/Ann/Documents/EnglishExamCoach";
     let loc = |d: &str| format!(r#"{{"dataDir": "{d}"}}"#);
-    assert_eq!(folder_to_grant(Some(&loc(ok)), HOME, APP), Ok(Some(PathBuf::from(ok))));
-    assert_eq!(folder_to_grant(Some(&loc("/Users/Ann/.ssh/EnglishExamCoach")), HOME, APP), Ok(Some(PathBuf::from("/Users/Ann/.ssh/EnglishExamCoach"))));
-    assert_eq!(folder_to_grant(Some(&loc("/Users/Ann/Documents/englishexamcoach/")), HOME, APP), Ok(Some(PathBuf::from("/Users/Ann/Documents/englishexamcoach/"))));
+    assert_eq!(folder_to_grant(Some(&loc(ok)), HOME, APP, false), Ok(Some(PathBuf::from(ok))));
+    assert_eq!(folder_to_grant(Some(&loc("/Users/Ann/.ssh/EnglishExamCoach")), HOME, APP, false), Ok(Some(PathBuf::from("/Users/Ann/.ssh/EnglishExamCoach"))));
+    assert_eq!(folder_to_grant(Some(&loc("/Users/Ann/Documents/englishexamcoach/")), HOME, APP, false), Ok(Some(PathBuf::from("/Users/Ann/Documents/englishexamcoach/"))));
   }
 
   #[test]
   fn default_location_grants_nothing() {
-    assert_eq!(folder_to_grant(None, HOME, APP), Ok(None));
-    assert_eq!(folder_to_grant(Some("{"), HOME, APP), Ok(None));
-    assert_eq!(folder_to_grant(Some("{}"), HOME, APP), Ok(None));
+    assert_eq!(folder_to_grant(None, HOME, APP, false), Ok(None));
+    assert_eq!(folder_to_grant(Some("{"), HOME, APP, false), Ok(None));
+    assert_eq!(folder_to_grant(Some("{}"), HOME, APP, false), Ok(None));
   }
 
   #[test]
@@ -136,8 +144,37 @@ mod tests {
       "Documents/EnglishExamCoach",
       "/Users/Ann/../Bob/EnglishExamCoach",
       "/Users/Ann/Documents/EnglishExamCoach/..",
+      "/Users/Ann//Documents/EnglishExamCoach",
+      "/Users/Ann/./Documents/EnglishExamCoach",
+      "/Users/Ann/Documents/EnglishExamCoach/.",
+      "//Users/Ann/Documents/EnglishExamCoach",
     ] {
-      assert!(folder_to_grant(Some(&loc(d)), HOME, APP).is_err(), "{d}");
+      assert!(folder_to_grant(Some(&loc(d)), HOME, APP, false).is_err(), "{d}");
     }
+  }
+
+  #[test]
+  fn grants_a_legacy_folder_only_when_it_holds_a_db_and_passes_the_rules() {
+    let loc = |d: &str| format!(r#"{{"dataDir": "{d}"}}"#);
+    let legacy = "/Users/Ann/Documents/my data";
+    assert_eq!(folder_to_grant(Some(&loc(legacy)), HOME, APP, true), Ok(Some(PathBuf::from(legacy))));
+    assert!(folder_to_grant(Some(&loc(legacy)), HOME, APP, false).is_err());
+    for d in ["/Users/Ann", "/Users/Ann/Library/Mail", "/Volumes/Disk", "/System/x", "Documents/x", "/Users/Ann/../Bob/data", "/Users/Ann//data", "/Users/Ann/./data"] {
+      assert!(folder_to_grant(Some(&loc(d)), HOME, APP, true).is_err(), "{d}");
+    }
+  }
+
+  #[test]
+  fn db_check_wants_a_regular_file() {
+    let dir = std::env::temp_dir().join(format!("enlearn-db-check-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    assert!(!has_regular_db(&dir));
+    std::fs::create_dir(dir.join("enlearn.db")).unwrap();
+    assert!(!has_regular_db(&dir));
+    std::fs::remove_dir(dir.join("enlearn.db")).unwrap();
+    std::fs::write(dir.join("enlearn.db"), b"x").unwrap();
+    assert!(has_regular_db(&dir));
+    std::fs::remove_dir_all(&dir).unwrap();
   }
 }

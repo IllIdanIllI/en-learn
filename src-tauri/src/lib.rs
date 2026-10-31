@@ -9,7 +9,8 @@ fn grant_current_data_folder<R: Runtime>(app: &AppHandle<R>) -> Result<(), Strin
   let app_data = path.app_data_dir().map_err(|e| e.to_string())?;
   let home = path.home_dir().map_err(|e| e.to_string())?;
   let location = std::fs::read_to_string(app_data.join("location.json")).ok();
-  let folder = data_folder::folder_to_grant(location.as_deref(), &home.to_string_lossy(), &app_data.to_string_lossy())?;
+  let has_db = location.as_deref().and_then(data_folder::parse_data_dir).is_some_and(|d| data_folder::has_regular_db(std::path::Path::new(&d)));
+  let folder = data_folder::folder_to_grant(location.as_deref(), &home.to_string_lossy(), &app_data.to_string_lossy(), has_db)?;
   if let Some(folder) = folder {
     app.fs_scope().allow_directory(folder, true).map_err(|e| e.to_string())?;
   }

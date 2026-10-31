@@ -1,4 +1,4 @@
-import { Ajv, type ValidateFunction } from 'ajv';
+import { Validator, type OutputUnit } from '@cfworker/json-schema';
 import type { LlmKind } from '@/core/domain';
 import type { Deps, LlmErrorCode, LlmResult } from '@/core/ports';
 import { getSettings } from '@/core/db/repos/settings';
@@ -7,16 +7,20 @@ import { insertLlmCall } from '@/core/db/repos/llmCalls';
 const DEFAULT_MAX_ATTEMPTS = 2;
 const RETRYABLE: ReadonlySet<LlmErrorCode> = new Set(['timeout', 'invalid_json', 'schema', 'check', 'cli_error']);
 
-const ajv = new Ajv({ allErrors: true, strict: false });
-const validators = new WeakMap<object, ValidateFunction>();
+// Interprets the schema without code generation: the app's CSP forbids eval and new Function.
+const validators = new WeakMap<object, Validator>();
 
-function validatorFor(schema: object): ValidateFunction {
+function validatorFor(schema: object): Validator {
   let v = validators.get(schema);
   if (!v) {
-    v = ajv.compile(schema);
+    v = new Validator(schema, '2019-09', false);
     validators.set(schema, v);
   }
   return v;
+}
+
+function errorsText(errors: OutputUnit[]): string {
+  return errors.map((e) => `${e.instanceLocation} ${e.error}`).join(', ');
 }
 
 export async function callStructured<T>(
@@ -65,13 +69,14 @@ export async function callStructured<T>(
 
 function checked<T>(
   res: LlmResult<unknown>,
-  validate: ValidateFunction,
+  validate: Validator,
   check: ((data: T) => string | null) | undefined,
 ): LlmResult<T> {
   if (!res.ok) return res;
   const base = { costUsd: res.costUsd, durationMs: res.durationMs, raw: res.raw, ...(res.sessionId ? { sessionId: res.sessionId } : {}) };
-  if (!validate(res.data)) {
-    return { ok: false, code: 'schema', message: ajv.errorsText(validate.errors), ...base };
+  const verdict = validate.validate(res.data);
+  if (!verdict.valid) {
+    return { ok: false, code: 'schema', message: errorsText(verdict.errors), ...base };
   }
   const data = res.data as T;
   const problem = check?.(data) ?? null;

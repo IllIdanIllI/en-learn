@@ -23,7 +23,11 @@ export class TauriPromptStore implements PromptStore {
   }
 
   private async override(path: string): Promise<string | null> {
-    return (await exists(path)) ? readTextFile(path) : null;
+    try {
+      return (await exists(path)) ? await readTextFile(path) : null;
+    } catch {
+      return null;
+    }
   }
 }
 

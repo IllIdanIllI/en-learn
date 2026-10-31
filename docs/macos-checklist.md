@@ -95,8 +95,26 @@ J. **A failed move keeps the old folder.**
 J2. **Access to the custom folder after a move and a restart (security round 1).**
    - Action: after a move (G), put a changed `grade.md` into `<new folder>/prompts/` and grade or generate something without restarting. Then quit, start the app again and repeat.
    - Expected: both times the changed prompt is used and the data loads. A folder you picked earlier that is not the current data folder is not accessible to the app after the restart. After a second move, the previous folder stays reachable until the restart.
-   - Also: a custom folder chosen before this round (not named `EnglishExamCoach`) keeps its database, but its prompt overrides are not used until you move the data once more.
+   - Also: a custom folder chosen before this round (not named `EnglishExamCoach`) keeps working, prompt overrides included, as long as it still holds `enlearn.db`; it can be moved again.
    - If it fails: record whether it failed right after the move or only after the restart, and the console error.
+
+J3. **Move into `EnglishExamCoach` and refusals (security round 1).**
+   - Action: Settings → Data folder → "Change…", pick `~/Documents`.
+   - Expected: the confirm names `~/Documents/EnglishExamCoach`; after the move the data is in that subfolder and nothing else in `~/Documents` changed. Moving again removes only the app's own files from the old subfolder.
+   - Also: picking your home folder, `/`, a folder in `~/Library` (other than the app data folder), `/System…` or a disk under `/Volumes` is refused with a message; a non-empty `EnglishExamCoach` is refused.
+   - If it fails: record the picked folder and the message.
+
+## Security policy (security round 1)
+
+O. **Production build works under the content security policy.**
+   - Action: `yarn tauri build`, open the bundle, generate and grade a session, open a rule and send a chat message. Open the devtools console (Cmd+Opt+I) if the build allows it.
+   - Expected: everything works; no "Refused to …" content-security-policy errors in the console.
+   - If it fails: copy the console error (it names the blocked directive).
+
+P. **Dev mode works under `devCsp`.**
+   - Action: `yarn tauri dev`, same steps as O.
+   - Expected: the page renders (not blank) and works; no content-security-policy errors.
+   - If it fails with a refused inline script: the React refresh preamble changed (usually after upgrading `@vitejs/plugin-react`). Copy the `sha256-…` hash from the console error into `devCsp` `script-src` in `src-tauri/tauri.conf.json`.
 
 ## Rule chat (round 5)
 

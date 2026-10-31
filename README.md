@@ -40,7 +40,7 @@ Delete the file to start from scratch.
 
 ## Data folder
 
-Settings → Data folder shows where the app keeps `enlearn.db` and `prompts/` (overrides). "Change…" moves them to a folder you pick; the choice is stored in `<app data>/location.json`.
+Settings → Data folder shows where the app keeps `enlearn.db` and `prompts/` (overrides). "Change…" moves them into an `EnglishExamCoach` subfolder of the folder you pick (it must not exist or be empty); the choice is stored in `<app data>/location.json`. Your home folder, `/`, `~/Library`, `/System` and disks under `/Volumes` are refused. The app can only open its own data folder: folders picked earlier are not accessible after a restart.
 
 ## Prompt overrides
 

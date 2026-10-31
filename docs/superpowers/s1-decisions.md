@@ -108,6 +108,21 @@ Spec `specs/2026-10-28-s1-feedback-round-5.md`, plan `plans/2026-10-28-s1-feedba
 - Rule chat cache: `--resume <id> --fork-session`; a clean-environment check showed a new id per turn, full history and growing cache reads (`notes/2026-10-28-prompt-cache.md`) — cost if wrong: none (measured).
 - The rule draft no longer gets the learner's errors; the prompt sentences about them (incl. inattention errors) are gone — cost if wrong: drafts may miss a trap the learner hit.
 
+## Security round 1 decisions (2026-10-31)
+
+Spec `specs/2026-10-31-security-round-1.md`, plan `plans/2026-10-31-security-round-1.md`, audit `notes/2026-10-30-security-audit.md`.
+
+- CSP `font-src` allows `data:` (the build inlines three font faces) — cost if wrong: none.
+- `devCsp` allows the React refresh preamble by its hash (Tauri's nonces make `'unsafe-inline'` ignored); a plugin upgrade can need a new hash (checklist P) — cost if wrong: blank dev page until updated.
+- LLM replies are validated with `@cfworker/json-schema` instead of Ajv, because Ajv generates code (`new Function`) that the CSP blocks; an e2e test runs the preview under the production policy — cost if wrong: one dependency swap.
+- Every CLI call adds `--safe-mode --disable-slash-commands` and runs in `<app data>/cli` (verified with Claude Code 2.1.312: sign-in, structured output, resume and cache work) — cost if wrong: none.
+- The data moves into `<picked>/EnglishExamCoach` (no spaces, at the learner's request); refusals compare paths case-insensitively — cost if wrong: none.
+- The folder picker grants the picked folder recursively for the current run (the move writes two levels below it); grants are no longer remembered — cost if wrong: that folder stays open until restart.
+- Rust grants only the current data folder from `location.json`: an absolute path without empty, `.` or `..` segments, passing the refusals, and either named `EnglishExamCoach` or already holding `enlearn.db` (folders chosen before this round) — cost if wrong: none.
+- A prompt override that cannot be read counts as no override — cost if wrong: a broken override is silently ignored.
+- A rule gap stores the rule version the grader saw; gaps from before this round, and gaps whose rule has changed since, cannot be approved (the message points to the rule chat) — cost if wrong: old pending gaps need the chat.
+- A grade reply whose rule-gap proposal breaks the skeleton is retried, not partly accepted — cost if wrong: an extra retry.
+
 ## Still open
 
 - **Mac-only checks** (`docs/macos-checklist.md`): `$HOME` in the shell permission, long multi-line arguments, plugin-sql migrations, the not-signed-in output, PATH/HOME when launched from Finder. Not verifiable in the Linux build container.
@@ -120,4 +135,6 @@ Spec `specs/2026-10-28-s1-feedback-round-5.md`, plan `plans/2026-10-28-s1-feedba
 - **Round 3 small known limitations** (from reviews, not fixed): the "previous questions" toggle has no `aria-controls`; a spelling error answered with nothing or ✓ shows the hint as "Было" and again under it; no e2e for a third added round or for disputing an earlier item after unfolding (logic checked by review).
 - **Round 5 Mac-only checks**: the rule chat through the Tauri shell scope (checklist K–N: first message, follow-up with `--resume`, proposal and save, with a budget).
 - **Round 5 small known limitations** (from reviews, not fixed): a first rule-chat message rejected by the checks leaves an unused CLI session file; a failed chat message stays in the list without a reply if a different message is sent instead of Retry; the chat tabs are the app's two-option toggle (radio role), not tabs; the CLI session id is not checked as a UUID before it is kept (the shell scope rejects a bad one); no e2e for today's new round next to a skip (unit tests cover it); the bold block-title prefix in the session log has no e2e (unit test only).
+- **Security round 1 accepted risks** (`notes/2026-10-30-security-audit.md`; for the round that moves the CLI call and the database into Rust, M1/M3): the folder picker grants the whole picked folder until restart, even when the move then refuses it; a script in the webview could still navigate the window to another site (CSP does not cover navigation); `fs:allow-remove` still allows a recursive delete inside granted folders; the Tauri `grant_data_folder` command and the packaged-app CSP are checked only on the Mac (checklist J2, J3, O, P).
+- **Security round 1 small known limitations** (from reviews, not fixed): a grade reply is retried when a rule gap with an unknown ref has a malformed proposal; if the current rule cannot be loaded, the "Changes" tab shows the whole proposal as added; a stale rule gap is refused only after "Approve" is pressed; the rule-gap proposal has no height cap; a failure to create `<app data>/cli` stops start-up.
 - **Design pass**: the learner noted the UI looks generic ("Claudified"); revisit after trying the app.

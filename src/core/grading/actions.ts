@@ -105,10 +105,17 @@ export async function setInattention(db: Db, itemId: number, value: boolean): Pr
   await db.execute('UPDATE answer SET is_inattention = ? WHERE item_id = ?', [value ? 1 : 0, itemId]);
 }
 
+/** The rule moved on (or its base is unknown) since the proposal was written; the learner should use the rule chat instead. */
+export class RuleGapStaleError extends Error {
+  constructor() {
+    super('Rule changed since this proposal was written');
+  }
+}
+
 /** Approve writes the proposal as a new rule version (reason 'rule gap'); reject leaves the rule unchanged. */
 export async function decideRuleGap(db: Db, gapId: number, approve: boolean, now: ISODate): Promise<void> {
-  const rows = await db.select<{ rule_id: number; proposal: string; sources: string; status: string }>(
-    'SELECT rule_id, proposal, sources, status FROM rule_gap WHERE id = ?',
+  const rows = await db.select<{ rule_id: number; proposal: string; sources: string; status: string; base_version: number | null }>(
+    'SELECT rule_id, proposal, sources, status, base_version FROM rule_gap WHERE id = ?',
     [gapId],
   );
   const gap = rows[0];
@@ -118,6 +125,8 @@ export async function decideRuleGap(db: Db, gapId: number, approve: boolean, now
     // A crash after the version write but before the status write leaves the gap pending; a retry must not add a duplicate version.
     const current = await getRule(db, gap.rule_id);
     if (current.body !== gap.proposal) {
+      // Unknown base (NULL, gap stored before the column existed) is refused like a moved rule: the safe side.
+      if (gap.base_version === null || gap.base_version !== current.version) throw new RuleGapStaleError();
       await saveRuleVersion(db, { ruleId: gap.rule_id }, gap.proposal, JSON.parse(gap.sources) as Source[], 'rule gap', now);
     }
   }

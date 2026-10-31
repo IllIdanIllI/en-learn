@@ -16,6 +16,22 @@ export function ruleSections(body: string): string[] {
   return [...body.matchAll(/^##[ \t]+(.+?)[ \t]*$/gm)].map((m) => m[1]!.trim());
 }
 
+/** A proposed rule body must keep to the skeleton: its headings are skeleton headings, each at most once, in skeleton order. */
+export function checkRuleBody(body: string, language: 'ru' | 'en'): string | null {
+  if (body.trim() === '') return 'Proposal body is empty';
+  const skeleton = SKELETON[language];
+  let last = -1;
+  const headings = ruleSections(body);
+  if (headings.length === 0) return 'Proposal has no section headings';
+  for (const h of headings) {
+    const at = skeleton.indexOf(h);
+    if (at < 0) return `Heading "${h}" is not in the skeleton`;
+    if (at <= last) return `Heading "${h}" is repeated or out of skeleton order`;
+    last = at;
+  }
+  return null;
+}
+
 /** Proposes a rule body for a topic. Does not save it; saving needs the learner's confirmation (D3). */
 export async function draftRule(deps: Deps, topicId: number): Promise<LlmResult<RuleDraft>> {
   const topic = (await getTopics(deps.db)).find((t) => t.id === topicId);

@@ -1,6 +1,7 @@
 import type { Deps } from '@/core/ports';
 import type { LlmErrorCode } from '@/core/ports';
 import type { GradeResult } from '@/core/llm/types';
+import { checkRuleBody } from '@/core/rules/rules';
 import { toneViolations } from '@/core/validate/tone';
 import { callStructured } from '@/core/llm/call';
 import { getSettings, setSetting } from '@/core/db/repos/settings';
@@ -181,6 +182,10 @@ async function run(
         if (missing.length > 0) return `missing refs: ${missing.join(', ')}`;
         const noProposal = r.items.filter((i) => i.verdict === 'rule_gap' && !r.ruleGaps.some((g) => g.ref === i.ref));
         if (noProposal.length > 0) return `rule_gap without ruleGaps entry: ${noProposal.map((i) => i.ref).join(', ')}`;
+        for (const g of r.ruleGaps) {
+          const bad = checkRuleBody(g.proposal, settings.nativeLanguage);
+          if (bad) return `rule gap ${g.ref}: ${bad}`;
+        }
         return toneViolations(proseOf(r)).join('; ') || null;
       },
     });

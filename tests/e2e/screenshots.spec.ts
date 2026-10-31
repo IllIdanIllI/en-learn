@@ -516,6 +516,10 @@ test.describe('today actions', () => {
     await expect(elephant(page).getByText('Не засчитано: в правилах пока нет такого случая')).toBeVisible();
     await expect(elephant(page).getByText('I saw one elephant')).toBeVisible();
     await expect(page.getByText('1 из 2')).toBeVisible();
+    await expect(elephant(page).getByRole('radio', { name: 'Новая версия' })).toBeChecked();
+    await elephant(page).getByRole('radio', { name: 'Изменения' }).click();
+    await expect(elephant(page).getByTestId('diff-add')).toContainText('I saw one elephant');
+    await elephant(page).getByRole('radio', { name: 'Новая версия' }).click();
     await elephant(page).scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${SHOTS}/today-rule-gap.png` });
     await elephant(page).getByRole('button', { name: 'Принять' }).click();

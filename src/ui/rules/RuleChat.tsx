@@ -2,23 +2,15 @@ import { useRef, useState } from 'react';
 import { t, type Lang } from '@/core/i18n';
 import type { Source } from '@/core/llm/types';
 import { saveRuleVersion } from '@/core/db/repos/rules';
-import { lineDiff } from '@/core/rules/lineDiff';
 import { ruleChatTurn } from '@/core/rules/chat';
-import { cn } from '@/lib/utils';
 import { useCore } from '@/ui/app/CoreProvider';
-import { Segmented } from '@/ui/components/Segmented';
 import { Button } from '@/ui/components/ui/button';
 import { FieldInput } from '@/ui/components/ui/field-input';
 import { Notice } from '@/ui/today/chips';
-import { RuleBody } from '@/ui/today/RuleBody';
-import { SourceList } from '@/ui/today/RulePanel';
-import { bodyHasSources } from '@/ui/today/ruleSources';
+import { ProposalTabs } from './ProposalTabs';
 
 interface Proposal { body: string; sources: Source[] }
 type Message = { from: 'learner'; text: string } | { from: 'coach'; text: string; proposal: Proposal | null };
-
-const DIFF_TONE = { add: 'bg-success/10 text-success', del: 'bg-destructive/10 text-destructive', same: 'text-muted-foreground' } as const;
-const DIFF_MARK = { add: '+ ', del: '- ', same: '  ' } as const;
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -26,7 +18,6 @@ function ProposalCard({ proposal, current, ruleId, lang, onSaved }: {
   proposal: Proposal; current: string; ruleId: number; lang: Lang; onSaved: () => void;
 }) {
   const { deps } = useCore();
-  const [tab, setTab] = useState<'new' | 'diff'>('new');
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -49,26 +40,7 @@ function ProposalCard({ proposal, current, ruleId, lang, onSaved }: {
 
   return (
     <div className="mt-3 rounded-md border border-border px-4 py-3">
-      <Segmented
-        value={tab}
-        onChange={setTab}
-        label={t(lang, 'rulechat.proposal')}
-        options={[{ value: 'new', label: t(lang, 'rulechat.tabNew') }, { value: 'diff', label: t(lang, 'rulechat.tabDiff') }]}
-      />
-      {tab === 'new' ? (
-        <>
-          <RuleBody body={proposal.body} className="mt-3" />
-          {!bodyHasSources(proposal.body) && <SourceList sources={proposal.sources} lang={lang} />}
-        </>
-      ) : (
-        <pre className="mt-3 overflow-x-auto font-mono text-note whitespace-pre-wrap">
-          {lineDiff(current, proposal.body).map((l, i) => (
-            <div key={i} data-testid={l.kind === 'same' ? undefined : `diff-${l.kind}`} className={cn('px-1', DIFF_TONE[l.kind])}>
-              {DIFF_MARK[l.kind]}{l.text}
-            </div>
-          ))}
-        </pre>
-      )}
+      <ProposalTabs body={proposal.body} sources={proposal.sources} current={current} lang={lang} />
       <label className="mt-4 block">
         <span className="label text-muted-foreground">{t(lang, 'rule.reason')}</span>
         <FieldInput className="mt-1 max-w-md" value={reason} disabled={saving} onChange={(e) => { setReason(e.target.value); setError(null); }} />

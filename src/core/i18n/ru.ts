@@ -232,6 +232,7 @@ export const ru: Record<keyof typeof en, string> = {
   'gap.reject': 'Отклонить',
   'gap.approved': 'Правило обновлено.',
   'gap.rejected': 'Предложение отклонено.',
+  'gap.stale': 'Правило изменилось после этого предложения. Внесите правку через чат правила.',
   'mnemonic.label': 'Мнемоника',
   'mnemonic.placeholder': 'Подсказка, как запомнить написание',
   'mnemonic.saved': 'Сохранено',

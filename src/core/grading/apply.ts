@@ -87,9 +87,11 @@ export async function applyGraded(db: Db, clock: Clock, items: GradingItem[], g:
   }
   for (const gap of g.result.ruleGaps) {
     const it = refs.byRef.get(gap.ref);
-    if (!it || it.ruleId === null) continue;
+    // The grader saw the rule version pinned on the item, so that is the version the proposal is written against.
+    if (!it || it.ruleId === null || it.ruleVersion === null) continue;
     await upsertRuleGap(db, {
       itemId: it.id, ruleId: it.ruleId, proposal: gap.proposal, explanation: gap.explanation, sources: JSON.stringify(gap.sources),
+      baseVersion: it.ruleVersion,
     });
   }
   for (const w of g.result.spellingErrors) {

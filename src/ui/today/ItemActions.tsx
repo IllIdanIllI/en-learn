@@ -1,13 +1,14 @@
-import { useRef, useState } from 'react';
-import { decideRuleGap, saveMnemonic, setInattention } from '@/core/grading/actions';
+import { useEffect, useRef, useState } from 'react';
+import { decideRuleGap, RuleGapStaleError, saveMnemonic, setInattention } from '@/core/grading/actions';
+import { getRule } from '@/core/db/repos/rules';
 import { t, type Lang } from '@/core/i18n';
 import type { ViewItem } from '@/core/session/view';
 import { useCore } from '@/ui/app/CoreProvider';
+import { ProposalTabs } from '@/ui/rules/ProposalTabs';
 import { Button } from '@/ui/components/ui/button';
 import { Input } from '@/ui/components/ui/input';
 import { Toggle } from '@/ui/components/ui/toggle';
 import { DisputeField } from './DisputeField';
-import { RuleBody } from './RuleBody';
 import { Notice } from './chips';
 import { useSessionActions } from './sessionActions';
 
@@ -20,6 +21,11 @@ function GapProposal({ item, lang }: { item: ViewItem; lang: Lang }) {
   const gap = item.gap!;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [current, setCurrent] = useState<string | null>(null);
+  useEffect(() => {
+    if (item.ruleId === null) return;
+    void getRule(deps.db, item.ruleId).then((r) => setCurrent(r.body), () => setCurrent(''));
+  }, [deps.db, item.ruleId]);
   if (gap.status !== 'pending') {
     return <p className="mt-3 text-muted-foreground">{t(lang, gap.status === 'approved' ? 'gap.approved' : 'gap.rejected')}</p>;
   }
@@ -30,7 +36,7 @@ function GapProposal({ item, lang }: { item: ViewItem; lang: Lang }) {
       await decideRuleGap(deps.db, gap.id, approve, deps.clock.now());
       reload();
     } catch (e) {
-      setError(message(e));
+      setError(e instanceof RuleGapStaleError ? t(lang, 'gap.stale') : t(lang, 'action.error', { message: message(e) }));
     } finally {
       setBusy(false);
     }
@@ -38,12 +44,14 @@ function GapProposal({ item, lang }: { item: ViewItem; lang: Lang }) {
   return (
     <div className="mt-3 rounded-md border border-border px-4 py-3">
       <p className="label text-muted-foreground">{t(lang, 'gap.title')}</p>
-      <RuleBody body={gap.proposal} className="mt-1 max-h-96 overflow-y-auto" />
+      <div className="mt-2">
+        {current !== null && <ProposalTabs body={gap.proposal} sources={gap.sources} current={current} lang={lang} />}
+      </div>
       <div className="mt-3 flex gap-2">
         <Button variant="secondary" size="sm" disabled={busy} onClick={() => void decide(true)}>{t(lang, 'gap.approve')}</Button>
         <Button variant="ghost" size="sm" disabled={busy} onClick={() => void decide(false)}>{t(lang, 'gap.reject')}</Button>
       </div>
-      {error !== null && <Notice className="mt-3">{t(lang, 'action.error', { message: error })}</Notice>}
+      {error !== null && <Notice className="mt-3">{error}</Notice>}
     </div>
   );
 }

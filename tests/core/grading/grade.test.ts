@@ -434,13 +434,13 @@ describe('gradeSession', () => {
         entry('b1.i2', 'correct'),
         ...spotEntries([0, 1]),
       ],
-      ruleGaps: [{ ref: 'b1.i1', ruleTopicKey: 'articles', proposal: 'New body', explanation: 'Adds a case', sources: [] }],
+      ruleGaps: [{ ref: 'b1.i1', ruleTopicKey: 'articles', proposal: '## Formula\nNew body', explanation: 'Adds a case', sources: [] }],
     });
     const { db, deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(r)]);
     await gradeSession(deps, sid, subm(), []);
     expect(await rows(db, 'SELECT status, note FROM item WHERE id = 2')).toEqual([{ status: 'defect', note: 'Two valid answers.' }]);
     expect((await verdicts(db))[2]).toBeUndefined();
-    expect(await rows(db, 'SELECT item_id, rule_id, status, proposal FROM rule_gap')).toEqual([{ item_id: 3, rule_id: 1, status: 'pending', proposal: 'New body' }]);
+    expect(await rows(db, 'SELECT item_id, rule_id, status, proposal, base_version FROM rule_gap')).toEqual([{ item_id: 3, rule_id: 1, status: 'pending', proposal: '## Formula\nNew body', base_version: 1 }]);
     expect((await verdicts(db))[3]).toBe('rule_gap');
   });
 
@@ -502,10 +502,19 @@ describe('gradeSession', () => {
 
   test('a rule_gap verdict without a ruleGaps entry is an invalid response and is retried', async () => {
     const noGap = fullResult({ items: [entry('b1.i0', 'rule_gap'), entry('b1.i1', 'correct'), entry('b1.i2', 'correct'), ...spotEntries([0, 1])] });
-    const withGap = { ...noGap, ruleGaps: [{ ref: 'b1.i0', ruleTopicKey: 'articles', proposal: 'P', explanation: 'E', sources: [] }] };
+    const withGap = { ...noGap, ruleGaps: [{ ref: 'b1.i0', ruleTopicKey: 'articles', proposal: '## Formula\nP', explanation: 'E', sources: [] }] };
     const { db, llm, deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(noGap), ok(withGap)]);
     expect(await gradeSession(deps, sid, subm(), [])).toEqual({ kind: 'graded' });
     expect(llm.calls).toHaveLength(2);
     expect(await rows(db, 'SELECT status FROM rule_gap')).toEqual([{ status: 'pending' }]);
+  });
+
+  test('a rule-gap proposal with a non-skeleton heading is invalid and is retried', async () => {
+    const base = fullResult({ items: [entry('b1.i0', 'rule_gap'), entry('b1.i1', 'correct'), entry('b1.i2', 'correct'), ...spotEntries([0, 1])] });
+    const gap = (proposal: string) => ({ ...base, ruleGaps: [{ ref: 'b1.i0', ruleTopicKey: 'articles', proposal, explanation: 'E', sources: [] }] });
+    const { db, llm, deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(gap('## Examples\nP\n## Formula\nQ')), ok(gap('## Formula\nP'))]);
+    expect(await gradeSession(deps, sid, subm(), [])).toEqual({ kind: 'graded' });
+    expect(llm.calls).toHaveLength(2);
+    expect(await rows(db, 'SELECT proposal FROM rule_gap')).toEqual([{ proposal: '## Formula\nP' }]);
   });
 });

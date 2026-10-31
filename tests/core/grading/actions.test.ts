@@ -14,7 +14,7 @@ import type { Db, Deps, Llm, LlmResult } from '@/core/ports';
 import type { DisputeReply, Source } from '@/core/llm/types';
 import type { Verdict } from '@/core/domain';
 import {
-  decideDispute, decideRuleGap, disputeItem, disputeItems, recordSupport, saveMnemonic, setInattention,
+  decideDispute, decideRuleGap, disputeItem, disputeItems, RuleGapStaleError, recordSupport, saveMnemonic, setInattention,
 } from '@/core/grading/actions';
 
 const seedDir = path.resolve(import.meta.dirname, '../../fixtures/seed');
@@ -33,7 +33,7 @@ const reply = (recommendation: DisputeReply['recommendation'] = 'drop'): Dispute
 
 const one = (r: DisputeReply, ref = 'd1'): LlmResult<unknown> => ok({ replies: [{ ref, ...r }] });
 
-const PROPOSAL = '## Basics\n\nUse "a" before a consonant sound and "an" before a vowel sound, including silent h: "an hour".';
+const PROPOSAL = '## Formula\n\nUse "a" before a consonant sound and "an" before a vowel sound, including silent h: "an hour".';
 const GAP_SOURCES: Source[] = [{ title: 'Cambridge Dictionary', url: 'https://dictionary.cambridge.org/grammar/british-grammar/a-an-and-the' }];
 
 interface Row {
@@ -68,7 +68,7 @@ async function gradedSession(rows: Row[], status: 'draft' | 'generated' | 'grade
       itemId, text: r.text, verdict: r.verdict, fix: r.fix ?? null, ruleSection: 'Basics',
       explanation: r.explanation ?? null, vocabularyNote: null,
     });
-    if (r.gap) await upsertRuleGap(db, { itemId, ruleId: 1, proposal: r.gap.proposal, explanation: r.gap.explanation, sources: JSON.stringify(r.gap.sources) });
+    if (r.gap) await upsertRuleGap(db, { itemId, ruleId: 1, proposal: r.gap.proposal, explanation: r.gap.explanation, sources: JSON.stringify(r.gap.sources), baseVersion: 1 });
   }
   await setSessionStatus(db, sid, status);
   return { db, sid, blockId, ids };
@@ -317,6 +317,25 @@ describe('decideRuleGap', () => {
     expect(await count(db, 'SELECT COUNT(*) AS n FROM rule_version WHERE rule_id = 1')).toBe(2);
     expect(await count(db, 'SELECT COUNT(*) AS n FROM rule_gap WHERE id = ? AND status = ?', [gapId, 'approved'])).toBe(1);
     expect((await loadGradedFacts(db)).errorRows.find((r) => r.itemId === ids[0])!.effective).toBe('correct');
+  });
+
+  test('approve is refused when the rule has a newer version than the gap was proposed against', async () => {
+    const { db } = await gradedSession([{ ...GAP }]);
+    const gapId = (await db.select<{ id: number }>('SELECT id FROM rule_gap'))[0]!.id;
+    await saveRuleVersion(db, { ruleId: 1 }, '## Formula\n\nOther edit.', [], 'manual', NOW);
+    await expect(decideRuleGap(db, gapId, true, NOW)).rejects.toBeInstanceOf(RuleGapStaleError);
+    expect(await getRule(db, 1)).toMatchObject({ version: 2, body: '## Formula\n\nOther edit.' });
+    expect(await count(db, 'SELECT COUNT(*) AS n FROM rule_gap WHERE id = ? AND status = ?', [gapId, 'pending'])).toBe(1);
+    await decideRuleGap(db, gapId, false, NOW);
+    expect(await count(db, 'SELECT COUNT(*) AS n FROM rule_gap WHERE id = ? AND status = ?', [gapId, 'rejected'])).toBe(1);
+  });
+
+  test('approve is refused when the base version is unknown (NULL)', async () => {
+    const { db } = await gradedSession([{ ...GAP }]);
+    const gapId = (await db.select<{ id: number }>('SELECT id FROM rule_gap'))[0]!.id;
+    await db.execute('UPDATE rule_gap SET base_version = NULL WHERE id = ?', [gapId]);
+    await expect(decideRuleGap(db, gapId, true, NOW)).rejects.toBeInstanceOf(RuleGapStaleError);
+    expect((await getRule(db, 1)).version).toBe(1);
   });
 
   test('reject leaves the rule unchanged and the item not counted', async () => {

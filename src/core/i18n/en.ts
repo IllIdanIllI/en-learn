@@ -230,6 +230,7 @@ export const en = {
   'gap.reject': 'Reject',
   'gap.approved': 'The rule is updated.',
   'gap.rejected': 'The proposal is rejected.',
+  'gap.stale': 'The rule has changed since this proposal. Make the change in the rule chat instead.',
   'mnemonic.label': 'Mnemonic',
   'mnemonic.placeholder': 'A trick to remember the spelling',
   'mnemonic.saved': 'Saved',

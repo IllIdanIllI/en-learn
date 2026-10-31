@@ -228,12 +228,13 @@ export async function upsertExtraFinding(db: Db, blockId: number, paragraph: num
 /** A pending proposal; the status of an existing row is kept. */
 export async function upsertRuleGap(
   db: Db,
-  g: { itemId: number; ruleId: number; proposal: string; explanation: string; sources: string },
+  g: { itemId: number; ruleId: number; proposal: string; explanation: string; sources: string; baseVersion: number },
 ): Promise<void> {
   await db.execute(
-    `INSERT INTO rule_gap (item_id, rule_id, proposal, explanation, sources) VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(item_id) DO UPDATE SET proposal = excluded.proposal, explanation = excluded.explanation, sources = excluded.sources`,
-    [g.itemId, g.ruleId, g.proposal, g.explanation, g.sources],
+    `INSERT INTO rule_gap (item_id, rule_id, proposal, explanation, sources, base_version) VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(item_id) DO UPDATE SET proposal = excluded.proposal, explanation = excluded.explanation, sources = excluded.sources,
+       base_version = excluded.base_version`,
+    [g.itemId, g.ruleId, g.proposal, g.explanation, g.sources, g.baseVersion],
   );
 }
 

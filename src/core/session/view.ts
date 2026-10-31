@@ -1,3 +1,4 @@
+import type { Source } from '@/core/llm/types';
 import type {
   BlockFormat, BlockKind, DisputeDecision, EffectiveVerdict, GapStatus, ISODate, ItemStatus, SessionStatus, Verdict,
 } from '@/core/domain';
@@ -34,7 +35,7 @@ export interface ViewItem {
   note?: string | null;
   answer?: ViewAnswer | null;
   effective?: EffectiveVerdict;
-  gap?: { id: number; status: GapStatus; proposal: string } | null;
+  gap?: { id: number; status: GapStatus; proposal: string; sources: Source[] } | null;
   /** Graded spelling items: the word's id and the learner's saved mnemonic. */
   spellingWordId?: number | null;
   mnemonic?: string | null;
@@ -93,7 +94,7 @@ interface ItemRow {
   a_text: string | null; a_verdict: Verdict | null; a_fix: string | null; a_rule_section: string | null;
   a_explanation: string | null; a_vocabulary_note: string | null; a_is_inattention: number | null;
   a_dispute_text: string | null; a_dispute_reply: string | null; a_dispute_decision: DisputeDecision | null;
-  has_answer: number | null; spelling_word_id: number | null; mnemonic: string | null; gap_id: number | null; gap_status: GapStatus | null; gap_proposal: string | null;
+  has_answer: number | null; spelling_word_id: number | null; mnemonic: string | null; gap_id: number | null; gap_status: GapStatus | null; gap_proposal: string | null; gap_sources: string | null;
 }
 
 /**
@@ -119,7 +120,7 @@ export async function loadSessionView(db: Db, sessionId: number): Promise<Sessio
             a.text AS a_text, a.verdict AS a_verdict, a.fix AS a_fix, a.rule_section AS a_rule_section,
             a.explanation AS a_explanation, a.vocabulary_note AS a_vocabulary_note, a.is_inattention AS a_is_inattention,
             a.dispute_text AS a_dispute_text, a.dispute_reply AS a_dispute_reply, a.dispute_decision AS a_dispute_decision,
-            a.item_id AS has_answer, i.spelling_word_id AS spelling_word_id, w.mnemonic AS mnemonic, g.id AS gap_id, g.status AS gap_status, g.proposal AS gap_proposal
+            a.item_id AS has_answer, i.spelling_word_id AS spelling_word_id, w.mnemonic AS mnemonic, g.id AS gap_id, g.status AS gap_status, g.proposal AS gap_proposal, g.sources AS gap_sources
      FROM item i JOIN block b ON b.id = i.block_id
      LEFT JOIN answer a ON a.item_id = i.id LEFT JOIN rule_gap g ON g.item_id = i.id
      LEFT JOIN spelling_word w ON w.id = i.spelling_word_id
@@ -168,7 +169,7 @@ export async function loadSessionView(db: Db, sessionId: number): Promise<Sessio
       }),
       spellingWordId: r.spelling_word_id,
       mnemonic: r.mnemonic,
-      gap: r.gap_id === null ? null : { id: r.gap_id, status: r.gap_status ?? 'pending', proposal: r.gap_proposal ?? '' },
+      gap: r.gap_id === null ? null : { id: r.gap_id, status: r.gap_status ?? 'pending', proposal: r.gap_proposal ?? '', sources: JSON.parse(r.gap_sources ?? '[]') as Source[] },
     };
   };
 

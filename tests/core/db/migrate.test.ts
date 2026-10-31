@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import { splitStatements, runMigrations } from '@/core/db/migrate';
 import { createTestDb } from '@/adapters/test/sqliteDb';
+import Database from 'better-sqlite3';
+import { migrations } from '@/core/db/migrations';
 import type { Db } from '@/core/ports';
 
 describe('splitStatements', () => {
@@ -36,13 +38,13 @@ function counting(db: Db): { db: Db; executed: string[] } {
 }
 
 describe('runMigrations', () => {
-  test('fresh db returns 2; second run returns 2 and executes nothing new', async () => {
+  test('fresh db returns 3; second run returns 3 and executes nothing new', async () => {
     const raw = await createTestDb(); // already migrated once
     const rows = await raw.select<{ schema_version: number }>('SELECT schema_version FROM meta');
-    expect(rows).toEqual([{ schema_version: 2 }]);
+    expect(rows).toEqual([{ schema_version: 3 }]);
     const c = counting(raw);
     const list = [{ version: 1, sql: 'CREATE TABLE zzz (x INTEGER);' }];
-    expect(await runMigrations(c.db, list)).toBe(2);
+    expect(await runMigrations(c.db, list)).toBe(3);
     expect(c.executed.some((s) => s.includes('zzz'))).toBe(false);
     expect(await raw.select('SELECT * FROM meta')).toHaveLength(1);
   });
@@ -50,12 +52,30 @@ describe('runMigrations', () => {
   test('applies only newer migrations, in order', async () => {
     const db = await createTestDb();
     const v = await runMigrations(db, [
-      { version: 2, sql: 'CREATE TABLE ignored (x INTEGER);' },
-      { version: 3, sql: 'CREATE TABLE t2 (x INTEGER);' },
+      { version: 3, sql: 'CREATE TABLE ignored (x INTEGER);' },
+      { version: 4, sql: 'CREATE TABLE t2 (x INTEGER);' },
     ]);
-    expect(v).toBe(3);
+    expect(v).toBe(4);
     expect(await db.select('SELECT * FROM t2')).toEqual([]);
-    expect(await db.select('SELECT * FROM meta')).toEqual([{ schema_version: 3 }]);
+    expect(await db.select('SELECT * FROM meta')).toEqual([{ schema_version: 4 }]);
+  });
+
+  test('0003 adds rule_gap.base_version to an existing db; old rows get NULL', async () => {
+    const raw = new Database(':memory:');
+    raw.pragma('foreign_keys = OFF'); // only the column is under test, not the referenced rows
+    const db: Db = {
+      async execute(sql, params) {
+        const info = raw.prepare(sql).run(...((params ?? []) as unknown[]));
+        return { lastInsertId: Number(info.lastInsertRowid), rowsAffected: info.changes };
+      },
+      async select<T>(sql: string, params?: unknown[]) {
+        return raw.prepare(sql).all(...((params ?? []) as unknown[])) as T[];
+      },
+    };
+    expect(await runMigrations(db, migrations.filter((m) => m.version <= 2))).toBe(2);
+    await db.execute("INSERT INTO rule_gap (id, item_id, rule_id, proposal, explanation, sources) VALUES (1, 1, 1, 'p', 'e', '[]')");
+    expect(await runMigrations(db, migrations)).toBe(3);
+    expect(await db.select('SELECT id, base_version FROM rule_gap')).toEqual([{ id: 1, base_version: null }]);
   });
 });
 

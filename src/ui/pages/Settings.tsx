@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { t, type MessageKey } from '@/core/i18n';
 import type { Effort, LlmKind } from '@/core/domain';
 import { CLAUDE_LOCATIONS } from '@/core/llm/claude';
-import { MoveRefused } from '@/core/dataFolder';
+import { MoveRefused, moveTarget } from '@/core/dataFolder';
 import { Button } from '@/ui/components/ui/button';
 import { setSetting, type Settings as SettingsData } from '@/core/db/repos/settings';
 import { FieldInput } from '@/ui/components/ui/field-input';
@@ -55,7 +55,7 @@ export function Settings() {
     try {
       const { open, ask } = await import('@tauri-apps/plugin-dialog');
       const picked = await open({ directory: true, multiple: false });
-      if (typeof picked !== 'string' || !(await ask(t(lang, 'settings.dataDir.confirm', { path: picked }), { kind: 'warning' }))) return;
+      if (typeof picked !== 'string' || !(await ask(t(lang, 'settings.dataDir.confirm', { path: moveTarget(picked) }), { kind: 'warning' }))) return;
       setMoving(true);
       await moveDataDir(picked);
     } catch (e) {

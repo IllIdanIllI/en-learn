@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { t } from '@/core/i18n';
 import { cleanupPlan, moveTarget, planMove, refusePicked } from '@/core/dataFolder';
 
 const present = ['enlearn.db', 'enlearn.db-wal', 'prompts/grade.md', 'prompts/sub/x.json'];
@@ -56,9 +57,23 @@ test('other picked folders pass, including the app data folder and below it', ()
   expect(refusePicked(`${appData}/sub/`, home, appData)).toBeNull();
 });
 
-test('comparison is case-sensitive', () => {
-  expect(refusePicked('/users/me', home, appData)).toBeNull();
-  expect(refusePicked('/system', home, appData)).toBeNull();
+test('comparison is case-insensitive', () => {
+  expect(refusePicked('/users/ME', home, appData)).toBe('home');
+  expect(refusePicked('/system/x', home, appData)).toBe('system');
+  expect(refusePicked('/VOLUMES/Backup', home, appData)).toBe('volume');
+  expect(refusePicked('/users/me/LIBRARY/x', home, appData)).toBe('library');
+  expect(refusePicked(appData.toUpperCase(), home, appData)).toBeNull();
+});
+
+test('the confirm text names the real target folder', () => {
+  expect(t('en', 'settings.dataDir.confirm', { path: moveTarget('/x/y/') })).toContain('/x/y/EnglishExamCoach');
+});
+
+test('a rollback list removes copied files, then the dirs under the target, deepest first', () => {
+  expect(cleanupPlan(['/t/enlearn.db', '/t/prompts/sub/a.md'], ['/t'])).toEqual({
+    files: ['/t/enlearn.db', '/t/prompts/sub/a.md'],
+    dirs: ['/t/prompts/sub', '/t/prompts'],
+  });
 });
 
 test('the data goes into a subfolder of the picked folder', () => {

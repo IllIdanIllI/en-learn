@@ -7,26 +7,27 @@ const trimSlash = (p: string) => p.replace(/\/+$/, '');
 
 /**
  * Picked-folder refusal rules (the Rust side ports these verbatim).
- * Every path first loses its trailing slashes, so `/` becomes the empty string; comparison is case-sensitive.
+ * Every path first loses its trailing slashes (so `/` becomes the empty string) and is lowercased: comparison is case-insensitive, like the default macOS filesystem.
+ * Task 4 (Rust) mirrors these rules.
  * First match wins:
  *  1. root:    picked is empty (`/`)
  *  2. home:    picked equals home
- *  3. system:  picked equals `/System` or starts with `/System/`
- *  4. volume:  picked is `/Volumes/<name>`, exactly one non-empty segment below `/Volumes`
- *  5. library: picked equals `<home>/Library` or starts with `<home>/Library/`,
+ *  3. system:  picked equals `/system` or starts with `/system/`
+ *  4. volume:  picked is `/volumes/<name>`, exactly one non-empty segment below `/volumes`
+ *  5. library: picked equals `<home>/library` or starts with `<home>/library/`,
  *              unless picked equals appData or starts with `<appData>/`
  * Anything else passes (null).
  */
 export function refusePicked(picked: string, home: string, appData: string): PickRefusal | null {
-  const p = trimSlash(picked);
-  const h = trimSlash(home);
-  const app = trimSlash(appData);
+  const p = trimSlash(picked).toLowerCase();
+  const h = trimSlash(home).toLowerCase();
+  const app = trimSlash(appData).toLowerCase();
   const within = (dir: string) => p === dir || p.startsWith(`${dir}/`);
   if (p === '') return 'root';
   if (p === h) return 'home';
-  if (within('/System')) return 'system';
-  if (/^\/Volumes\/[^/]+$/.test(p)) return 'volume';
-  if (within(`${h}/Library`) && !within(app)) return 'library';
+  if (within('/system')) return 'system';
+  if (/^\/volumes\/[^/]+$/.test(p)) return 'volume';
+  if (within(`${h}/library`) && !within(app)) return 'library';
   return null;
 }
 

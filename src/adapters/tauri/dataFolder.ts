@@ -58,6 +58,7 @@ export async function moveDataDir(cur: DataLocation, picked: string, closeDb: ()
     return `${rel.startsWith('prompts/') ? promptsBase : dbBase}/${rel}`;
   };
   const made: string[] = [];
+  const createdTarget = !(await exists(target));
   try {
     await mkdir(target, { recursive: true });
     for (const c of plan.copies) {
@@ -70,7 +71,10 @@ export async function moveDataDir(cur: DataLocation, picked: string, closeDb: ()
     }
     await writeTextFile(`${cur.appDataDir}/location.json`, JSON.stringify({ dataDir: target }));
   } catch (e) {
-    for (const p of made) await remove(p).catch(() => undefined);
+    const undo = cleanupPlan(made, [target]);
+    for (const f of undo.files) await remove(f).catch(() => undefined);
+    for (const d of undo.dirs) if ((await readDir(d).catch(() => [null])).length === 0) await remove(d).catch(() => undefined);
+    if (createdTarget && (await readDir(target).catch(() => [null])).length === 0) await remove(target).catch(() => undefined);
     throw e;
   }
 

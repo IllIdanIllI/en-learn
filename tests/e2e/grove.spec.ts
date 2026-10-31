@@ -135,6 +135,18 @@ test.describe('sidebar garden', () => {
     await expect(page.locator('[data-garden] [data-geta]')).toHaveCount(0);
   });
 
+  test('geta follows closing and reopening without a reload', async ({ page }) => {
+    await page.goto('/?state=graded#/today');
+    await expect(page.locator('[data-garden]')).toBeVisible();
+    await expect(page.locator('[data-garden] [data-geta]')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Закрыть урок' }).click();
+    await expect(page.getByRole('heading', { name: 'Урок завершён' })).toBeVisible();
+    await expect(page.locator('[data-garden] [data-geta]')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Добавить вопросы' }).click();
+    await expect(page.getByRole('heading', { name: 'Урок завершён' })).toHaveCount(0);
+    await expect(page.locator('[data-garden] [data-geta]')).toHaveCount(0);
+  });
+
   test('Lamp has no garden; collapsed sidebar hides it', async ({ page }) => {
     await page.goto('/?state=graded#/settings');
     await page.getByRole('radio', { name: 'Лампа' }).click();
@@ -189,6 +201,13 @@ test.describe('lesson details', () => {
     await page.screenshot({ path: 'test-results/screens/grove-lesson-answering-dark.png' });
   });
 
+  test('grove: no divider above the first visible block of an added round', async ({ page }) => {
+    await page.goto('/?state=open-round#/today');
+    const round = page.locator('#latest-round');
+    await expect(round.locator('section').first()).toBeVisible();
+    await expect(round.locator('[data-divider]')).toHaveCount((await round.locator('section').count()) - 1);
+  });
+
   test('grove: score bar after checking, dry leaves in the error bank', async ({ page }) => {
     await page.goto('/?state=graded#/today');
     const bar = page.locator('[data-score-bar]');
@@ -202,6 +221,11 @@ test.describe('lesson details', () => {
     await expect(bar).toContainText(`${right} / ${counted}`);
     await expect(bar).toContainText(`Верно ${right} из ${counted}`);
     await expect(bar.locator('svg')).toHaveCount(1);
+    const sizes = await page.evaluate(() => ({
+      score: parseFloat(getComputedStyle(document.querySelector('[data-score-bar] .grove-score')!).fontSize),
+      title: parseFloat(getComputedStyle(document.querySelector('h2.title')!).fontSize),
+    }));
+    expect(sizes.score).toBeGreaterThan(sizes.title);
     await page.screenshot({ path: 'test-results/screens/grove-lesson-checked-dark.png' });
 
     await page.goto('/?state=graded#/errors');

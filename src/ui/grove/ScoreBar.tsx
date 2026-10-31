@@ -11,7 +11,7 @@ export function ScoreBar({ view, lang }: { view: SessionView; lang: Lang }) {
   const n = states.filter((s) => s === 'ok').length;
   return (
     <div data-score-bar className="mt-4">
-      <p className="title tabular text-4xl">{n} / {states.length}</p>
+      <p className="title grove-score tabular">{n} / {states.length}</p>
       <p className="label text-muted-foreground">{t(lang, 'grove.correct', { n, m: states.length })}</p>
       <Pixel rows={stalkMeter(states)} className="mt-2 max-w-full" />
     </div>

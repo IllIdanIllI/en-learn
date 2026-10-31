@@ -20,7 +20,7 @@ import { GENERATION_STAGES, Loader, type LoaderView } from '@/ui/today/Loader';
 import { GENERATION_KINDS, useWaitInfo } from '@/ui/today/useWaitInfo';
 
 export function Today() {
-  const { deps, lang, version, prereq } = useCore();
+  const { deps, lang, version, prereq, refresh } = useCore();
   const noClaude = prereq !== null && !prereq.ok;
   const [state, setState] = useState<TodayState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -101,12 +101,16 @@ export function Today() {
   const start = (light: boolean) => void build((onStage) => generateSession(deps, { light }, onStage));
   const addMore = (sessionId: number) => {
     setShowResults(false);
-    void build((onStage) => extendSession(deps, sessionId, onStage));
+    // Extending reopens the session, which the sidebar garden shows.
+    void build((onStage) => extendSession(deps, sessionId, onStage)).then(refresh);
   };
   const close = (sessionId: number) => {
     setGenError(null);
     closeSession(deps.db, sessionId).then(
-      () => setReload((n) => n + 1),
+      () => {
+        setReload((n) => n + 1);
+        refresh();
+      },
       (e: unknown) => setGenError({ message: e instanceof Error ? e.message : String(e) }),
     );
   };

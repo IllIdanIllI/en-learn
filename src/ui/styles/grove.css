@@ -115,6 +115,11 @@
   font-family: Murecho, system-ui, sans-serif;
   font-weight: 700;
 }
+/* Score bar "N / M": a dedicated class, because the unlayered .title size would beat a utility. */
+[data-design='grove'] .grove-score {
+  font-size: 2.25rem;
+  line-height: 1.1;
+}
 [data-design='grove'] .reading {
   font-family: Alegreya, Georgia, serif;
   font-size: 1.125rem;

@@ -72,6 +72,19 @@ export async function generateSession(deps: Deps, opts: { light: boolean }, onSt
   }
 }
 
+const STANDARD_EXAMPLE = { gap: 'She ___ tea. → drinks', fix: 'He go to work by bus. → goes', spot: 'He go to work by bus. → goes' } as const;
+
+/** A gap, fix or spot block with an empty format example gets the standard one for its format; other blocks stay as they are. */
+export function fillFormatExamples(s: GeneratedSession): GeneratedSession {
+  return {
+    ...s,
+    blocks: s.blocks.map((b) => {
+      if (b.format !== 'gap' && b.format !== 'fix' && b.format !== 'spot') return b;
+      return b.formatExample.trim() === '' ? { ...b, formatExample: STANDARD_EXAMPLE[b.format] } : b;
+    }),
+  };
+}
+
 /** Generate → validate → code check, with one retry. The llm_call rows carry `sessionId`. */
 export async function produce(
   deps: Deps, sessionId: number, ctx: GenerationContext, onStage?: OnStage,
@@ -93,20 +106,21 @@ export async function produce(
       lastCode = gen.code;
       continue;
     }
+    const session = fillFormatExamples(gen.data);
     onStage?.('checking', attempt);
-    const val = await callStructured<ValidationResult>(deps, 'validate_session', renderValidationInput(gen.data, ctx.allowed), { sessionId, maxAttempts: 1 });
+    const val = await callStructured<ValidationResult>(deps, 'validate_session', renderValidationInput(session, ctx.allowed), { sessionId, maxAttempts: 1 });
     if (!val.ok) {
       if (FATAL.has(val.code)) return { ok: false, message: val.message, code: val.code };
       problems = [val.message];
       lastCode = val.code;
       continue;
     }
-    const { defects, remaining } = applyValidation(gen.data, val.data);
+    const { defects, remaining } = applyValidation(session, val.data);
     problems = violations(remaining, ctx);
     lastCode = undefined;
     if (problems.length > 0) continue;
     onStage?.('saving', attempt);
-    return { ok: true, gen: gen.data, defects };
+    return { ok: true, gen: session, defects };
   }
   return lastCode === undefined ? { ok: false, message: problems.join('\n') } : { ok: false, message: problems.join('\n'), code: lastCode };
 }

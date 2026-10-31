@@ -162,16 +162,12 @@ describe('checkGenerated', () => {
       expect(checkGenerated(s, ctx)).toEqual(['b2.p0 TD-1: placeholder "-"']);
     });
 
-    test('an empty format example fails for gap, fix and spot', () => {
+    test('an empty format example is not a violation', () => {
       const s = valid();
       s.blocks[0]!.formatExample = '   ';
       s.blocks[1]!.formatExample = '';
       s.blocks[2]!.formatExample = '';
-      expect(checkGenerated(s, ctx)).toEqual([
-        'b0 TD-1: format example is empty',
-        'b1 TD-1: format example is empty',
-        'b2 TD-1: format example is empty',
-      ]);
+      expect(checkGenerated(s, ctx)).toEqual([]);
     });
   });
 

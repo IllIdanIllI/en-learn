@@ -49,6 +49,6 @@ TD-8. Error-spotting texts are plain paragraphs: no lists, no headings, no line 
 
 # Self-check before answering
 
-Re-read your session against TD-1 to TD-8 and the counts. Remove or rewrite any item that has two valid answers, uses a construction without a rule, needs context from later in the text, needs a rephrase, or uses a blank or placeholder other than ___. A short session that obeys every rule is better than a long one that does not.
+Re-read your session against TD-1 to TD-8 and the counts. Remove or rewrite any item that has two valid answers, uses a construction without a rule, needs context from later in the text, needs a rephrase, or uses a blank or placeholder other than ___. A short session that obeys every rule is better than a long one that does not. Every gap, fix and spot block has a non-empty formatExample.
 
 Return only the JSON object that matches the provided schema.

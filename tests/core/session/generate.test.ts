@@ -9,7 +9,7 @@ import { setSetting } from '@/core/db/repos/settings';
 import { cleanupDrafts } from '@/core/db/repos/sessions';
 import { buildGenerationContext, renderContext } from '@/core/session/context';
 import { getTodayState } from '@/core/session/plan';
-import { generateSession, rebuildSession } from '@/core/session/generate';
+import { fillFormatExamples, generateSession, rebuildSession } from '@/core/session/generate';
 import type { LlmKind } from '@/core/domain';
 import type { Deps, LlmResult } from '@/core/ports';
 import type { GeneratedBlock, GeneratedSession, ValidationResult } from '@/core/llm/types';
@@ -117,6 +117,24 @@ describe('generateSession', () => {
     expect(await count(db, 'spelling_attempt')).toBe(0);
     const calls = await db.select<{ kind: string; session_id: number | null }>('SELECT kind, session_id FROM llm_call ORDER BY id');
     expect(calls).toEqual([{ kind: 'generate_session', session_id: 1 }, { kind: 'validate_session', session_id: 1 }]);
+  });
+
+  test('an empty format example is filled with the standard one: one generate call, no retry', async () => {
+    const gapBlock: GeneratedBlock = {
+      kind: 'review', format: 'gap', title: 'Gap', instruction: 'Fill the gap.', formatExample: '', minutes: 4,
+      items: [item(1, { isCheck: true }), item(2), item(3)], paragraphs: [], question: '',
+    };
+    const gen: GeneratedSession = { blocks: [gapBlock, { ...fixBlock('task'), formatExample: '  ' }, speaking] };
+    const { db, llm, deps } = await setup('2026-10-20', { generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
+    await gradeWrong(db, '2026-10-19');
+    expect((await generateSession(deps, { light: false })).ok).toBe(true);
+    expect(llm.calls.filter((c) => c.kind === 'generate_session')).toHaveLength(1);
+    const rows = await db.select<{ format: string; format_example: string | null }>("SELECT format, format_example FROM block WHERE session_id = (SELECT id FROM session WHERE status = 'generated') ORDER BY ord");
+    expect(rows).toEqual([
+      { format: 'gap', format_example: 'She ___ tea. → drinks' },
+      { format: 'fix', format_example: 'He go to work by bus. → goes' },
+      { format: 'question', format_example: null },
+    ]);
   });
 
   test('a fix item stores its wrong fragment; other items store NULL; blocks get round 1', async () => {
@@ -322,6 +340,23 @@ describe('generateSession', () => {
     await gradeWrong(db, '2026-10-19');
     await db.execute("UPDATE session SET status = 'generated'");
     await expect(rebuildSession(deps, 1, { light: false })).rejects.toThrow('another day');
+  });
+});
+
+describe('fillFormatExamples', () => {
+  test('fills empty gap, fix and spot examples; keeps a given one; a question block stays empty', () => {
+    const out = fillFormatExamples({
+      blocks: [
+        { ...fixBlock('review'), format: 'gap', formatExample: '' },
+        { ...fixBlock('task'), formatExample: '' },
+        { ...spotBlock(), formatExample: ' ' },
+        { ...fixBlock('task'), formatExample: 'keep → me' },
+        speaking,
+      ],
+    });
+    expect(out.blocks.map((b) => b.formatExample)).toEqual([
+      'She ___ tea. → drinks', 'He go to work by bus. → goes', 'He go to work by bus. → goes', 'keep → me', '',
+    ]);
   });
 });
 

@@ -49,10 +49,6 @@ export function checkGenerated(s: GeneratedSession, ctx: CheckContext): string[]
 
   s.blocks.forEach((b, bi) => {
     const bref = `b${bi}`;
-    if ((b.format === 'gap' || b.format === 'fix' || b.format === 'spot') && b.formatExample.trim() === '') {
-      out.push(`${bref} TD-1: format example is empty`);
-    }
-
     checkEnglish(bref, b.question, b.formatExample);
 
     b.items.forEach((it, ii) => {

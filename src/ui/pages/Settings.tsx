@@ -143,6 +143,14 @@ export function Settings() {
             onChange={(v) => void save('theme', v)}
           />
         </Row>
+        <Row label={t(lang, 'settings.design')}>
+          <Segmented
+            label={t(lang, 'settings.design')}
+            value={settings.design}
+            options={(['grove', 'lamp'] as const).map((v) => ({ value: v, label: t(lang, `settings.design.${v}` as MessageKey) }))}
+            onChange={(v) => void save('design', v)}
+          />
+        </Row>
         <Row label={t(lang, 'settings.budget')} htmlFor="settings-budget" hint={t(lang, 'settings.budgetHint')}>
           <FieldInput
             id="settings-budget"

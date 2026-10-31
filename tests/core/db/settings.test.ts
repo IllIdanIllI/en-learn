@@ -20,8 +20,15 @@ describe('settings repo', () => {
       acceptedShorthands: ['✓'],
       spellingVariant: 'british',
       theme: 'dark',
+      design: 'grove',
       closedSessions: [],
     });
+  });
+
+  test('design round-trips', async () => {
+    const db = await createTestDb();
+    await setSetting(db, 'design', 'lamp');
+    expect((await getSettings(db)).design).toBe('lamp');
   });
 
   test('budgetUsd round-trips and overwrites', async () => {

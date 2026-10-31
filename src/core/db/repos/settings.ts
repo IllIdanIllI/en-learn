@@ -9,6 +9,7 @@ export interface Settings {
   acceptedShorthands: string[];
   spellingVariant: 'british' | 'american';
   theme: 'dark' | 'light' | 'system';
+  design: 'grove' | 'lamp';
   /** Ids of sessions the learner closed; the last 30 are kept. */
   closedSessions: number[];
 }
@@ -37,6 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
   acceptedShorthands: ['✓'],
   spellingVariant: 'british',
   theme: 'dark',
+  design: 'grove',
   closedSessions: [],
 };
 

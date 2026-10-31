@@ -124,7 +124,7 @@ Flat, as in Lamp: tonal layers, 1px borders, spacing. The garden adds two light 
 
 A pixel scene at the foot of the sidebar: a short bamboo grove behind a low fence of dried bamboo (yotsume-gaki), a stone lantern in front at the left, and two bamboo shoots at the right.
 
-**Placement and size.** The grove is 101 sprite columns by 78 rows (202 × 156 CSS px); the fence is 40 px tall. Both are fixed in size and anchored to the bottom of the sidebar, so the space between the menu and the grove stays empty. A short window clips the grove from the top rather than covering the links.
+**Placement and size.** The grove is 101 sprite columns by 78 rows (202 × 156 CSS px); the fence is 40 px tall, so the sidebar-garden component is 196 px high (156 px grove + 40 px fence). Both are fixed in size and anchored to the bottom of the sidebar, so the space between the menu and the grove stays empty. A short window clips the grove from the top rather than covering the links.
 
 **Behaviour.**
 - Shown only at 1100px and wider (below that the sidebar is icons only, and the garden is hidden).
@@ -148,7 +148,7 @@ Fireflies are still drawn under `prefers-reduced-motion`, but without the blink:
 Night grove only. Each detail is decorative unless noted.
 
 - **Block heading leaf:** a small pixel bamboo leaf before each block heading.
-- **Block divider:** a thin pale bamboo line between blocks (none above the first block of the session).
+- **Block divider:** a thin pale bamboo line between blocks (none above the first visible block).
 - **Answer meter:** under the lesson header while answering. A horizontal bamboo stalk with one segment per answer field (each item input and each "Find the errors" paragraph). A segment turns green once its field is filled; a small leaf sprouts at the last green node. Label "Ответов: N из M" / "Answered: N of M". Hidden while solving skipped questions (the separate solving mode).
 - **Score bar:** in the feedback summary after checking. A large "N / M" in the heading font, the line "Верно N из M", and a bamboo stalk with one segment per counted item in item order: green for correct, dry yellow for "to fix". Never red.
 - **Error bank:** a small dry leaf before each row's "was" text.

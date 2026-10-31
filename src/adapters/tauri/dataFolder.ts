@@ -1,5 +1,5 @@
 import { copyFile, exists, mkdir, readDir, readTextFile, remove, stat, writeTextFile } from '@tauri-apps/plugin-fs';
-import { MoveRefused, planMove } from '@/core/dataFolder';
+import { cleanupPlan, MoveRefused, moveTarget, planMove, refusePicked } from '@/core/dataFolder';
 
 const DB_FILES = ['enlearn.db', 'enlearn.db-wal', 'enlearn.db-shm'];
 
@@ -7,6 +7,7 @@ const DB_FILES = ['enlearn.db', 'enlearn.db-wal', 'enlearn.db-shm'];
 export interface DataLocation {
   appDataDir: string;
   appConfigDir: string;
+  home: string;
   custom: string | null;
 }
 
@@ -28,7 +29,10 @@ async function listFiles(dir: string, rel: string): Promise<string[]> {
 }
 
 /** Copy, verify sizes, write location.json, remove the old files. The caller reloads on success; on failure the old folder is still in use. */
-export async function moveDataDir(cur: DataLocation, target: string, closeDb: () => Promise<void>): Promise<void> {
+export async function moveDataDir(cur: DataLocation, picked: string, closeDb: () => Promise<void>): Promise<void> {
+  const refused = refusePicked(picked, cur.home, cur.appDataDir);
+  if (refused) throw new MoveRefused(refused);
+  const target = moveTarget(picked);
   const dbBase = cur.custom ?? cur.appConfigDir;
   const promptsBase = cur.custom ?? cur.appDataDir;
   const scanDb = async () => {
@@ -38,7 +42,8 @@ export async function moveDataDir(cur: DataLocation, target: string, closeDb: ()
   };
   const prompts = await listFiles(`${promptsBase}/prompts`, 'prompts');
 
-  const first = planMove(promptsBase, target, [...(await scanDb()), ...prompts], false);
+  const notEmpty = (await exists(target)) && (await readDir(target)).length > 0;
+  const first = planMove(promptsBase, target, [...(await scanDb()), ...prompts], false, notEmpty);
   if (!first.ok) throw new MoveRefused(first.reason);
   for (const c of first.copies) if (await exists(c.to)) throw new MoveRefused('occupied');
 
@@ -48,12 +53,16 @@ export async function moveDataDir(cur: DataLocation, target: string, closeDb: ()
   if (!present.includes('enlearn.db')) throw new Error('enlearn.db not found');
   const plan = planMove(promptsBase, target, [...present, ...prompts], false);
   if (!plan.ok) throw new MoveRefused(plan.reason);
+  const realFrom = (c: { from: string }) => {
+    const rel = c.from.slice(promptsBase.length + 1);
+    return `${rel.startsWith('prompts/') ? promptsBase : dbBase}/${rel}`;
+  };
   const made: string[] = [];
   try {
     await mkdir(target, { recursive: true });
     for (const c of plan.copies) {
+      const from = realFrom(c);
       const rel = c.from.slice(promptsBase.length + 1);
-      const from = `${rel.startsWith('prompts/') ? promptsBase : dbBase}/${rel}`;
       await mkdir(c.to.replace(/\/[^/]*$/, ''), { recursive: true });
       made.push(c.to);
       await copyFile(from, c.to);
@@ -65,7 +74,10 @@ export async function moveDataDir(cur: DataLocation, target: string, closeDb: ()
     throw e;
   }
 
-  // The move is done; leftovers in the old folder are not an error.
-  for (const f of DB_FILES) if (await exists(`${dbBase}/${f}`)) await remove(`${dbBase}/${f}`).catch(() => undefined);
-  if (await exists(`${promptsBase}/prompts`)) await remove(`${promptsBase}/prompts`, { recursive: true }).catch(() => undefined);
+  // The move is done; leftovers in the old folder are not an error. Only the copied files and the folders they emptied are removed.
+  const cleanup = cleanupPlan(plan.copies.map(realFrom), [...new Set([dbBase, promptsBase])]);
+  for (const f of cleanup.files) if (await exists(f)) await remove(f).catch(() => undefined);
+  for (const d of cleanup.dirs) {
+    if ((await exists(d)) && (await readDir(d)).length === 0) await remove(d).catch(() => undefined);
+  }
 }

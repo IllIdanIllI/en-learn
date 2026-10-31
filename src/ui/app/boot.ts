@@ -53,7 +53,7 @@ export async function bootTauri(): Promise<CoreInit> {
     },
     dataDir,
     ...(dataDirError === undefined ? {} : { dataDirError }),
-    moveDataDir: (target) => moveDataDir({ appDataDir: appData, appConfigDir: appConfig, custom }, target, () => db.close()),
+    moveDataDir: (target) => moveDataDir({ appDataDir: appData, appConfigDir: appConfig, home, custom }, target, () => db.close()),
     reopenDb: () => openTauriDb(custom),
     makeLlm: (location) => new ClaudeCli(runner, location, cliDir, home),
   };

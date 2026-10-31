@@ -1,0 +1,58 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "message",
+    "proposal"
+  ],
+  "properties": {
+    "message": {
+      "type": "string",
+      "description": "Reply to the learner, in Markdown"
+    },
+    "proposal": {
+      "description": "A new version of the rule when the learner asked for a change; null otherwise",
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "body",
+            "sources"
+          ],
+          "properties": {
+            "body": {
+              "type": "string",
+              "description": "Complete new rule body in Markdown"
+            },
+            "sources": {
+              "type": "array",
+              "description": "Authoritative sources only; empty array if none",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "title",
+                  "url"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "description": "Source name"
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "Real URL of the page that supports the claim"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

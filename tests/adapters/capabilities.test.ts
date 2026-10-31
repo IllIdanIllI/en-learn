@@ -1,0 +1,61 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, test } from 'vitest';
+import { buildClaudeArgs, CLAUDE_LOCATIONS, scopeName } from '@/core/llm/claude';
+import type { LlmRequest } from '@/core/ports';
+
+type Slot = string | { validator: string };
+interface Entry { name: string; cmd: string; args: Slot[] }
+
+const caps = JSON.parse(readFileSync('src-tauri/capabilities/default.json', 'utf8')) as {
+  permissions: Array<string | { identifier: string; allow?: Entry[] }>;
+};
+const spawn = caps.permissions.find((p) => typeof p !== 'string' && p.identifier === 'shell:allow-spawn');
+const entries = (spawn as { allow: Entry[] }).allow;
+
+const SID = '123e4567-e89b-42d3-a456-426614174000';
+const req = (budgetUsd: number | null, extra: Partial<LlmRequest> = {}): LlmRequest => ({
+  kind: 'grade',
+  systemPrompt: 'line one\nline two',
+  userPrompt: 'the user prompt',
+  schema: { type: 'object' },
+  model: 'claude-sonnet-5-5',
+  effort: 'medium',
+  budgetUsd,
+  timeoutMs: 1000,
+  ...extra,
+});
+
+test('every call and chat shape carries --safe-mode --disable-slash-commands right after --strict-mcp-config', () => {
+  const shaped = entries.filter((e) => /-(call|chat)/.test(e.name));
+  expect(shaped).toHaveLength(CLAUDE_LOCATIONS.length * 6);
+  for (const e of shaped) {
+    const i = e.args.indexOf('--strict-mcp-config');
+    expect(e.args.slice(i + 1, i + 3), e.name).toEqual(['--safe-mode', '--disable-slash-commands']);
+  }
+  expect(buildClaudeArgs(req(null)).join(' ')).toContain('--strict-mcp-config --safe-mode --disable-slash-commands');
+});
+
+describe('shell capability call shapes', () => {
+  for (const { loc } of CLAUDE_LOCATIONS) {
+    const shapes = [
+      ['call', null, {}],
+      ['call-budget', 0.3, {}],
+      ['chat', null, { persist: true, resume: null }],
+      ['chat-budget', 0.3, { persist: true, resume: null }],
+      ['chat-next', null, { persist: true, resume: SID }],
+      ['chat-next-budget', 0.3, { persist: true, resume: SID }],
+    ] as const;
+    for (const [shape, budget, extra] of shapes) {
+      test(`${loc} ${shape} matches buildClaudeArgs`, () => {
+        const entry = entries.find((e) => e.name === scopeName(loc, shape));
+        expect(entry).toBeDefined();
+        const args = buildClaudeArgs(req(budget, extra));
+        expect(entry!.args).toHaveLength(args.length);
+        entry!.args.forEach((slot, i) => {
+          if (typeof slot === 'string') expect(args[i]).toBe(slot);
+          else expect(args[i]).toMatch(new RegExp(slot.validator));
+        });
+      });
+    }
+  }
+});

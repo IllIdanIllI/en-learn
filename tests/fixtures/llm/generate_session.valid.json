@@ -1,0 +1,28 @@
+{
+  "blocks": [
+    {
+      "kind": "review", "format": "fix", "title": "Review", "instruction": "Write ✓ if the sentence is correct, otherwise write the corrected fragment.",
+      "formatExample": "If it rains, we stay at home. → ✓", "minutes": 5,
+      "items": [
+        { "prompt": "If she will come, we will start.", "expected": "comes", "topicKey": "conditionals", "ruleSection": "Formula", "isCheck": true, "wrong": "will come" },
+        { "prompt": "If it rains, we stay at home.", "expected": "✓", "topicKey": "conditionals", "ruleSection": "Formula", "isCheck": false, "wrong": "" },
+        { "prompt": "If they leave now, they will catch the train.", "expected": "✓", "topicKey": "conditionals", "ruleSection": "Formula", "isCheck": false, "wrong": "" }
+      ],
+      "paragraphs": [], "question": ""
+    },
+    {
+      "kind": "task", "format": "spot", "title": "Spot the errors", "instruction": "Write each correction on its own line as wrong → right.",
+      "formatExample": "He go home → goes", "minutes": 10,
+      "items": [],
+      "paragraphs": [
+        { "text": "If I would have time, I will call you.",
+          "errors": [ { "wrong": "would have", "correction": "had", "topicKey": "conditionals", "ruleSection": "Traps" } ] }
+      ],
+      "question": ""
+    },
+    {
+      "kind": "speaking", "format": "question", "title": "Speaking", "instruction": "Answer aloud for one to two minutes.",
+      "formatExample": "", "minutes": 3, "items": [], "paragraphs": [], "question": "Describe a time when you had to make a quick decision."
+    }
+  ]
+}

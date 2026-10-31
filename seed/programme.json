@@ -1,0 +1,20 @@
+{
+  "title": "IELTS grammar, 3 weeks",
+  "weeks": [
+    { "title": "Articles", "key": "articles", "kind": "learn" },
+    { "title": "Conditionals", "key": "conditionals", "kind": "learn" },
+    { "title": "Present perfect or past simple", "key": "present-perfect-past-simple", "kind": "learn" }
+  ],
+  "background": [
+    { "title": "Third person -s", "key": "third-person-s", "kind": "notice" }
+  ],
+  "slots": {
+    "1": "error_spotting",
+    "2": "topic",
+    "3": "rest",
+    "4": "second_set",
+    "5": "speaking",
+    "6": "writing",
+    "7": "review_rewrite"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "body",
+    "sources"
+  ],
+  "properties": {
+    "body": {
+      "type": "string",
+      "description": "Rule body in Markdown"
+    },
+    "sources": {
+      "type": "array",
+      "description": "Authoritative sources only; empty array if none",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "url"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Source name"
+          },
+          "url": {
+            "type": "string",
+            "description": "Real URL of the page that supports the claim"
+          }
+        }
+      }
+    }
+  }
+}

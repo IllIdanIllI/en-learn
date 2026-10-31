@@ -1,0 +1,98 @@
+import { invoke } from '@tauri-apps/api/core';
+import { copyFile, exists, mkdir, readDir, readTextFile, remove, stat, writeTextFile } from '@tauri-apps/plugin-fs';
+import { cleanupPlan, MoveRefused, moveTarget, planMove, refusePicked } from '@/core/dataFolder';
+
+const DB_FILES = ['enlearn.db', 'enlearn.db-wal', 'enlearn.db-shm'];
+
+/** Where the files live now. With no custom folder the DB is in appConfigDir (plugin-sql's base) and prompts in appDataDir. */
+export interface DataLocation {
+  appDataDir: string;
+  appConfigDir: string;
+  home: string;
+  custom: string | null;
+}
+
+export async function readDataDir(appDataDir: string): Promise<string | null> {
+  const file = `${appDataDir}/location.json`;
+  if (!(await exists(file))) return null;
+  const parsed = JSON.parse(await readTextFile(file)) as { dataDir?: unknown } | null;
+  return typeof parsed?.dataDir === 'string' && parsed.dataDir !== '' ? parsed.dataDir : null;
+}
+
+async function listFiles(dir: string, rel: string): Promise<string[]> {
+  if (!(await exists(dir))) return [];
+  const out: string[] = [];
+  for (const e of await readDir(dir)) {
+    if (e.isDirectory) out.push(...(await listFiles(`${dir}/${e.name}`, `${rel}/${e.name}`)));
+    else if (e.isFile) out.push(`${rel}/${e.name}`);
+  }
+  return out;
+}
+
+/** Copy, verify sizes, write location.json, remove the old files. The caller reloads on success; on failure the old folder is still in use. */
+export async function moveDataDir(cur: DataLocation, picked: string, closeDb: () => Promise<void>): Promise<void> {
+  const target = moveTarget(picked);
+  // The target is checked too: Rust only grants what passes the rules, so /Volumes (target /Volumes/EnglishExamCoach) must not get this far.
+  const refused = refusePicked(picked, cur.home, cur.appDataDir) ?? refusePicked(target, cur.home, cur.appDataDir);
+  if (refused) throw new MoveRefused(refused);
+  const dbBase = cur.custom ?? cur.appConfigDir;
+  const promptsBase = cur.custom ?? cur.appDataDir;
+  const scanDb = async () => {
+    const found: string[] = [];
+    for (const f of DB_FILES) if (await exists(`${dbBase}/${f}`)) found.push(f);
+    return found;
+  };
+  const prompts = await listFiles(`${promptsBase}/prompts`, 'prompts');
+
+  const notEmpty = (await exists(target)) && (await readDir(target)).length > 0;
+  const first = planMove(promptsBase, target, [...(await scanDb()), ...prompts], false, notEmpty);
+  if (!first.ok) throw new MoveRefused(first.reason);
+  for (const c of first.copies) if (await exists(c.to)) throw new MoveRefused('occupied');
+
+  await closeDb();
+  // Closing a WAL-mode database removes -wal/-shm, so what gets copied is what is left now.
+  const present = await scanDb();
+  if (!present.includes('enlearn.db')) throw new Error('enlearn.db not found');
+  const plan = planMove(promptsBase, target, [...present, ...prompts], false);
+  if (!plan.ok) throw new MoveRefused(plan.reason);
+  const realFrom = (c: { from: string }) => {
+    const rel = c.from.slice(promptsBase.length + 1);
+    return `${rel.startsWith('prompts/') ? promptsBase : dbBase}/${rel}`;
+  };
+  const made: string[] = [];
+  const createdTarget = !(await exists(target));
+  const locationFile = `${cur.appDataDir}/location.json`;
+  const previousLocation = (await exists(locationFile)) ? await readTextFile(locationFile) : null;
+  let wroteLocation = false;
+  try {
+    await mkdir(target, { recursive: true });
+    for (const c of plan.copies) {
+      const from = realFrom(c);
+      const rel = c.from.slice(promptsBase.length + 1);
+      await mkdir(c.to.replace(/\/[^/]*$/, ''), { recursive: true });
+      made.push(c.to);
+      await copyFile(from, c.to);
+      if ((await stat(from)).size !== (await stat(c.to)).size) throw new Error(`size mismatch: ${rel}`);
+    }
+    wroteLocation = true;
+    await writeTextFile(locationFile, JSON.stringify({ dataDir: target }));
+    await invoke('grant_data_folder');
+  } catch (e) {
+    if (wroteLocation) {
+      if (previousLocation === null) await remove(locationFile).catch(() => undefined);
+      else await writeTextFile(locationFile, previousLocation).catch(() => undefined);
+    }
+    const undo = cleanupPlan(made, [target]);
+    for (const f of undo.files) await remove(f).catch(() => undefined);
+    for (const d of undo.dirs) if ((await readDir(d).catch(() => [null])).length === 0) await remove(d).catch(() => undefined);
+    if (createdTarget && (await readDir(target).catch(() => [null])).length === 0) await remove(target).catch(() => undefined);
+    throw e;
+  }
+
+  // The move is done; leftovers in the old folder are not an error. Only the copied files and the folders they emptied are removed.
+  const cleanup = cleanupPlan(plan.copies.map(realFrom), [...new Set([dbBase, promptsBase])]);
+  for (const f of cleanup.files) if (await exists(f)) await remove(f).catch(() => undefined);
+  for (const d of cleanup.dirs) {
+    if ((await exists(d)) && (await readDir(d)).length === 0) await remove(d).catch(() => undefined);
+  }
+}

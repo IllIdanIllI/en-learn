@@ -1,0 +1,546 @@
+{
+  "note": "Labels derived from seed/rules. The learner must review them before the scores are trusted.",
+  "cases": [
+    {
+      "id": "art-01",
+      "topic": "articles",
+      "format": "gap",
+      "prompt": "My sister is ___ engineer at a large hospital.",
+      "expected": "an",
+      "ruleSection": "Формула",
+      "answer": "an",
+      "category": "exact_correct",
+      "label": {
+        "verdict": "correct"
+      },
+      "why": "Singular countable, first mention: a/an (an before a vowel sound)."
+    },
+    {
+      "id": "art-02",
+      "topic": "articles",
+      "format": "gap",
+      "prompt": "He is going to ___ university in Leeds next year.",
+      "expected": "a",
+      "ruleSection": "Ловушки",
+      "answer": "an",
+      "category": "wrong",
+      "label": {
+        "verdict": "wrong",
+        "fix": [
+          "a"
+        ]
+      },
+      "why": "a/an follows the sound, not the letter: a university."
+    },
+    {
+      "id": "art-03",
+      "topic": "articles",
+      "format": "fix",
+      "prompt": "She lives in Spain with her family.",
+      "expected": "✓",
+      "ruleSection": "Формула",
+      "answer": "✓",
+      "category": "check_on_correct",
+      "label": {
+        "verdict": "correct"
+      },
+      "why": "Most countries take no article, so the sentence is correct as written."
+    },
+    {
+      "id": "art-04",
+      "topic": "articles",
+      "format": "fix",
+      "prompt": "I think the films are too expensive in general, so I watch fewer.",
+      "expected": "films",
+      "ruleSection": "Ловушки",
+      "answer": "✓",
+      "category": "check_on_wrong",
+      "label": {
+        "verdict": "wrong",
+        "fix": [
+          "films"
+        ]
+      },
+      "why": "\"the\" before a plural used in the general sense is a listed trap; the answer should be \"films\"."
+    },
+    {
+      "id": "art-05",
+      "topic": "articles",
+      "format": "fix",
+      "prompt": "She bought apple at the market.",
+      "expected": "an apple",
+      "ruleSection": "Формула",
+      "answer": "apples",
+      "category": "defective_item",
+      "label": {
+        "verdict": "defect"
+      },
+      "why": "Item defect: under the Formula table both \"an apple\" and \"apples\" are correct, and nothing in the prompt says which is wanted (TD-2). The grader should flag the item, not grade the learner."
+    },
+    {
+      "id": "art-06",
+      "topic": "articles",
+      "format": "fix",
+      "prompt": "He goes to work by bus and stays in bed on Sundays.",
+      "expected": "✓",
+      "ruleSection": "Ловушки",
+      "answer": "the work",
+      "category": "over_correction",
+      "label": {
+        "verdict": "wrong",
+        "fix": [
+          "✓",
+          "work"
+        ]
+      },
+      "why": "Over-correction trap: \"work\" without an article is correct in this fixed expression (the rule lists \"at the work\" as the error)."
+    },
+    {
+      "id": "art-07",
+      "topic": "articles",
+      "format": "fix",
+      "prompt": "My brother is engineer at a bank.",
+      "expected": "an engineer",
+      "ruleSection": "Ловушки",
+      "answer": "an enginer",
+      "category": "misspelled_correct",
+      "label": {
+        "verdict": "correct",
+        "spellingErrors": [
+          "engineer"
+        ]
+      },
+      "why": "The fix applies the rule (an engineer); \"enginer\" is a typo, which goes to spellingErrors and does not change the verdict."
+    },
+    {
+      "id": "art-08",
+      "topic": "articles",
+      "format": "gap",
+      "prompt": "I saw ___ film last night and it was very long.",
+      "expected": "a",
+      "ruleSection": "Формула",
+      "answer": "a / the",
+      "category": "needs_clarification",
+      "label": {
+        "verdict": "needs_clarification"
+      },
+      "why": "Two alternatives in one answer: the grader cannot know which one is meant."
+    },
+    {
+      "id": "cond-01",
+      "topic": "conditionals",
+      "format": "gap",
+      "prompt": "If it rains tomorrow, we ___ stay at home.",
+      "expected": "will",
+      "ruleSection": "Формула",
+      "answer": "will",
+      "category": "exact_correct",
+      "label": {
+        "verdict": "correct"
+      },
+      "why": "First conditional: if + Present Simple, will + infinitive."
+    },
+    {
+      "id": "cond-02",
+      "topic": "conditionals",
+      "format": "gap",
+      "prompt": "If I ___ more money, I would buy a bigger house. (have)",
+      "expected": "had",
+      "ruleSection": "Ловушки",
+      "answer": "would have",
+      "category": "wrong",
+      "label": {
+        "verdict": "wrong",
+        "fix": [
+          "had"
+        ]
+      },
+      "why": "\"would\" in the if-part is a listed trap; second conditional needs Past Simple in the if-part."
+    },
+    {
+      "id": "cond-03",
+      "topic": "conditionals",
+      "format": "fix",
+      "prompt": "If you heat ice, it melts.",
+      "expected": "✓",
+      "ruleSection": "Формула",
+      "answer": "✓",
+      "category": "check_on_correct",
+      "label": {
+        "verdict": "correct"
+      },
+      "why": "Zero conditional (general truth): Present Simple in both parts."
+    },
+    {
+      "id": "cond-04",
+      "topic": "conditionals",
+      "format": "fix",
+      "prompt": "If it will rain tomorrow, we will stay at home.",
+      "expected": "rains",
+      "ruleSection": "Ловушки",
+      "answer": "✓",
+      "category": "check_on_wrong",
+      "label": {
+        "verdict": "wrong",
+        "fix": [
+          "rains"
+        ]
+      },
+      "why": "\"will\" in the if-part is a listed trap."
+    },
+    {
+      "id": "cond-05",
+      "topic": "conditionals",
+      "format": "fix",
+      "prompt": "If you mix blue and yellow, you get green.",
+      "expected": "✓",
+      "ruleSection": "Формула",
+      "answer": "will get",
+      "category": "over_correction",
+      "label": {
+        "verdict": "wrong",
+        "fix": [
+          "✓",
+          "get"
+        ]
+      },
+      "why": "Over-correction trap: zero conditional is correct with Present Simple in the main part."
+    },
+    {
+      "id": "cond-06",
+      "topic": "conditionals",
+      "format": "gap",
+      "prompt": "If she studies hard, she ___ pass the exam.",
+      "expected": "will",
+      "ruleSection": "Формула",
+      "answer": "might",
+      "category": "rule_gap",
+      "label": {
+        "verdict": "rule_gap"
+      },
+      "why": "\"might\" in the main part is natural English, but the rule only describes will + infinitive for the first conditional."
+    },
+    {
+      "id": "cond-07",
+      "topic": "conditionals",
+      "format": "fix",
+      "prompt": "If you will wait a moment, I will find the manager.",
+      "expected": "✓",
+      "ruleSection": "Ловушки",
+      "answer": "✓",
+      "category": "check_on_correct",
+      "label": {
+        "verdict": "correct"
+      },
+      "why": "The rule explicitly marks \"If you will wait a moment, ...\" (polite request) as a different, correct use of will after if."
+    },
+    {
+      "id": "cond-08",
+      "topic": "conditionals",
+      "format": "gap",
+      "prompt": "If I had more time, I ___ learn French.",
+      "expected": "would",
+      "ruleSection": "Формула",
+      "answer": "could",
+      "category": "rule_gap",
+      "label": {
+        "verdict": "rule_gap"
+      },
+      "why": "\"could\" in the main part is natural English, but the rule only describes would + infinitive for the second conditional."
+    },
+    {
+      "id": "cond-09",
+      "topic": "conditionals",
+      "format": "fix",
+      "prompt": "If you will heat ice, it melts.",
+      "expected": "heat",
+      "ruleSection": "Формула",
+      "answer": "When you heat",
+      "category": "alt_correct_fix",
+      "label": {
+        "verdict": "correct"
+      },
+      "why": "TD-7: the Formula table gives \"if / when + Present Simple\" for the zero conditional, so \"When you heat\" removes the wrong will and is a different, rule-covered fix than the key (\"heat\")."
+    },
+    {
+      "id": "pp-01",
+      "topic": "present-perfect-past-simple",
+      "format": "gap",
+      "prompt": "I ___ three emails today. (write)",
+      "expected": "have written",
+      "ruleSection": "Формула",
+      "answer": "have written",
+      "category": "exact_correct",
+      "label": {
+        "verdict": "correct"
+      },
+      "why": "\"today\" is a period that is not finished: have + past participle."
+    },
+    {
+      "id": "pp-02",
+      "topic": "present-perfect-past-simple",
+      "format": "gap",
+      "prompt": "I ___ him yesterday. (see)",
+      "expected": "saw",
+      "ruleSection": "Ловушки",
+      "answer": "have seen",
+      "category": "wrong",
+      "label": {
+        "verdict": "wrong",
+        "fix": [
+          "saw"
+        ]
+      },
+      "why": "Present Perfect with \"yesterday\" is a listed trap: Past Simple."
+    },
+    {
+      "id": "pp-03",
+      "topic": "present-perfect-past-simple",
+      "format": "fix",
+      "prompt": "We moved to London in 2019.",
+      "expected": "✓",
+      "ruleSection": "Формула",
+      "answer": "✓",
+      "category": "check_on_correct",
+      "label": {
+        "verdict": "correct"
+      },
+      "why": "A named finished time (2019) takes Past Simple."
+    },
+    {
+      "id": "pp-04",
+      "topic": "present-perfect-past-simple",
+      "format": "fix",
+      "prompt": "I wrote five emails so far.",
+      "expected": "have written",
+      "ruleSection": "Ловушки",
+      "answer": "✓",
+      "category": "check_on_wrong",
+      "label": {
+        "verdict": "wrong",
+        "fix": [
+          "have written",
+          "i've written"
+        ]
+      },
+      "why": "Past Simple with a period that continues (\"so far\") is a listed trap."
+    },
+    {
+      "id": "pp-05",
+      "topic": "present-perfect-past-simple",
+      "format": "fix",
+      "prompt": "Have you been there in 2019?",
+      "expected": "Were",
+      "ruleSection": "Ловушки",
+      "answer": "Were you",
+      "category": "different_form",
+      "label": {
+        "verdict": "correct"
+      },
+      "why": "The learner writes the corrected fragment with the subject; it is the same fix as the key (\"Were\") written differently."
+    },
+    {
+      "id": "pp-06",
+      "topic": "present-perfect-past-simple",
+      "format": "fix",
+      "prompt": "We have finished two units so far.",
+      "expected": "✓",
+      "ruleSection": "Формула",
+      "answer": "finished",
+      "category": "over_correction",
+      "label": {
+        "verdict": "wrong",
+        "fix": [
+          "✓",
+          "have finished"
+        ]
+      },
+      "why": "Over-correction trap: \"so far\" is an unfinished period, so Present Perfect is correct."
+    },
+    {
+      "id": "pp-07",
+      "topic": "present-perfect-past-simple",
+      "format": "gap",
+      "prompt": "I ___ here since 2019. (live)",
+      "expected": "have lived",
+      "ruleSection": "Формула",
+      "answer": "have been living",
+      "category": "rule_gap",
+      "label": {
+        "verdict": "rule_gap"
+      },
+      "why": "Present Perfect Continuous is natural and correct, but the rule describes only have/has + past participle."
+    },
+    {
+      "id": "pp-08",
+      "topic": "present-perfect-past-simple",
+      "format": "fix",
+      "prompt": "I didn't pay yet.",
+      "expected": "haven't paid",
+      "ruleSection": "Ловушки",
+      "answer": "haven't piad",
+      "category": "misspelled_correct",
+      "label": {
+        "verdict": "correct",
+        "spellingErrors": [
+          "paid"
+        ]
+      },
+      "why": "The fix applies the rule (haven't paid); \"piad\" is a typo (transposed letters) that goes to spellingErrors and does not change the verdict."
+    },
+    {
+      "id": "pp-09",
+      "topic": "present-perfect-past-simple",
+      "format": "fix",
+      "prompt": "I didn't pay yet.",
+      "expected": "haven't paid",
+      "ruleSection": "Ловушки",
+      "answer": "haven't payed",
+      "category": "morphology_slip",
+      "label": {
+        "verdict": "wrong",
+        "fix": [
+          "haven't paid"
+        ]
+      },
+      "why": "\"payed\" is a wrong form of the past participle of pay, inside the tested verb form: a grammar error, not a typo."
+    },
+    {
+      "id": "tps-01",
+      "topic": "third-person-s",
+      "format": "gap",
+      "prompt": "She ___ in London. (work)",
+      "expected": "works",
+      "ruleSection": "Формула",
+      "answer": "works",
+      "category": "exact_correct",
+      "label": {
+        "verdict": "correct"
+      },
+      "why": "he/she/it: verb + -s."
+    },
+    {
+      "id": "tps-02",
+      "topic": "third-person-s",
+      "format": "gap",
+      "prompt": "Does he ___ here? (work)",
+      "expected": "work",
+      "ruleSection": "Ловушки",
+      "answer": "works",
+      "category": "wrong",
+      "label": {
+        "verdict": "wrong",
+        "fix": [
+          "work"
+        ]
+      },
+      "why": "After does the main verb has no -s (listed trap)."
+    },
+    {
+      "id": "tps-03",
+      "topic": "third-person-s",
+      "format": "fix",
+      "prompt": "It doesn't rain much here.",
+      "expected": "✓",
+      "ruleSection": "Формула",
+      "answer": "✓",
+      "category": "check_on_correct",
+      "label": {
+        "verdict": "correct"
+      },
+      "why": "Negative with doesn't + base verb is correct as written."
+    },
+    {
+      "id": "tps-04",
+      "topic": "third-person-s",
+      "format": "fix",
+      "prompt": "She studys at night after work.",
+      "expected": "studies",
+      "ruleSection": "Ловушки",
+      "answer": "✓",
+      "category": "check_on_wrong",
+      "label": {
+        "verdict": "wrong",
+        "fix": [
+          "studies"
+        ]
+      },
+      "why": "Spelling of the -s form: studys → studies (listed trap)."
+    },
+    {
+      "id": "tps-05",
+      "topic": "third-person-s",
+      "format": "fix",
+      "prompt": "She doesn't work on Sundays.",
+      "expected": "✓",
+      "ruleSection": "Формула",
+      "answer": "works",
+      "category": "over_correction",
+      "label": {
+        "verdict": "wrong",
+        "fix": [
+          "✓",
+          "work",
+          "doesn't work"
+        ]
+      },
+      "why": "Over-correction trap: after doesn't the verb stays without -s."
+    },
+    {
+      "id": "tps-06",
+      "topic": "third-person-s",
+      "format": "fix",
+      "prompt": "He plays tennis on Saturdays.",
+      "expected": "✓",
+      "ruleSection": "Формула",
+      "answer": "ok",
+      "category": "needs_clarification",
+      "label": {
+        "verdict": "needs_clarification"
+      },
+      "why": "\"ok\" is not an accepted shorthand and is not a fix: it may mean \"correct as written\", so the grader should ask."
+    },
+    {
+      "id": "spell-01",
+      "topic": null,
+      "format": "spelling",
+      "prompt": "necessary: needed, essential",
+      "expected": "necessary",
+      "ruleSection": "",
+      "answer": "necessary",
+      "category": "spelling_code",
+      "label": {
+        "verdict": "correct"
+      },
+      "why": "Spelling is graded by code: exact match."
+    },
+    {
+      "id": "spell-02",
+      "topic": null,
+      "format": "spelling",
+      "prompt": "a place to stay, for example in a hotel",
+      "expected": "accommodation",
+      "ruleSection": "",
+      "answer": "accomodation",
+      "category": "spelling_code",
+      "label": {
+        "verdict": "wrong"
+      },
+      "why": "Spelling is graded by code: one letter missing."
+    },
+    {
+      "id": "spell-03",
+      "topic": null,
+      "format": "spelling",
+      "prompt": "the red of a rose",
+      "expected": "colour",
+      "ruleSection": "",
+      "answer": " Colour",
+      "category": "spelling_code",
+      "label": {
+        "verdict": "correct"
+      },
+      "why": "Spelling is graded by code: case and outer spaces are ignored."
+    }
+  ]
+}

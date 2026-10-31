@@ -1,0 +1,68 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "replies"
+  ],
+  "properties": {
+    "replies": {
+      "type": "array",
+      "description": "Exactly one reply per disputed item",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ref",
+          "position",
+          "ruleSection",
+          "sources",
+          "recommendation"
+        ],
+        "properties": {
+          "ref": {
+            "type": "string",
+            "description": "The reference of the disputed item from the input, d1, d2, ..."
+          },
+          "position": {
+            "type": "string",
+            "description": "The position of the app in the learner native language"
+          },
+          "ruleSection": {
+            "type": "string",
+            "description": "Exact heading of the rule section; empty if none"
+          },
+          "sources": {
+            "type": "array",
+            "description": "Authoritative sources only; empty array if none",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "title",
+                "url"
+              ],
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "Source name"
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Real URL of the page that supports the claim"
+                }
+              }
+            }
+          },
+          "recommendation": {
+            "type": "string",
+            "enum": [
+              "keep",
+              "correct",
+              "drop"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

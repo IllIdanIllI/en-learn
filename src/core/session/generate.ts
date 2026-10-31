@@ -72,7 +72,7 @@ export async function generateSession(deps: Deps, opts: { light: boolean }, onSt
   }
 }
 
-const STANDARD_EXAMPLE = { gap: 'She ___ tea. → drinks', fix: 'He go to work by bus. → goes', spot: 'He go to work by bus. → goes' } as const;
+const STANDARD_EXAMPLE = { gap: 'She ___ tea. → drinks', fix: 'He go to work by bus. → goes', spot: 'go → goes' } as const;
 
 /** A gap, fix or spot block with an empty format example gets the standard one for its format; other blocks stay as they are. */
 export function fillFormatExamples(s: GeneratedSession): GeneratedSession {

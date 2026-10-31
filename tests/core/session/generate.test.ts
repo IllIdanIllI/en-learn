@@ -355,7 +355,7 @@ describe('fillFormatExamples', () => {
       ],
     });
     expect(out.blocks.map((b) => b.formatExample)).toEqual([
-      'She ___ tea. → drinks', 'He go to work by bus. → goes', 'He go to work by bus. → goes', 'keep → me', '',
+      'She ___ tea. → drinks', 'He go to work by bus. → goes', 'go → goes', 'keep → me', '',
     ]);
   });
 });

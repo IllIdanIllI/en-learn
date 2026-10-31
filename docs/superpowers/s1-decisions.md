@@ -122,6 +122,7 @@ Spec `specs/2026-10-31-security-round-1.md`, plan `plans/2026-10-31-security-rou
 - A prompt override that cannot be read counts as no override — cost if wrong: a broken override is silently ignored.
 - A rule gap stores the rule version the grader saw; gaps from before this round, and gaps whose rule has changed since, cannot be approved (the message points to the rule chat) — cost if wrong: old pending gaps need the chat.
 - A grade reply whose rule-gap proposal breaks the skeleton is retried, not partly accepted — cost if wrong: an extra retry.
+- A gap, fix or spot block without a format example gets a standard one (`She ___ tea. → drinks`, `He go to work by bus. → goes`, `go → goes`) instead of the whole lesson being generated again (2026-10-31) — cost if wrong: the example may show a different grammar point than the block.
 
 ## Still open
 
@@ -139,5 +140,4 @@ Spec `specs/2026-10-31-security-round-1.md`, plan `plans/2026-10-31-security-rou
 - **Security round 1 small known limitations** (from reviews, not fixed): a grade reply is retried when a rule gap with an unknown ref has a malformed proposal; if the current rule cannot be loaded, the "Changes" tab shows the whole proposal as added; a stale rule gap is refused only after "Approve" is pressed; the rule-gap proposal has no height cap; a failure to create `<app data>/cli` stops start-up.
 - **"Find the errors in the text" block (spot format) looks bad** (learner, 2026-10-31): redesign it in the design pass; ask the learner what bothers them most before changing it.
 - **Watch: longer outputs after `--safe-mode`** (2026-10-31): the first lesson after security round 1 wrote 2–6× more output tokens (generate 3.9k vs 1.3–1.9k, validate 5.3k vs 2.5–2.7k, grade 2.9k vs ~0.5k with all answers wrong); per-token speed was higher, so the wait came from the extra output. Likely cause: `--safe-mode` no longer loads the learner's `~/.claude/CLAUDE.md`, which asks for short answers (confirmed by the learner); may be a coincidence. Watch 2–3 lessons with `select id, kind, duration_ms/1000, json_extract(response,'$.usage.output_tokens') from llm_call order by id desc`; if it holds, add a brevity instruction to the generate and validate prompts (not the learner's file).
-- **Generation retry on one empty format example** (2026-10-31): a whole lesson (34 s, $0.07) was discarded because the check found `b1 TD-1: format example is empty`; next round: ask the model to fix only that, or make the prompt rule unmissable.
 - **Design pass**: the learner noted the UI looks generic ("Claudified"); revisit after trying the app.

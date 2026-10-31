@@ -58,14 +58,18 @@ export function useCore(): Core {
   return core;
 }
 
+function resolveDark(theme: Settings['theme']): boolean {
+  return theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
+
 /** `dark` class on <html> follows the theme setting; "system" follows the OS. Returns whether the class is on. */
 function useTheme(theme: Settings['theme']): boolean {
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(() => resolveDark(theme));
   useEffect(() => {
     const root = document.documentElement;
     const query = window.matchMedia('(prefers-color-scheme: dark)');
     const apply = () => {
-      const dark = theme === 'dark' || (theme === 'system' && query.matches);
+      const dark = resolveDark(theme);
       root.classList.toggle('dark', dark);
       setIsDark(dark);
     };

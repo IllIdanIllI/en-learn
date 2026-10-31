@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { copyFile, exists, mkdir, readDir, readTextFile, remove, stat, writeTextFile } from '@tauri-apps/plugin-fs';
 import { cleanupPlan, MoveRefused, moveTarget, planMove, refusePicked } from '@/core/dataFolder';
 
@@ -59,6 +60,9 @@ export async function moveDataDir(cur: DataLocation, picked: string, closeDb: ()
   };
   const made: string[] = [];
   const createdTarget = !(await exists(target));
+  const locationFile = `${cur.appDataDir}/location.json`;
+  const previousLocation = (await exists(locationFile)) ? await readTextFile(locationFile) : null;
+  let wroteLocation = false;
   try {
     await mkdir(target, { recursive: true });
     for (const c of plan.copies) {
@@ -69,8 +73,14 @@ export async function moveDataDir(cur: DataLocation, picked: string, closeDb: ()
       await copyFile(from, c.to);
       if ((await stat(from)).size !== (await stat(c.to)).size) throw new Error(`size mismatch: ${rel}`);
     }
-    await writeTextFile(`${cur.appDataDir}/location.json`, JSON.stringify({ dataDir: target }));
+    wroteLocation = true;
+    await writeTextFile(locationFile, JSON.stringify({ dataDir: target }));
+    await invoke('grant_data_folder');
   } catch (e) {
+    if (wroteLocation) {
+      if (previousLocation === null) await remove(locationFile).catch(() => undefined);
+      else await writeTextFile(locationFile, previousLocation).catch(() => undefined);
+    }
     const undo = cleanupPlan(made, [target]);
     for (const f of undo.files) await remove(f).catch(() => undefined);
     for (const d of undo.dirs) if ((await readDir(d).catch(() => [null])).length === 0) await remove(d).catch(() => undefined);

@@ -54,7 +54,7 @@ export function Settings() {
     setMoveError(null);
     try {
       const { open, ask } = await import('@tauri-apps/plugin-dialog');
-      const picked = await open({ directory: true, multiple: false });
+      const picked = await open({ directory: true, multiple: false, recursive: true });
       if (typeof picked !== 'string' || !(await ask(t(lang, 'settings.dataDir.confirm', { path: moveTarget(picked) }), { kind: 'warning' }))) return;
       setMoving(true);
       await moveDataDir(picked);

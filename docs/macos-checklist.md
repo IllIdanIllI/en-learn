@@ -92,6 +92,11 @@ J. **A failed move keeps the old folder.**
    - Action: pick a folder you cannot write to (for example make one with `chmod 555`), confirm.
    - Expected: the row shows "Could not move the data: …", no files are left in the target, the old folder still has everything, and the app keeps working without a reload (add an answer or change a setting to check the database).
 
+J2. **Access to the custom folder after a move and a restart (security round 1).**
+   - Action: after a move (G), put a changed `grade.md` into `<new folder>/prompts/` and grade or generate something without restarting. Then quit, start the app again and repeat.
+   - Expected: both times the changed prompt is used and the data loads. A folder you picked earlier that is not the current data folder is not accessible to the app after the restart.
+   - If it fails: record whether it failed right after the move or only after the restart, and the console error.
+
 ## Rule chat (round 5)
 
 K. **First message (shell scope `claude-local-chat`).**

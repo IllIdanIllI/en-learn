@@ -3,7 +3,8 @@
 Fixes from `notes/2026-10-30-security-audit.md` (M2, L1, L2, L3, L4 and the likely bug I4). M1 and M3 (moving the CLI call and the database out of the webview into Rust) are a later round. Binding where it says something; otherwise the S1 spec and its feedback rounds hold.
 
 ## P1. Content security policy (M2)
-- `tauri.conf.json` sets a CSP: `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'`.
+- `tauri.conf.json` sets a CSP: `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'`.
+- `font-src` allows `data:` because the build inlines three font faces as data URIs (fonts cannot run script).
 - `devCsp` is the same plus what `yarn tauri dev` needs for Vite (its http and ws origin in `connect-src`, and whatever else the dev server needs, nothing broader).
 
 ## P2. Clean CLI calls (L2, I1)

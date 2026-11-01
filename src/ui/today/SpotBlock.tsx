@@ -83,11 +83,14 @@ export function SpotBlock({ block, lang, values, onChange, graded }: {
       {block.paragraphs.map((p) => {
         const key = `${block.id}:${p.index}`;
         const labelId = `para-${key.replace(':', '-')}`;
+        const counted = (p.errors ?? []).filter((e) => e.effective !== null);
+        const found = counted.filter((e) => e.effective === 'correct').length;
         return (
           <div key={key}>
             <p id={labelId} className="reading">{p.text}</p>
             {graded ? (
               <>
+                {counted.length > 0 && <p className="label mt-2 text-muted-foreground">{t(lang, 'spot.count', { found, total: counted.length })}</p>}
                 {p.learnerText?.trim() && (
                   <div className="mt-3">
                     <p className="label text-faint">{t(lang, 'spot.lines')}</p>

@@ -96,3 +96,28 @@ test.describe('error spotting: select and fix', () => {
     await expect(block.locator('textarea')).toHaveCount(0);
   });
 });
+
+const EXPLANATION = 'Перед гласным звуком нужен артикль an: an old friend.';
+
+test.describe('error spotting: results', () => {
+  test('graded paragraph shows found N of M', async ({ page }) => {
+    await page.goto('/?state=spot-graded#/today');
+    await expect(page.getByText(/Найдено \d+ из \d+/).first()).toBeVisible();
+  });
+
+  test('Explain fills the explanation once', async ({ page }) => {
+    await page.goto('/?state=spot-graded#/today');
+    const missed = page.getByRole('listitem').filter({ hasText: 'Не найдено' });
+    const explain = missed.getByRole('button', { name: 'Объяснить' }).first();
+    await expect(explain).toBeVisible();
+    const before = await page.getByRole('button', { name: 'Объяснить' }).count();
+    await explain.dblclick();
+    await expect(page.getByText(EXPLANATION)).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Объяснить' })).toHaveCount(before - 1);
+    // Leave the lesson and come back: the stored explanation stays, the button stays gone.
+    await page.getByRole('navigation').getByRole('link', { name: 'Настройки' }).click();
+    await page.getByRole('navigation').getByRole('link', { name: 'Сегодня' }).click();
+    await expect(page.getByText(EXPLANATION)).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Объяснить' })).toHaveCount(before - 1);
+  });
+});

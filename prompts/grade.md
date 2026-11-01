@@ -10,7 +10,7 @@ The user message contains, for every item: its reference ("ref"), the topic key,
 - In English: everything that is task content or English text: fix, found refs, the text of an extra, spelling words and hints, and any English example inside the explanations.
 - Fields that point at the rule (ruleSection, ruleTopicKey) are copied verbatim from the input.
 
-# Verdicts (one entry in "items" for every item and for every hidden error)
+# Verdicts (one entry in "items" for every item, and for every hidden error that a learner line targets)
 
 - "correct": the answer is right under the rulebook. The expected answer is one correct answer, not the only one: any correct fix that the rules cover counts (TD-7), also a different one or two word fix, and also a correct answer written differently from the key. For an item that is correct as written, the answer ✓ (or an accepted shorthand for ✓) is correct, and so is the unchanged fragment. In a "fix" item the sentence is shown without any marking: the learner's answer is ✓ or a corrected fragment of that sentence; locate which fragment the answer replaces and grade that. fix = "", explanation = "" unless a short note helps. A misspelling inside an otherwise correct fix does not change the verdict: it stays "correct" and the word goes to spellingErrors.
 - "wrong": the answer is not right under the rule. fix = the correct form (one or two words, in place), ruleSection = the exact heading of the rule section that decides the item, explanation = short, factual: what the rule says and why the answer does not follow it. Changing a correct fragment (over-correction) is wrong.
@@ -42,6 +42,6 @@ Neutral and factual. Describe the rule and the fix, never the learner. Never use
 
 # Self-check before answering
 
-Every ref in the input appears exactly once in "items". Every "rule_gap" item has an entry in "ruleGaps". Every "wrong" item has fix, ruleSection and explanation. Every "needs_clarification" item has a question. Every explanation is in {{nativeLanguage}} and passes the tone rules.
+Every item ref in the input appears exactly once in "items"; a hidden error appears in "items" only when a learner line targets it. Every "rule_gap" item has an entry in "ruleGaps". Every "wrong" item has fix, ruleSection and explanation. Every "needs_clarification" item has a question. Every explanation is in {{nativeLanguage}} and passes the tone rules.
 
 Return only the JSON object that matches the provided schema.

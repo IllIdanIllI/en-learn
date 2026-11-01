@@ -72,6 +72,23 @@ test.describe('error spotting: select and fix', () => {
     await expect(field).toHaveValue('an old friend');
   });
 
+  test('adding a field keeps a trailing space in another field', async ({ page }) => {
+    await page.goto('/?state=spot#/today');
+    await select(page, 'old fri');
+    await page.getByRole('button', { name: 'Исправить' }).click();
+    const first = page.getByRole('textbox', { name: 'было: old friend' });
+    await first.fill('');
+    await first.pressSequentially('an old ');
+    await select(page, 'Yesterday');
+    await page.getByRole('button', { name: 'Исправить' }).click();
+    await expect(page.getByRole('textbox', { name: 'было: Yesterday' })).toBeFocused();
+    const second = page.getByRole('textbox', { name: 'было: old friend' });
+    await second.click();
+    await second.press('End');
+    await second.pressSequentially('friend');
+    await expect(page.getByRole('textbox', { name: 'было: old friend' })).toHaveValue('an old friend');
+  });
+
   test('spot block shows the app hint, not the generated example', async ({ page }) => {
     await page.goto('/?state=spot#/today');
     const block = page.locator('section').filter({ has: page.locator('p[id^="para-"]', { hasText: PARAGRAPH }) });

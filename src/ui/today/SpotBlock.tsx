@@ -16,6 +16,9 @@ export function SpotBlock({ block, lang, values, onChange, graded }: {
   const root = useRef<HTMLDivElement>(null);
   const flyout = useRef<HTMLButtonElement>(null);
   const focusAfter = useRef<{ key: string; index: number } | null>(null);
+  /** Each paragraph's fields register their add here, so the flyout adds to the same local fields the inputs edit. */
+  const adders = useRef<Record<string, AddField>>({});
+  const register = (key: string, add: AddField) => { adders.current[key] = add; };
   const [pending, setPending] = useState<Pending | null>(null);
 
   useEffect(() => {
@@ -68,10 +71,8 @@ export function SpotBlock({ block, lang, values, onChange, graded }: {
           style={{ top: pending.top, left: pending.left }}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
-            const fields = fieldsFromLines(values[pending.key] ?? '');
-            const added = addField(fields, pending.text, pending.text.slice(pending.start, pending.end));
-            onChange(pending.key, linesFromFields(added.fields));
-            focusAfter.current = { key: pending.key, index: added.index };
+            const add = adders.current[pending.key];
+            if (add) focusAfter.current = { key: pending.key, index: add(pending.text.slice(pending.start, pending.end), pending.text) };
             window.getSelection()?.removeAllRanges();
             setPending(null);
           }}
@@ -110,6 +111,7 @@ export function SpotBlock({ block, lang, values, onChange, graded }: {
                 labelId={labelId}
                 lines={values[key] ?? ''}
                 lang={lang}
+                register={register}
                 onChange={(lines) => onChange(key, lines)}
               />
             )}
@@ -124,8 +126,11 @@ export function SpotBlock({ block, lang, values, onChange, graded }: {
  * The fields of one paragraph. Edits are kept here, not re-parsed from the draft on every keystroke: parsing trims a
  * line, so a space typed at the end of a fix would be lost. The draft is re-read only when it changes from outside.
  */
-function SpotFields({ fieldKey, labelId, lines, lang, onChange }: {
-  fieldKey: string; labelId: string; lines: string; lang: Lang; onChange: (lines: string) => void;
+type AddField = (original: string, paragraph: string) => number;
+
+function SpotFields({ fieldKey, labelId, lines, lang, register, onChange }: {
+  fieldKey: string; labelId: string; lines: string; lang: Lang; register: (key: string, add: AddField) => void;
+  onChange: (lines: string) => void;
 }) {
   const [fields, setFields] = useState(() => fieldsFromLines(lines));
   const [seen, setSeen] = useState(lines);
@@ -137,6 +142,14 @@ function SpotFields({ fieldKey, labelId, lines, lang, onChange }: {
     setFields(next);
     onChange(linesFromFields(next));
   };
+  const add: AddField = (original, paragraph) => {
+    const added = addField(fields, paragraph, original);
+    update(added.fields);
+    return added.index;
+  };
+  useEffect(() => {
+    register(fieldKey, add);
+  });
   return (
     <div className="mt-3 flex flex-col gap-3">
       {fields.map((f, i) => {

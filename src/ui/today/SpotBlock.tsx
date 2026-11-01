@@ -4,7 +4,7 @@ import type { ViewBlock } from '@/core/session/view';
 import { Button } from '@/ui/components/ui/button';
 import { Input } from '@/ui/components/ui/input';
 import { GradedItem } from './GradedItem';
-import { addField, fieldsFromLines, linesFromFields, snapToWords } from './spotFields';
+import { addField, fieldsFromLines, linesFromFields, snapToWords, type SpotField } from './spotFields';
 
 /** A selection in one paragraph, snapped to words, with the flyout's position inside the block. */
 type Pending = { key: string; index: number; text: string; start: number; end: number; top: number; left: number };
@@ -105,35 +105,62 @@ export function SpotBlock({ block, lang, values, onChange, graded }: {
                 ))}
               </>
             ) : (
-              <div className="mt-3 flex flex-col gap-3">
-                {fieldsFromLines(values[key] ?? '').map((f, i, fields) => {
-                  const fieldId = `${labelId}-field-${i}`;
-                  const update = (next: typeof fields) => onChange(key, linesFromFields(next));
-                  return (
-                    <div key={f.original} className="flex flex-col gap-1.5">
-                      <p id={fieldId} className="label text-faint">{t(lang, 'spot.was', { text: f.original })}</p>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          data-spot-key={key}
-                          aria-labelledby={fieldId}
-                          value={f.fix}
-                          onChange={(e) => update(fields.map((x, j) => (j === i ? { ...x, fix: e.target.value } : x)))}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          aria-label={t(lang, 'spot.remove')}
-                          onClick={() => update(fields.filter((_, j) => j !== i))}
-                        >
-                          ✕
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <SpotFields
+                fieldKey={key}
+                labelId={labelId}
+                lines={values[key] ?? ''}
+                lang={lang}
+                onChange={(lines) => onChange(key, lines)}
+              />
             )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The fields of one paragraph. Edits are kept here, not re-parsed from the draft on every keystroke: parsing trims a
+ * line, so a space typed at the end of a fix would be lost. The draft is re-read only when it changes from outside.
+ */
+function SpotFields({ fieldKey, labelId, lines, lang, onChange }: {
+  fieldKey: string; labelId: string; lines: string; lang: Lang; onChange: (lines: string) => void;
+}) {
+  const [fields, setFields] = useState(() => fieldsFromLines(lines));
+  const [seen, setSeen] = useState(lines);
+  if (lines !== seen) {
+    setSeen(lines);
+    if (lines !== linesFromFields(fields)) setFields(fieldsFromLines(lines));
+  }
+  const update = (next: SpotField[]) => {
+    setFields(next);
+    onChange(linesFromFields(next));
+  };
+  return (
+    <div className="mt-3 flex flex-col gap-3">
+      {fields.map((f, i) => {
+        const fieldId = `${labelId}-field-${i}`;
+        return (
+          <div key={f.original} className="flex flex-col gap-1.5">
+            <p id={fieldId} className="label text-faint">{t(lang, 'spot.was', { text: f.original })}</p>
+            <div className="flex items-center gap-2">
+              <Input
+                data-spot-key={fieldKey}
+                aria-labelledby={fieldId}
+                value={f.fix}
+                onChange={(e) => update(fields.map((x, j) => (j === i ? { ...x, fix: e.target.value } : x)))}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={t(lang, 'spot.remove')}
+                onClick={() => update(fields.filter((_, j) => j !== i))}
+              >
+                ✕
+              </Button>
+            </div>
           </div>
         );
       })}

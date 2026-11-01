@@ -62,6 +62,16 @@ test.describe('error spotting: select and fix', () => {
     await expect(page.getByRole('textbox', { name: 'было: old friend' })).toHaveValue('an old friend');
   });
 
+  test('typing a multi-word fix keeps its spaces', async ({ page }) => {
+    await page.goto('/?state=spot#/today');
+    await select(page, 'old fri');
+    await page.getByRole('button', { name: 'Исправить' }).click();
+    const field = page.getByRole('textbox', { name: 'было: old friend' });
+    await field.fill('');
+    await field.pressSequentially('an old friend');
+    await expect(field).toHaveValue('an old friend');
+  });
+
   test('spot block shows the app hint, not the generated example', async ({ page }) => {
     await page.goto('/?state=spot#/today');
     const block = page.locator('section').filter({ has: page.locator('p[id^="para-"]', { hasText: PARAGRAPH }) });

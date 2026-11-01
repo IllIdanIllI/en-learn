@@ -95,6 +95,19 @@ test.describe('error spotting: select and fix', () => {
     await expect(block.getByText('Выделите ошибку в тексте и нажмите «Исправить».')).toBeVisible();
     await expect(block.locator('textarea')).toHaveCount(0);
   });
+
+  test('Check clears an open flyout', async ({ page }) => {
+    await page.goto('/?state=spot#/today');
+    // Blank gap answers would raise skip questions and move focus, which could clear the selection before Check.
+    const gaps = page.getByPlaceholder('Ответ');
+    await expect(gaps.first()).toBeVisible();
+    for (let i = 0; i < await gaps.count(); i++) await gaps.nth(i).fill('an');
+    await select(page, 'old fri');
+    await expect(page.getByRole('button', { name: 'Исправить' })).toBeVisible();
+    await page.getByRole('button', { name: 'Проверить ответы' }).click();
+    await expect(page.getByRole('heading', { name: 'Итоги' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('button', { name: 'Исправить' })).toHaveCount(0);
+  });
 });
 
 const EXPLANATION = 'Перед гласным звуком нужен артикль an: an old friend.';

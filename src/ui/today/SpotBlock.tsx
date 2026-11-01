@@ -18,8 +18,16 @@ export function SpotBlock({ block, lang, values, onChange, graded }: {
   const focusAfter = useRef<{ key: string; index: number } | null>(null);
   /** Each paragraph's fields register their add here, so the flyout adds to the same local fields the inputs edit. */
   const adders = useRef<Record<string, AddField>>({});
-  const register = (key: string, add: AddField) => { adders.current[key] = add; };
+  const register = (key: string, add: AddField) => {
+    adders.current[key] = add;
+    return () => { delete adders.current[key]; };
+  };
   const [pending, setPending] = useState<Pending | null>(null);
+  const [seenGraded, setSeenGraded] = useState(graded);
+  if (graded !== seenGraded) {
+    setSeenGraded(graded);
+    if (graded) setPending(null);
+  }
 
   useEffect(() => {
     if (graded) return;
@@ -62,7 +70,7 @@ export function SpotBlock({ block, lang, values, onChange, graded }: {
 
   return (
     <div ref={root} className="relative flex flex-col gap-8">
-      {pending && (
+      {pending && !graded && (
         <Button
           ref={flyout}
           type="button"
@@ -132,7 +140,7 @@ export function SpotBlock({ block, lang, values, onChange, graded }: {
 type AddField = (original: string, paragraph: string) => number;
 
 function SpotFields({ fieldKey, labelId, lines, lang, register, onChange }: {
-  fieldKey: string; labelId: string; lines: string; lang: Lang; register: (key: string, add: AddField) => void;
+  fieldKey: string; labelId: string; lines: string; lang: Lang; register: (key: string, add: AddField) => () => void;
   onChange: (lines: string) => void;
 }) {
   const [fields, setFields] = useState(() => fieldsFromLines(lines));
@@ -150,9 +158,7 @@ function SpotFields({ fieldKey, labelId, lines, lang, register, onChange }: {
     update(added.fields);
     return added.index;
   };
-  useEffect(() => {
-    register(fieldKey, add);
-  });
+  useEffect(() => register(fieldKey, add));
   return (
     <div className="mt-3 flex flex-col gap-3">
       {fields.map((f, i) => {

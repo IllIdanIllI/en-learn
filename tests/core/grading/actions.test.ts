@@ -14,7 +14,7 @@ import type { Db, Deps, Llm, LlmResult } from '@/core/ports';
 import type { DisputeReply, Source } from '@/core/llm/types';
 import type { Verdict } from '@/core/domain';
 import {
-  decideDispute, decideRuleGap, disputeItem, disputeItems, RuleGapStaleError, recordSupport, saveMnemonic, setInattention,
+  decideDispute, decideRuleGap, disputeItem, disputeItems, explainItem, RuleGapStaleError, recordSupport, saveMnemonic, setInattention,
 } from '@/core/grading/actions';
 
 const seedDir = path.resolve(import.meta.dirname, '../../fixtures/seed');
@@ -24,6 +24,7 @@ const seedFiles = {
   rules: { 'articles.md': fs.readFileSync(path.join(seedDir, 'rules/articles.md'), 'utf8') },
 };
 const disputeSchema = JSON.parse(fs.readFileSync(path.join(promptsDir, 'dispute.schema.json'), 'utf8')) as object;
+const explainSchema = JSON.parse(fs.readFileSync(path.join(promptsDir, 'explain.schema.json'), 'utf8')) as object;
 
 const NOW = '2026-10-22T10:00:00.000Z';
 const ok = (data: unknown): LlmResult<unknown> => ({ ok: true, data, costUsd: 0.01, durationMs: 5, raw: JSON.stringify(data) });
@@ -43,23 +44,29 @@ interface Row {
   verdict: Verdict;
   fix?: string;
   explanation?: string;
+  paragraph?: number;
   gap?: { proposal: string; explanation: string; sources: Source[] };
 }
 
-/** One block of answered items on topic 1 (articles) and rule 1 (version 1). Session status as given. */
-async function gradedSession(rows: Row[], status: 'draft' | 'generated' | 'graded' = 'graded') {
+/** One block of answered items on topic 1 (articles) and rule 1 (version 1). Session status and block format as given. */
+async function gradedSession(
+  rows: Row[],
+  status: 'draft' | 'generated' | 'graded' = 'graded',
+  block: { format: 'fix' | 'spot'; passage?: string[] } = { format: 'fix' },
+) {
   const db = await createTestDb();
   const { programme, rules } = parseSeed(seedFiles, '2026-10-19');
   await saveProgramme(db, programme);
   await insertSeedRules(db, rules, 'x');
   const sid = await insertDraftSession(db, { date: '2026-10-20', title: 't', isLight: false, createdAt: 'x' });
   const blockId = await insertBlock(db, sid, 0, {
-    kind: 'task', format: 'fix', title: 'Fix', instruction: 'i', formatExample: null, passage: null, minutes: 5,
+    kind: 'task', format: block.format, title: 'Fix', instruction: 'i', formatExample: null,
+    passage: block.passage ? JSON.stringify(block.passage) : null, minutes: 5,
   });
   const ids: number[] = [];
   for (const [ord, r] of rows.entries()) {
     await insertItem(db, blockId, ord, {
-      prompt: r.prompt, expected: r.expected, paragraph: null, topicId: 1, ruleId: 1, ruleVersion: 1,
+      prompt: r.prompt, expected: r.expected, paragraph: r.paragraph ?? null, topicId: 1, ruleId: 1, ruleVersion: 1,
       ruleSection: 'Basics', spellingWordId: null, isCheck: false, status: 'active', note: null, wrong: null,
     });
     const itemId = (await db.select<{ id: number }>('SELECT id FROM item WHERE block_id = ? AND ord = ?', [blockId, ord]))[0]!.id;
@@ -74,9 +81,9 @@ async function gradedSession(rows: Row[], status: 'draft' | 'generated' | 'grade
   return { db, sid, blockId, ids };
 }
 
-const depsFor = (db: Db, llm: Llm): Deps => ({
+const depsFor = (db: Db, llm: Llm, schema: object = disputeSchema): Deps => ({
   db, llm, clock: new FixedClock('2026-10-22'),
-  prompts: { load: async () => ({ system: 's', schema: disputeSchema }) },
+  prompts: { load: async () => ({ system: 's', schema }) },
 });
 
 const count = async (db: Db, sql: string, p?: unknown[]) => (await db.select<{ n: number }>(sql, p))[0]!.n;
@@ -236,6 +243,56 @@ describe('disputeItem', () => {
     expect(res.ok).toBe(false);
     const row = (await db.select<{ dispute_text: string | null; dispute_reply: string | null }>('SELECT dispute_text, dispute_reply FROM answer WHERE item_id = ?', [ids[0]]))[0]!;
     expect(row).toEqual({ dispute_text: 'objection', dispute_reply: null });
+  });
+});
+
+describe('explainItem', () => {
+  const PASSAGE = ['Yesterday I met a old friend at the station.', 'He works as an engineer.'];
+  const SPOT = { prompt: 'a old', expected: 'an old', text: 'a old', verdict: 'wrong', paragraph: 0 } as const;
+  const explanationOf = async (db: Db, id: number) =>
+    (await db.select<{ explanation: string | null }>('SELECT explanation FROM answer WHERE item_id = ?', [id]))[0]!.explanation;
+
+  test('explainItem sends the paragraph, fragment, fix, rule and saves the explanation', async () => {
+    const { db, ids } = await gradedSession([{ ...SPOT }], 'graded', { format: 'spot', passage: PASSAGE });
+    const llm = new FakeLlm({ explain: [ok({ explanation: 'Перед гласным звуком нужен an.' })] });
+    const res = await explainItem(depsFor(db, llm, explainSchema), ids[0]!);
+    expect(res).toMatchObject({ ok: true, data: { explanation: 'Перед гласным звуком нужен an.' } });
+    expect(llm.calls).toHaveLength(1);
+    expect(llm.calls[0]!.kind).toBe('explain');
+    const p = llm.calls[0]!.userPrompt;
+    expect(p).toContain('Paragraph text: Yesterday I met a old friend at the station.');
+    expect(p).toContain('Wrong fragment: "a old"');
+    expect(p).toContain('Expected correction: "an old"');
+    expect(p).toContain('Rule section: Basics');
+    expect(p).toContain('Use "a" before a consonant sound and "an" before a vowel sound.');
+    expect(await explanationOf(db, ids[0]!)).toBe('Перед гласным звуком нужен an.');
+  });
+
+  test('explainItem refuses a found error or one with an explanation, without a call', async () => {
+    const llm = new FakeLlm({});
+    const found = await gradedSession([{ ...SPOT, verdict: 'correct', text: 'an old' }], 'graded', { format: 'spot', passage: PASSAGE });
+    await expect(explainItem(depsFor(found.db, llm, explainSchema), found.ids[0]!)).rejects.toThrow('explain not allowed');
+    const explained = await gradedSession([{ ...SPOT, explanation: 'Already here.' }], 'graded', { format: 'spot', passage: PASSAGE });
+    await expect(explainItem(depsFor(explained.db, llm, explainSchema), explained.ids[0]!)).rejects.toThrow('explain not allowed');
+    expect(llm.calls).toHaveLength(0);
+  });
+
+  test('explainItem failure leaves the answer unchanged', async () => {
+    const { db, ids } = await gradedSession([{ ...SPOT }], 'graded', { format: 'spot', passage: PASSAGE });
+    const failed: LlmResult<unknown> = { ok: false, code: 'cli_error', message: 'boom', costUsd: 0, durationMs: 1, raw: '' };
+    const llm = new FakeLlm({ explain: [failed, failed] });
+    const res = await explainItem(depsFor(db, llm, explainSchema), ids[0]!);
+    expect(res.ok).toBe(false);
+    expect(await explanationOf(db, ids[0]!)).toBeNull();
+  });
+
+  test('explainItem rejects a reply that breaks the tone rule', async () => {
+    const { db, ids } = await gradedSession([{ ...SPOT }], 'graded', { format: 'spot', passage: PASSAGE });
+    const bad = ok({ explanation: 'Вы снова ошиблись с артиклем.' });
+    const llm = new FakeLlm({ explain: [bad, bad] });
+    const res = await explainItem(depsFor(db, llm, explainSchema), ids[0]!);
+    expect(res).toMatchObject({ ok: false, code: 'check' });
+    expect(await explanationOf(db, ids[0]!)).toBeNull();
   });
 });
 

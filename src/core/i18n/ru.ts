@@ -108,6 +108,7 @@ export const ru: Record<keyof typeof en, string> = {
   'llm.validate_session': 'Проверка занятия',
   'llm.grade': 'Проверка ответов',
   'llm.dispute': 'Споры',
+  'llm.explain': 'Объяснение ошибки',
   'prereq.intro': 'Для работы нужна программа Claude в командной строке: установленная и с выполненным входом. Ни в одном из этих мест её нет.',
   'prereq.checked': 'Проверенные места',
   'prereq.result.missing': 'Не найден',

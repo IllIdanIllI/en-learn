@@ -106,6 +106,7 @@ export const en = {
   'llm.validate_session': 'Session validation',
   'llm.grade': 'Grading',
   'llm.dispute': 'Disputes',
+  'llm.explain': 'Error explanation',
   'prereq.intro': 'English Exam Coach needs the Claude command line tool, installed and signed in. It was not found in any of these places.',
   'prereq.checked': 'Places checked',
   'prereq.result.missing': 'Not found',

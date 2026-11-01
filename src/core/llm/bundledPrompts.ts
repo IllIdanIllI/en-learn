@@ -11,6 +11,8 @@ import gradeMd from '../../../prompts/grade.md?raw';
 import gradeSchema from '../../../prompts/grade.schema.json';
 import disputeMd from '../../../prompts/dispute.md?raw';
 import disputeSchema from '../../../prompts/dispute.schema.json';
+import explainMd from '../../../prompts/explain.md?raw';
+import explainSchema from '../../../prompts/explain.schema.json';
 
 export interface PromptFiles { system: string; schema: object }
 
@@ -22,4 +24,5 @@ export const bundledPrompts: Record<LlmKind, PromptFiles> = {
   validate_session: { system: validateSessionMd, schema: validateSessionSchema },
   grade: { system: gradeMd, schema: gradeSchema },
   dispute: { system: disputeMd, schema: disputeSchema },
+  explain: { system: explainMd, schema: explainSchema },
 };

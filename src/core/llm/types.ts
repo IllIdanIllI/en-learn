@@ -62,3 +62,5 @@ export interface DisputeReply {
 }
 
 export interface DisputeBatchReply { replies: (DisputeReply & { ref: string })[] }
+
+export interface ExplainReply { explanation: string }

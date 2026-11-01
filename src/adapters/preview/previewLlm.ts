@@ -1,7 +1,7 @@
 import type { Llm, LlmRequest, LlmResult } from '@/core/ports';
 import { MINI_RULES } from './miniSeed';
 import type {
-  DisputeBatchReply, GeneratedBlock, GeneratedItem, GeneratedParagraph, GeneratedSession, GradeResult, RuleChatReply, RuleDraft, ValidationResult,
+  DisputeBatchReply, ExplainReply, GeneratedBlock, GeneratedItem, GeneratedParagraph, GeneratedSession, GradeResult, RuleChatReply, RuleDraft, ValidationResult,
 } from '@/core/llm/types';
 
 /** Canned, valid model outputs for preview mode. They are derived from the request text so they pass the code checks. */
@@ -362,6 +362,7 @@ export const previewLlm: Llm = {
       case 'rule_draft': data = ruleDraft(req.userPrompt); break;
       case 'rule_chat': ({ reply: data, sessionId } = ruleChat(req.userPrompt, req.resume ?? null)); break;
       case 'dispute': data = dispute(req.userPrompt); break;
+      case 'explain': data = { explanation: 'Перед гласным звуком нужен артикль an: an old friend.' } satisfies ExplainReply; break;
     }
     return { ok: true, data, costUsd: 0, durationMs: 5, raw: JSON.stringify(envelope(data, sessionId)), ...(sessionId ? { sessionId } : {}) };
   },

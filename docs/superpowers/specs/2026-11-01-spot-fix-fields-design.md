@@ -25,9 +25,9 @@ Goal: the learner marks errors by selecting them in the text instead of typing `
 4. **Missed errors.** A hidden error no line found is stored as "wrong" with the key's fix and rule section and no explanation. `applyGraded` already does this for spot errors absent from `found`; no change needed there.
 5. **LLM call.** Only paragraphs with leftover lines go to the grade call. Each sends the paragraph text, the hidden errors not yet found (with their refs), and only the leftover lines. If no paragraph has leftover lines (and no gap/fix item needs the LLM), there is no grade call.
 6. **LLM reply** (schema unchanged). Per sent paragraph one `spot` entry: `found` = refs of not-yet-found errors that a leftover line fixes correctly (possibly a different correct fix than the key); `extra` = leftover lines that are not hidden errors, with an explanation. In `items`, an entry only for a hidden error that a leftover line targeted with a wrong fix (verdict "wrong", fix, ruleSection, explanation). The grader no longer writes entries for errors no line targets.
-7. **Merge.** Local and LLM results are merged as now (`found` refs are unioned per paragraph). `missingRefs` requires a `spot` entry for every paragraph sent, and no longer requires item entries for spot errors.
+7. **Merge.** Local and LLM results are merged as now (`found` refs are unioned per paragraph). `missingRefs` already requires only a `spot` entry for every paragraph sent (it never required item entries for spot errors); no change.
 
-Changes: `autoSpot` (`src/core/grading/autocheck.ts`), the spot step in `src/core/grading/grade.ts`, the spot paragraph sent in `renderGradeInput` and `missingRefs` (`src/core/grading/input.ts`), the "Error-spotting paragraphs" section of `prompts/grade.md`.
+Changes: `autoSpot` (`src/core/grading/autocheck.ts`), the spot step in `src/core/grading/grade.ts`, what is passed to `renderGradeInput` (its format is unchanged), the "Error-spotting paragraphs" section of `prompts/grade.md`.
 
 ## SF4. "Explain" for a missed error
 - **Where.** After "Check", under each spot error with verdict "wrong" and no explanation (a missed error). Not for found errors, errors the grader already explained, skipped paragraphs, or other formats.

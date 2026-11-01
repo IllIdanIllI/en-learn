@@ -22,8 +22,8 @@ export function Block({ block, number, lang, hideTitle = false, divider: withDiv
           <span className="label tabular shrink-0 text-faint">{t(lang, 'today.minutes', { n: block.minutes })}</span>
         </div>
       )}
-      <p className="mt-2 text-muted-foreground">{block.instruction}</p>
-      {block.formatExample && (
+      <p className="mt-2 text-muted-foreground">{block.format === 'spot' ? t(lang, 'spot.hint') : block.instruction}</p>
+      {block.format !== 'spot' && block.formatExample && (
         <p className="answer mt-2 inline-block rounded-sm bg-input px-2.5 py-1 text-foreground">{block.formatExample}</p>
       )}
       <div className="mt-6">{children}</div>

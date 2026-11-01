@@ -17,6 +17,7 @@ import { MINI_PROGRAMME, MINI_RULES } from './miniSeed';
 export const PREVIEW_STATES = [
   'empty', 'no_session', 'generated', 'questions', 'graded', 'progress', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing',
   'earlier_session', 'progress_archived', 'closed', 'open-round', 'round-graded', 'skipped', 'skipped-round', 'fireflies',
+  'spot', 'spot-graded',
 ] as const;
 export type PreviewState = (typeof PREVIEW_STATES)[number];
 
@@ -41,6 +42,7 @@ const ANSWERS: Record<string, string> = {
 const TUESDAY = '2026-10-20';
 const WEDNESDAY = '2026-10-21';
 const THURSDAY = '2026-10-22';
+const MONDAY = '2026-10-19';
 
 /**
  * Earlier days of the `progress` fixture, played through the core on that day's date: five more graded sessions, the
@@ -152,7 +154,7 @@ async function playDay(deps: Deps, light: boolean): Promise<void> {
 }
 
 export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
-  const clock = new SteppedClock(state === 'rest' ? WEDNESDAY : TUESDAY);
+  const clock = new SteppedClock(state === 'rest' ? WEDNESDAY : state.startsWith('spot') ? MONDAY : TUESDAY);
   const deps: Deps = {
     db: await createSqlJsDb(),
     llm: previewLlm,
@@ -195,12 +197,13 @@ export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
     clock.set(THURSDAY);
   }
   const answered = state === 'graded' || state === 'closed' || state === 'open-round' || state === 'round-graded' || state === 'skipped' || state === 'skipped-round';
-  if (state === 'generated' || state === 'questions' || answered || progressLike) {
+  if (state === 'generated' || state === 'spot' || state === 'spot-graded' || state === 'questions' || answered || progressLike) {
     requireOk(await generateSession(deps, { light: false }), 'generateSession');
   }
   if (state === 'questions' || answered || progressLike) {
     await answerToday(deps, state === 'questions' || state === 'skipped' ? state : 'graded');
   }
+  if (state === 'spot-graded') await answerToday(deps, 'graded');
   if (state === 'closed' || state === 'open-round' || state === 'round-graded' || state === 'skipped-round') {
     const session = await getSessionByDate(deps.db, today);
     if (!session) throw new Error('Preview fixture: no session');

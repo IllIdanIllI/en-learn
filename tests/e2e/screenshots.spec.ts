@@ -63,7 +63,7 @@ test('settings page', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 1100 });
   await page.goto('/?state=no_session#/settings');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  await expect(page.locator('button[data-model-kind]')).toHaveCount(6);
+  await expect(page.locator('button[data-model-kind]')).toHaveCount(7);
   await expect(page.locator('#settings-budget')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Настройка программы' })).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/settings.png` });
@@ -103,7 +103,7 @@ test('settings changes save immediately', async ({ page }) => {
 
 test('an effort select saves', async ({ page }) => {
   await page.goto('/?state=no_session#/settings');
-  await expect(page.locator('button[data-effort-kind]')).toHaveCount(6);
+  await expect(page.locator('button[data-effort-kind]')).toHaveCount(7);
   const trigger = page.locator('#effort-grade');
   await expect(trigger).toHaveText('Высокое');
   await trigger.click();

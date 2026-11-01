@@ -189,6 +189,42 @@ describe('gradeSession', () => {
     expect(await verdicts(db)).toMatchObject({ 5: 'correct', 6: 'correct', 7: 'wrong', 8: 'wrong', 9: 'wrong' });
   });
 
+  test('a paragraph with only unchanged or empty fixes is skipped without an LLM call', async () => {
+    const { db, llm, deps, sid } = await setup('2026-10-20', '2026-10-20', []);
+    expect(await gradeSession(deps, sid, subm({ items: { 4: 'an' }, spot: 'a apple → a apple\na hour → ' }), [], { finish: true })).toEqual({ kind: 'graded' });
+    expect(llm.calls).toHaveLength(0);
+    expect(await verdicts(db)).toEqual({ 1: 'correct', 2: 'correct', 3: 'correct', 4: 'correct', 5: 'skipped', 6: 'skipped', 7: 'skipped', 8: 'skipped', 9: 'skipped' });
+  });
+
+  test('only leftover lines and not-yet-found errors reach the LLM', async () => {
+    const { db, llm, deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(fullResult())]);
+    expect(await gradeSession(deps, sid, subm({ spot: 'a apple → an apple\na hour → an hour\nthe cat → a cat' }), [])).toEqual({ kind: 'graded' });
+    const p = userPrompt(llm);
+    expect(p).toContain('the cat → a cat');
+    expect(p).toContain('b2.p0.e2');
+    expect(p).not.toContain('a apple → an apple');
+    expect(p).not.toContain('b2.p0.e0');
+    expect(p).not.toContain('b2.p0.e1');
+    expect(await verdicts(db)).toMatchObject({ 5: 'correct', 6: 'correct' });
+  });
+
+  test('missed errors are stored wrong with the key fix and no explanation', async () => {
+    const { db, llm, deps, sid } = await setup('2026-10-20', '2026-10-20', []);
+    expect(await gradeSession(deps, sid, subm({ items: { 4: 'an' }, spot: 'a apple → an apple\na hour → an hour' }), [])).toEqual({ kind: 'graded' });
+    expect(llm.calls).toHaveLength(0);
+    expect(await rows(db, 'SELECT item_id, verdict, fix, explanation FROM answer WHERE item_id >= 7 ORDER BY item_id')).toEqual([
+      { item_id: 7, verdict: 'wrong', fix: 'an egg', explanation: null },
+      { item_id: 8, verdict: 'wrong', fix: 'an umbrella', explanation: null },
+      { item_id: 9, verdict: 'wrong', fix: 'an orange', explanation: null },
+    ]);
+  });
+
+  test('ignored lines are not stored', async () => {
+    const { db, deps, sid } = await setup('2026-10-20', '2026-10-20', []);
+    expect(await gradeSession(deps, sid, subm({ items: { 4: 'an' }, spot: 'a apple → an apple\na hour → a hour' }), [])).toEqual({ kind: 'graded' });
+    expect((await rows<{ text: string }>(db, 'SELECT text FROM spot_answer'))[0]!.text).toBe('a apple → an apple');
+  });
+
   test('finish still asks about an unknown symbol answer', async () => {
     const { deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(result())]);
     const out = await gradeSession(deps, sid, subm({ items: { 2: '', 3: '~' } }), [], { finish: true });
@@ -217,8 +253,9 @@ describe('gradeSession', () => {
     expect(p).toContain('Rule section: Basics');
     expect(p).toContain('version 1');
     expect(p).toContain('Use "a" before a consonant sound and "an" before a vowel sound.');
-    expect(p).toContain('b2.p0.e1');
-    expect(p).toContain('a hour → an hour');
+    expect(p).toContain('b2.p0.e2');
+    expect(p).toContain('the cat → a cat');
+    expect(p).not.toContain('a hour → an hour');
     expect(p).toContain('Spelling variant: british');
     expect(p).not.toContain('b0.i0');
     expect(p.match(/Rule body/g)).toHaveLength(1);

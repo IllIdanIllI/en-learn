@@ -8,7 +8,7 @@ import { getSettings, setSetting } from '@/core/db/repos/settings';
 import { getSession, hasOpenItems, listGradingItems, type GradingItem } from '@/core/db/repos/sessions';
 import { applyGraded, type Graded } from './apply';
 import { buildRefs, missingRefs, proseOf, renderGradeInput, spotParagraphs, type GradeBatch } from './input';
-import { autoCorrect, autoSpot } from './autocheck';
+import { autoCorrect, autoSpot, dropIgnoredLines } from './autocheck';
 import { BUILTIN_SHORTHANDS, precheckAnswers, type Question, type Submission } from './precheck';
 
 export type { Question, Submission } from './precheck';
@@ -135,8 +135,9 @@ async function run(
         if (i.format !== 'spot' && i.format !== 'question' && (answers[i.id] ?? '').trim() === '') skipped.add(i.id);
       }
     }
-    // A spot paragraph without learner lines is not graded: its hidden errors are stored as skipped.
-    for (const s of spotParagraphs(items, sub.spot)) if (s.learnerText.trim() === '') for (const e of s.errors) skipped.add(e.id);
+    // Lines that change nothing are ignored. A spot paragraph without learner lines is not graded: its hidden errors are stored as skipped.
+    const spotTexts = Object.fromEntries(Object.entries(sub.spot).map(([k, v]) => [k, dropIgnoredLines(v)]));
+    for (const s of spotParagraphs(items, spotTexts)) if (s.learnerText.trim() === '') for (const e of s.errors) skipped.add(e.id);
     const open = items.filter((i) => !skipped.has(i.id));
     const questions = precheckAnswers({ items: answers, spot: sub.spot }, open, shorthands);
     if (questions.length > 0) return { kind: 'questions', questions };
@@ -146,7 +147,7 @@ async function run(
       const a = (answers[it.id] ?? '').trim();
       texts.set(it.id, shorthands.includes(a) || BUILTIN_SHORTHANDS.includes(a) ? '✓' : a);
     }
-    const allSpots = spotParagraphs(items, sub.spot);
+    const allSpots = spotParagraphs(items, spotTexts);
     const spots = allSpots.filter((s) => s.learnerText.trim() !== '');
     const result = emptyResult();
     const gradable = open.filter((i): i is typeof i & { format: 'gap' | 'fix' } => i.format === 'gap' || i.format === 'fix');
@@ -156,11 +157,11 @@ async function run(
         result.items.push({ ref: refs.refOf.get(it.id)!, verdict: 'correct', fix: '', ruleSection: it.ruleSection ?? '', explanation: '', vocabularyNote: '', question: '' });
       }
     }
-    const llmSpots = spots.filter((s) => {
-      const code = autoSpot(s.passageText, s.errors, s.learnerText);
-      if (code.leftover.length > 0) return true;
-      result.spot.push({ blockRef: `b${s.blockOrd}`, paragraph: s.paragraph, found: code.found.map((id) => refs.refOf.get(id)!), extra: [] });
-      return false;
+    // Only the lines the code cannot decide, and the hidden errors they could still name, go to the LLM.
+    const llmSpots = spots.flatMap((s) => {
+      const { found, leftover } = autoSpot(s.passageText, s.errors, s.learnerText);
+      if (found.length > 0) result.spot.push({ blockRef: `b${s.blockOrd}`, paragraph: s.paragraph, found: found.map((id) => refs.refOf.get(id)!), extra: [] });
+      return leftover.length > 0 ? [{ ...s, learnerText: leftover.join('\n'), errors: s.errors.filter((e) => !found.includes(e.id)) }] : [];
     });
     graded = {
       sessionId, texts, skipped,

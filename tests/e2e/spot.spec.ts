@@ -120,4 +120,17 @@ test.describe('error spotting: results', () => {
     await expect(page.getByText(EXPLANATION)).toHaveCount(1);
     await expect(page.getByRole('button', { name: 'Объяснить' })).toHaveCount(before - 1);
   });
+
+  test('no Explain for a missed error that the learner disputed into a count', async ({ page }) => {
+    await page.goto('/?state=spot-graded#/today');
+    const missed = page.getByRole('listitem').filter({ hasText: 'Не найдено' }).first();
+    await missed.getByRole('button', { name: 'Оспорить' }).click();
+    await missed.getByRole('textbox', { name: 'Ваше возражение' }).fill('Здесь нет ошибки.');
+    await missed.getByRole('button', { name: 'Отправить' }).click();
+    await expect(missed.getByText('Правило допускает только указанный вариант.')).toBeVisible();
+    await missed.getByRole('button', { name: 'Засчитать как верный' }).click();
+    const counted = page.getByRole('listitem').filter({ hasText: 'Засчитано как верное.' });
+    await expect(counted).toHaveCount(1);
+    await expect(counted.getByRole('button', { name: 'Объяснить' })).toHaveCount(0);
+  });
 });

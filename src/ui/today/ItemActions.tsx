@@ -107,7 +107,7 @@ export function ItemActions({ item, lang }: { item: ViewItem; lang: Lang }) {
 
   const canDispute = item.status === 'active' && (a.verdict === 'wrong' || a.verdict === 'rule_gap');
   const canTag = item.status === 'active' && a.verdict === 'wrong';
-  const canExplain = item.format === 'spot' && item.status === 'active' && a.verdict === 'wrong' && a.explanation === '';
+  const canExplain = item.format === 'spot' && item.status === 'active' && item.effective === 'wrong' && a.verdict === 'wrong' && a.explanation === '';
   const explain = async () => {
     if (explaining) return;
     setExplaining(true);

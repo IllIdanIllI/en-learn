@@ -61,7 +61,7 @@ components:
 
 # Design System: English Exam Coach, Night grove
 
-Night grove is the default design (Settings, "Оформление" / "Design", switches to Lamp). It keeps the layout, components, states and copy rules of `app-design/DESIGN.md` (Lamp) and changes four things: the colour tokens, the fonts, a pixel garden in the sidebar, and a few pixel details on lesson pages. Everything here hangs off `[data-design='grove']` on `<html>`. Where this file and `DESIGN.md` differ, this file wins for Night grove; the rules that are not mentioned here still hold.
+Night grove is the default design (Settings, "Оформление" / "Design", switches to Default). It keeps the layout, components, states and copy rules of `app-design/DESIGN.md` (Default) and changes four things: the colour tokens, the fonts, a pixel garden in the sidebar, and a few pixel details on lesson pages. Everything here hangs off `[data-design='grove']` on `<html>`. Where this file and `DESIGN.md` differ, this file wins for Night grove; the rules that are not mentioned here still hold.
 
 Built from: `src/ui/styles/grove.css` (tokens, fonts), `src/ui/grove/*` (sprites, garden, meter, score bar), `src/core/moon.ts` (moon phase), `src/core/progress/garden.ts` (fireflies, geta).
 
@@ -71,7 +71,7 @@ Built from: `src/ui/styles/grove.css` (tokens, fonts), `src/ui/grove/*` (sprites
 
 A study desk beside a small garden. The page is a quiet evergreen-and-cream sheet by day and a dark evergreen sheet by night, with moon-yellow as the one warm accent. The garden is the only decoration, and it is drawn in pixels, so it reads as a picture, not as UI.
 
-Night and day follow the effective theme, not the clock: dark is night, light is day. Lamp keeps the warm brown palette and the Literata serif.
+Night and day follow the effective theme, not the clock: dark is night, light is day. Default keeps the warm brown palette and the Literata serif.
 
 **Key characteristics:**
 - Evergreen primary by day, moon yellow by night (the focus and primary-action colour swaps with the theme).
@@ -103,22 +103,22 @@ Tokens are OKLCH and override the shadcn variables (`:root` block for light, `.d
 ### Named rules
 **The Moon Swap Rule.** Primary and focus colours change with the theme: evergreen by day, moon yellow by night. Do not hard-code either.
 
-**The No Pure Colours Rule** from Lamp still holds: no #000, #fff or default Tailwind neutrals.
+**The No Pure Colours Rule** from Default still holds: no #000, #fff or default Tailwind neutrals.
 
 ## 3. Typography
 
-- **Headline and title** (`.headline`, `.title`): Murecho 700. Sizes as in Lamp (1.5rem and 1.25rem).
+- **Headline and title** (`.headline`, `.title`): Murecho 700. Sizes as in Default (1.5rem and 1.25rem).
 - **Reading** (`.reading`): Alegreya 400, 400 italic for emphasis, 1.125rem, line-height 1.55. Alegreya 700 is bundled for bold text in reading copy.
-- **Interface**: Murecho 400 and 500 (labels and buttons), sizes as in Lamp.
+- **Interface**: Murecho 400 and 500 (labels and buttons), sizes as in Default.
 - **Answers and format examples**: the monospace stack, unchanged.
 
 Fonts are bundled locally from `@fontsource/murecho` and `@fontsource/alegreya`, Latin and Cyrillic subsets only, so the app works offline. Chosen because the Japanese-style faces tried earlier set Cyrillic in wide, spaced-out glyphs.
 
-Rules from Lamp still apply: serif for content, sans for interface, tabular numerals for counts.
+Rules from Default still apply: serif for content, sans for interface, tabular numerals for counts.
 
 ## 4. Elevation
 
-Flat, as in Lamp: tonal layers, 1px borders, spacing. The garden adds two light effects that are not shadows: an outline in the background colour around the geta (so they read against the fence), and a soft glow around each firefly.
+Flat, as in Default: tonal layers, 1px borders, spacing. The garden adds two light effects that are not shadows: an outline in the background colour around the geta (so they read against the fence), and a soft glow around each firefly.
 
 ## 5. Sidebar garden
 
@@ -152,7 +152,7 @@ Night grove only. Each detail is decorative unless noted.
 - **Answer meter:** under the lesson header while answering. A horizontal bamboo stalk with one segment per answer field (each item input and each "Find the errors" paragraph). A segment turns green once its field is filled; a small leaf sprouts at the last green node. Label "Ответов: N из M" / "Answered: N of M". Hidden while solving skipped questions (the separate solving mode).
 - **Score bar:** in the feedback summary after checking. A large "N / M" in the heading font, the line "Верно N из M", and a bamboo stalk with one segment per counted item in item order: green for correct, dry yellow for "to fix". Never red.
 - **Error bank:** a small dry leaf before each row's "was" text.
-- **Unchanged from Lamp:** the loader card "Пока вы ждёте", verdict chips (no leaves), the wrong-item treatment (N7, applies to both designs).
+- **Unchanged from Default:** the loader card "Пока вы ждёте", verdict chips (no leaves), the wrong-item treatment (N7, applies to both designs).
 
 ## 7. Pixel sprites
 

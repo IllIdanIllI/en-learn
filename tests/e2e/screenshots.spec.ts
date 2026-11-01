@@ -258,7 +258,7 @@ test.describe('today session', () => {
 
   test('a wrong item has a full border and no strike-through', async ({ page }) => {
     for (const design of [
-      { radio: 'Лампа', attr: 'lamp' },
+      { radio: 'По умолчанию', attr: 'lamp' },
       { radio: 'Ночная роща', attr: 'grove' },
     ]) {
       await page.goto('/?state=graded#/settings');

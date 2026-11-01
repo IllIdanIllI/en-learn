@@ -78,7 +78,7 @@ export const en = {
   'settings.theme.system': 'System',
   'settings.design': 'Design',
   'settings.design.grove': 'Night grove',
-  'settings.design.lamp': 'Lamp',
+  'settings.design.lamp': 'Default',
   'settings.err.save': 'The setting was not saved.',
   'settings.saved': 'Saved',
   'settings.claude': 'Claude CLI',

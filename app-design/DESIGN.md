@@ -128,7 +128,7 @@ components:
 
 # Design System: English Exam Coach
 
-> Two designs exist. This file describes **Lamp**, the design Settings switches back to. The default, **Night grove**, is in `app-design/DESIGN-night-grove.md`; it changes the colour tokens, fonts and adds a sidebar garden and pixel details, and keeps the rules here unless it says otherwise.
+> Two designs exist. This file describes **Default** (formerly "Lamp"), the design Settings switches back to. The default, **Night grove**, is in `app-design/DESIGN-night-grove.md`; it changes the colour tokens, fonts and adds a sidebar garden and pixel details, and keeps the rules here unless it says otherwise.
 
 Stack: React + shadcn/ui + Tailwind inside Tauri. This file is normative: when generating or changing UI, follow the tokens in the frontmatter and the rules below. Product context and principles live in `PRODUCT.md`.
 

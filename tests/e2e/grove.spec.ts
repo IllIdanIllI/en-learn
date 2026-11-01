@@ -4,7 +4,7 @@ test('design switch applies immediately', async ({ page }) => {
   await page.goto('/?state=no_session#/settings');
   const html = page.locator('html');
   await expect(html).toHaveAttribute('data-design', 'grove');
-  await page.getByRole('radio', { name: 'Лампа' }).click();
+  await page.getByRole('radio', { name: 'По умолчанию' }).click();
   await expect(html).toHaveAttribute('data-design', 'lamp');
   await page.getByRole('radio', { name: 'Ночная роща' }).click();
   await expect(html).toHaveAttribute('data-design', 'grove');
@@ -50,7 +50,7 @@ test('grove and lamp tokens and fonts', async ({ page }) => {
   await expectBackground('oklch(0.955 0.016 115)');
 
   await page.getByRole('navigation').getByRole('link', { name: 'Настройки' }).click();
-  await page.getByRole('radio', { name: 'Лампа' }).click();
+  await page.getByRole('radio', { name: 'По умолчанию' }).click();
   await page.getByRole('radio', { name: 'Тёмная' }).click();
   await page.getByRole('navigation').getByRole('link', { name: 'Сегодня' }).click();
   await expect(page.locator('h1.headline')).toBeVisible();
@@ -149,7 +149,7 @@ test.describe('sidebar garden', () => {
 
   test('Lamp has no garden; collapsed sidebar hides it', async ({ page }) => {
     await page.goto('/?state=graded#/settings');
-    await page.getByRole('radio', { name: 'Лампа' }).click();
+    await page.getByRole('radio', { name: 'По умолчанию' }).click();
     await expect(page.locator('[data-garden]')).toHaveCount(0);
     await page.getByRole('radio', { name: 'Ночная роща' }).click();
     await expect(page.locator('[data-garden]')).toBeVisible();
@@ -179,7 +179,7 @@ test.describe('sidebar garden', () => {
 });
 
 test.describe('lesson details', () => {
-  const setDesign = async (page: import('@playwright/test').Page, state: string, design: 'Ночная роща' | 'Лампа') => {
+  const setDesign = async (page: import('@playwright/test').Page, state: string, design: 'Ночная роща' | 'По умолчанию') => {
     await page.goto(`/?state=${state}#/settings`);
     await page.getByRole('radio', { name: design }).click();
   };
@@ -249,12 +249,12 @@ test.describe('lesson details', () => {
 
   test('lamp: none of the grove details', async ({ page }) => {
     const nav = (name: string) => page.getByRole('navigation').getByRole('link', { name }).click();
-    await setDesign(page, 'generated', 'Лампа');
+    await setDesign(page, 'generated', 'По умолчанию');
     await nav('Сегодня');
     await expect(page.locator('section h2.title').first()).toBeVisible();
     await expect(page.locator('section h2.title svg')).toHaveCount(0);
     await expect(page.locator('[data-divider], [data-answer-meter]')).toHaveCount(0);
-    await setDesign(page, 'graded', 'Лампа');
+    await setDesign(page, 'graded', 'По умолчанию');
     await nav('Сегодня');
     await expect(page.locator('#feedback-title')).toBeVisible();
     await expect(page.locator('[data-score-bar]')).toHaveCount(0);

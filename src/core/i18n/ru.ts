@@ -80,7 +80,7 @@ export const ru: Record<keyof typeof en, string> = {
   'settings.theme.system': 'Как в системе',
   'settings.design': 'Оформление',
   'settings.design.grove': 'Ночная роща',
-  'settings.design.lamp': 'Лампа',
+  'settings.design.lamp': 'По умолчанию',
   'settings.err.save': 'Настройка не сохранена.',
   'settings.saved': 'Сохранено',
   'settings.claude': 'Claude CLI',

@@ -158,7 +158,7 @@ async function run(
     }
     const llmSpots = spots.filter((s) => {
       const code = autoSpot(s.passageText, s.errors, s.learnerText);
-      if (!code) return true;
+      if (code.leftover.length > 0) return true;
       result.spot.push({ blockRef: `b${s.blockOrd}`, paragraph: s.paragraph, found: code.found.map((id) => refs.refOf.get(id)!), extra: [] });
       return false;
     });

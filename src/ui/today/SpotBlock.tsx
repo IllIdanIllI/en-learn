@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { X } from 'lucide-react';
 import { t, type Lang } from '@/core/i18n';
 import type { ViewBlock } from '@/core/session/view';
 import { Button } from '@/ui/components/ui/button';
@@ -180,7 +181,7 @@ function SpotFields({ fieldKey, labelId, lines, lang, register, onChange }: {
                 aria-label={t(lang, 'spot.remove')}
                 onClick={() => update(fields.filter((_, j) => j !== i))}
               >
-                ✕
+                <X strokeWidth={1.5} aria-hidden />
               </Button>
             </div>
           </div>

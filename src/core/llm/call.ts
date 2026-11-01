@@ -3,6 +3,7 @@ import type { LlmKind } from '@/core/domain';
 import type { Deps, LlmErrorCode, LlmResult } from '@/core/ports';
 import { getSettings } from '@/core/db/repos/settings';
 import { insertLlmCall } from '@/core/db/repos/llmCalls';
+import { COMMON_RULES } from './bundledPrompts';
 
 const DEFAULT_MAX_ATTEMPTS = 2;
 const RETRYABLE: ReadonlySet<LlmErrorCode> = new Set(['timeout', 'invalid_json', 'schema', 'check', 'cli_error']);
@@ -40,7 +41,7 @@ export async function callStructured<T>(
   for (let attempt = 1; attempt <= (opts.maxAttempts ?? DEFAULT_MAX_ATTEMPTS); attempt++) {
     const res = await deps.llm.call({
       kind,
-      systemPrompt: prompt.system.replaceAll('{{nativeLanguage}}', language),
+      systemPrompt: `${COMMON_RULES}\n\n${prompt.system.replaceAll('{{nativeLanguage}}', language)}`,
       userPrompt,
       schema: prompt.schema,
       model,

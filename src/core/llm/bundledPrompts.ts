@@ -11,8 +11,12 @@ import gradeMd from '../../../prompts/grade.md?raw';
 import gradeSchema from '../../../prompts/grade.schema.json';
 import disputeMd from '../../../prompts/dispute.md?raw';
 import disputeSchema from '../../../prompts/dispute.schema.json';
+import commonMd from '../../../prompts/common.md?raw';
 import explainMd from '../../../prompts/explain.md?raw';
 import explainSchema from '../../../prompts/explain.schema.json';
+
+/** Shared rules put before every system prompt (the app's calls run with --safe-mode, so no CLAUDE.md applies). */
+export const COMMON_RULES = commonMd.trim();
 
 export interface PromptFiles { system: string; schema: object }
 

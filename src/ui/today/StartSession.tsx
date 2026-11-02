@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { ISODate } from '@/core/domain';
 import { t, type Lang } from '@/core/i18n';
 import { lessonOptions, type LessonChoice, type LessonOptions } from '@/core/session/choice';
 import { useCore } from '@/ui/app/CoreProvider';
@@ -11,8 +12,8 @@ import { Loader, type LoaderView } from './Loader';
 export type GenError = { message: string; code?: string };
 
 /** Empty state with the lesson picker and the primary action, and the loading and error states of generation. */
-export function StartSession({ lang, loader, error, rest = false, onStart }: {
-  lang: Lang; loader: LoaderView | null; error: GenError | null; rest?: boolean; onStart: (light: boolean, choice: LessonChoice) => void;
+export function StartSession({ lang, today, loader, error, rest = false, onStart }: {
+  lang: Lang; today: ISODate; loader: LoaderView | null; error: GenError | null; rest?: boolean; onStart: (light: boolean, choice: LessonChoice) => void;
 }) {
   const { deps } = useCore();
   const [lightChoice, setLight] = useState(false);
@@ -23,7 +24,7 @@ export function StartSession({ lang, loader, error, rest = false, onStart }: {
   const [reload, setReload] = useState(0);
   useEffect(() => {
     let live = true;
-    lessonOptions(deps, deps.clock.today(), rest).then(
+    lessonOptions(deps, today, rest).then(
       (o) => {
         if (!live) return;
         setOptions(o);
@@ -36,7 +37,7 @@ export function StartSession({ lang, loader, error, rest = false, onStart }: {
     return () => {
       live = false;
     };
-  }, [deps, rest, reload]);
+  }, [deps, today, rest, reload]);
 
   const generating = loader !== null;
   // A rest day has no toggle: the only way to practise is a light day.

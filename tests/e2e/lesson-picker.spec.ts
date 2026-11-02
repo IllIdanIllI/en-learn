@@ -12,14 +12,15 @@ test.describe('lesson picker: generation outlives the page', () => {
     // Still running: the loader is shown and the button is not offered again.
     await expect(page.getByRole('status')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Добавить вопросы' })).toBeDisabled();
-    // Done: the lesson is open again with the added round.
-    await expect(page.getByRole('textbox').first()).toBeVisible({ timeout: 30_000 });
+    // Done: the lesson is open again with the added round, and the loader is gone.
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('status')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Добавить вопросы' })).toHaveCount(0);
     const fields = await page.getByRole('textbox').count();
 
     // Exactly one round was added: the fixture with one added round has the same number of answer fields.
     await page.goto('/?state=open-round#/today');
-    await expect(page.getByRole('textbox').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible();
     await expect(page.getByRole('textbox')).toHaveCount(fields);
   });
 });

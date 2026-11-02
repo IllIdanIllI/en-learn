@@ -24,6 +24,8 @@ import { GENERATION_KINDS, useWaitInfo } from '@/ui/today/useWaitInfo';
 export function Today() {
   const { deps, lang, version, prereq, refresh } = useCore();
   const noClaude = prereq !== null && !prereq.ok;
+  // Read on every render: a new day reaches the picker when the page re-reads its state (on focus).
+  const today = deps.clock.today();
   const [state, setState] = useState<TodayState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   // The job lives above the routes: it keeps running, and its loader stays, when the page is left.
@@ -238,7 +240,7 @@ export function Today() {
       {state.kind === 'rest' && (
         <>
           <p className="reading mt-6 text-muted-foreground">{t(lang, 'today.restNote')}</p>
-          {noClaude ? claudeNotice : <StartSession lang={lang} loader={loader} error={genError} rest onStart={start} />}
+          {noClaude ? claudeNotice : <StartSession lang={lang} today={today} loader={loader} error={genError} rest onStart={start} />}
         </>
       )}
       {state.kind === 'rule_missing' && noClaude && claudeNotice}
@@ -256,7 +258,7 @@ export function Today() {
       {state.kind === 'no_session' && noClaude && claudeNotice}
       {state.kind === 'no_session' && !noClaude && (
         <>
-          <StartSession lang={lang} loader={loader} error={genError} onStart={start} />
+          <StartSession lang={lang} today={today} loader={loader} error={genError} onStart={start} />
           {state.missingRuleTopics.length > 0 && (
             <section className="mt-12">
               <p className="text-muted-foreground">{t(lang, 'today.missingSpotRules')}</p>

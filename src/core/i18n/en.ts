@@ -192,6 +192,7 @@ export const en = {
   'picker.spot': 'Task: find the errors',
   'picker.spelling': 'Spelling',
   'picker.speaking': 'Speaking',
+  'picker.add': 'Add',
   'picker.reason.no_week_topic': 'no topic this week',
   'picker.reason.no_rule': 'no rule',
   'picker.reason.no_topics': 'no topics',

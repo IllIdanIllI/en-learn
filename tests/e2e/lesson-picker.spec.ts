@@ -5,6 +5,7 @@ test.describe('lesson picker: generation outlives the page', () => {
     await page.goto('/?state=closed&delay=1500#/today');
     const add = page.getByRole('button', { name: 'Добавить вопросы' });
     await add.click();
+    await page.getByRole('button', { name: 'Добавить', exact: true }).click();
     await expect(add).toBeDisabled();
     await page.getByRole('link', { name: 'Настройки' }).click();
     await expect(page).toHaveURL(/#\/settings/);
@@ -70,5 +71,52 @@ test.describe('lesson picker: before a lesson', () => {
     await expect(page.getByRole('checkbox', { name: 'Говорение', exact: true })).not.toBeChecked();
     for (const box of await page.getByRole('checkbox', { name: /^Задание:/ }).all()) await expect(box).not.toBeChecked();
     await expect(page.getByRole('button', { name: 'Начать лёгкий день' })).toBeEnabled();
+  });
+});
+
+test.describe('lesson picker: added round', () => {
+  test('pressing Добавить вопросы shows the format rows with the defaults ticked and an Add button', async ({ page }) => {
+    await page.goto('/?state=closed#/today');
+    await page.getByRole('button', { name: 'Добавить вопросы' }).click();
+    const gap = page.getByRole('checkbox', { name: 'Задание: вставить пропуск' });
+    const fix = page.getByRole('checkbox', { name: 'Задание: исправить предложение' });
+    const spot = page.getByRole('checkbox', { name: 'Задание: найти ошибки' });
+    await expect(gap).toBeVisible();
+    await expect(fix).toBeVisible();
+    await expect(spot).toBeVisible();
+    await expect(spot).not.toBeChecked();
+    // The programme's format for today: exactly one of gap and fix.
+    await expect.poll(async () => [await gap.isChecked(), await fix.isChecked()].filter(Boolean).length).toBe(1);
+    await expect(page.getByRole('button', { name: 'Добавить', exact: true })).toBeEnabled();
+  });
+
+  test('ticking find-the-errors as well adds a round with a spot block', async ({ page }) => {
+    await page.goto('/?state=closed#/today');
+    await page.getByRole('button', { name: 'Добавить вопросы' }).click();
+    await page.getByRole('checkbox', { name: 'Задание: найти ошибки' }).check();
+    await page.getByRole('button', { name: 'Добавить', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Выделите ошибку в тексте и нажмите «Исправить».')).toHaveCount(1);
+  });
+
+  test('unticking every row disables Добавить', async ({ page }) => {
+    await page.goto('/?state=closed#/today');
+    await page.getByRole('button', { name: 'Добавить вопросы' }).click();
+    const add = page.getByRole('button', { name: 'Добавить', exact: true });
+    await expect(add).toBeEnabled();
+    for (const box of await page.getByRole('checkbox').all()) {
+      if (await box.isChecked()) await box.uncheck();
+    }
+    await expect(add).toBeDisabled();
+  });
+
+  test('pressing Добавить вопросы again closes the panel', async ({ page }) => {
+    await page.goto('/?state=closed#/today');
+    const add = page.getByRole('button', { name: 'Добавить вопросы' });
+    await add.click();
+    await expect(page.getByRole('checkbox', { name: 'Задание: вставить пропуск' })).toBeVisible();
+    await add.click();
+    await expect(page.getByRole('checkbox', { name: 'Задание: вставить пропуск' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Добавить', exact: true })).toHaveCount(0);
   });
 });

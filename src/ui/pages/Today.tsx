@@ -4,7 +4,7 @@ import type { ISODate } from '@/core/domain';
 import { formatTitleDate } from '@/core/dates';
 import { t } from '@/core/i18n';
 import { closeSession } from '@/core/db/repos/sessions';
-import { extendOptions, type LessonChoice } from '@/core/session/choice';
+import type { LessonChoice, TaskFormat } from '@/core/session/choice';
 import { extendSession } from '@/core/session/extend';
 import { generateSession, rebuildSession } from '@/core/session/generate';
 import { getTodayState, type TodayState } from '@/core/session/plan';
@@ -86,13 +86,13 @@ export function Today() {
   }, [generating]);
 
   const start = (light: boolean, choice?: LessonChoice) => void gen.run((onStage) => generateSession(deps, { light, choice }, onStage));
-  const addMore = (sessionId: number) => {
+  // The formats of the last added round, so that its retry adds the same round.
+  const lastFormats = useRef<TaskFormat[]>([]);
+  const addMore = (sessionId: number, formats: TaskFormat[]) => {
     setShowResults(false);
+    lastFormats.current = formats;
     // Extending reopens the session, which the sidebar garden shows.
-    void gen.run(async (onStage) => {
-      const { defaults } = await extendOptions(deps, sessionId);
-      return extendSession(deps, sessionId, defaults, onStage);
-    }).then(refresh);
+    void gen.run((onStage) => extendSession(deps, sessionId, formats, onStage)).then(refresh);
   };
   const close = (sessionId: number) => {
     setActionError(null);
@@ -169,7 +169,7 @@ export function Today() {
             message={genError.message}
             code={genError.code}
             busy={generating}
-            onRetry={() => (shown.earlier ? start(shown.restDay) : closed ? addMore(shown.id) : rebuild(shown.id, lastLight.current))}
+            onRetry={() => (shown.earlier ? start(shown.restDay) : closed ? addMore(shown.id, lastFormats.current) : rebuild(shown.id, lastLight.current))}
           />
         )}
         {shown.earlier && (
@@ -192,10 +192,11 @@ export function Today() {
         {closed && (
           <LessonClosed
             lang={lang}
+            sessionId={shown.id}
             loader={loader}
             showingResults={showResults}
             onToggleResults={() => setShowResults((v) => !v)}
-            onAddMore={() => addMore(shown.id)}
+            onAdd={(formats) => addMore(shown.id, formats)}
           >
             {solveButton}
           </LessonClosed>

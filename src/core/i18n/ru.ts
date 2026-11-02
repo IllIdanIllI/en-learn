@@ -194,6 +194,7 @@ export const ru: Record<keyof typeof en, string> = {
   'picker.spot': 'Задание: найти ошибки',
   'picker.spelling': 'Правописание',
   'picker.speaking': 'Говорение',
+  'picker.add': 'Добавить',
   'picker.reason.no_week_topic': 'нет темы недели',
   'picker.reason.no_rule': 'нет правила',
   'picker.reason.no_topics': 'нет тем',

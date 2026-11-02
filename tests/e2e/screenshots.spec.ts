@@ -296,6 +296,7 @@ test.describe('today session', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Урок завершён' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Добавить вопросы' }).click();
+    await page.getByRole('button', { name: 'Добавить', exact: true }).click();
     await expect(page.getByText('Составляю задания', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('My sister is an nurse')).toBeVisible();
@@ -305,6 +306,7 @@ test.describe('today session', () => {
   test('the loader tip card is headed "Пока вы ждёте" and highlights the changed part of an error', async ({ page }) => {
     await page.goto('/?state=closed&delay=2500#/today');
     await page.getByRole('button', { name: 'Добавить вопросы' }).click();
+    await page.getByRole('button', { name: 'Добавить', exact: true }).click();
     const card = page.locator('section[aria-live="off"]').filter({ has: page.getByRole('heading', { name: 'Пока вы ждёте' }) });
     await expect(card).toBeVisible();
     await expect(card.locator('span.font-semibold.text-destructive')).toHaveCount(1);

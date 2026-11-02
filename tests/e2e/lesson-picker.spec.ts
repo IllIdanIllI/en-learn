@@ -17,12 +17,25 @@ test.describe('lesson picker: generation outlives the page', () => {
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('status')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Добавить вопросы' })).toHaveCount(0);
-    const fields = await page.getByRole('textbox').count();
 
     // Exactly one round was added: the fixture with one added round has the same number of answer fields.
+    // count() does not wait, so the fixture's number is read once its fields have settled, and the result is compared with a web-first assertion.
+    const fields = page.getByRole('textbox');
     await page.goto('/?state=open-round#/today');
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible();
-    await expect(page.getByRole('textbox')).toHaveCount(fields);
+    await expect(fields.first()).toBeVisible();
+    let expected = -1;
+    await expect.poll(async () => {
+      const n = await fields.count();
+      const settled = n === expected;
+      expected = n;
+      return settled;
+    }, { intervals: [300] }).toBe(true);
+    await page.goto('/?state=closed&delay=1500#/today');
+    await page.getByRole('button', { name: 'Добавить вопросы' }).click();
+    await page.getByRole('button', { name: 'Добавить', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 30_000 });
+    await expect(fields).toHaveCount(expected);
   });
 });
 
@@ -53,6 +66,24 @@ test.describe('lesson picker: before a lesson', () => {
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('heading', { name: /Найдите ошибки/ })).toHaveCount(1);
     await expect(page.getByRole('heading', { name: /Задание дня/ })).toHaveCount(1);
+  });
+
+  test('the light day toggle clears the task ticks, and switching it off restores them', async ({ page }) => {
+    await page.goto('/?state=no_session#/today');
+    const gap = page.getByRole('checkbox', { name: 'Задание: вставить пропуск' });
+    const fix = page.getByRole('checkbox', { name: 'Задание: исправить предложение' });
+    const ticked = async () => [await gap.isChecked(), await fix.isChecked()].filter(Boolean).length;
+    await expect.poll(ticked).toBe(1);
+    const defaultGap = await gap.isChecked();
+    await page.getByRole('button', { name: 'Лёгкий день' }).click();
+    await expect.poll(ticked).toBe(0);
+    await expect(page.getByRole('checkbox', { name: 'Правописание', exact: true })).toBeChecked();
+    // A task can still be ticked on a light day.
+    await gap.check();
+    await expect.poll(ticked).toBe(1);
+    await page.getByRole('button', { name: 'Лёгкий день' }).click();
+    await expect(gap).toBeChecked({ checked: defaultGap });
+    await expect(fix).toBeChecked({ checked: !defaultGap });
   });
 
   test('unticking all rows disables Start session', async ({ page }) => {

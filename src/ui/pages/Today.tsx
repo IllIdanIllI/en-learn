@@ -10,7 +10,7 @@ import { generateSession, rebuildSession } from '@/core/session/generate';
 import { getTodayState, type TodayState } from '@/core/session/plan';
 import { reopenSkipped, skippedToSolve } from '@/core/session/skipped';
 import { useCore } from '@/ui/app/CoreProvider';
-import { useGeneration } from '@/ui/app/GenerationProvider';
+import { errorOfDay, useGeneration } from '@/ui/app/GenerationProvider';
 import { Button } from '@/ui/components/ui/button';
 import { Notice } from '@/ui/today/chips';
 import { LessonClosed } from '@/ui/today/LessonClosed';
@@ -33,7 +33,7 @@ export function Today() {
   const generating = gen.running;
   // Errors of closing a lesson or reopening skipped questions; those of a job are `gen.error`.
   const [actionError, setActionError] = useState<GenError | null>(null);
-  const genError = gen.error ?? actionError;
+  const genError = errorOfDay(gen.error, gen.errorDay, today) ?? actionError;
   const waiting = useWaitInfo(GENERATION_KINDS, generating);
   // A graded session of an earlier day stays on screen after grading, until the page is left.
   const [pinned, setPinned] = useState<number | null>(null);
@@ -85,7 +85,7 @@ export function Today() {
     return () => window.removeEventListener('focus', onFocus);
   }, [generating]);
 
-  const start = (light: boolean, choice?: LessonChoice) => void gen.run((onStage) => generateSession(deps, { light, choice }, onStage));
+  const start = (light: boolean, choice?: LessonChoice) => void gen.run((onStage) => generateSession(deps, { light, choice }, onStage), today);
   // The formats of the last added round, so that its retry adds the same round.
   const lastFormats = useRef<TaskFormat[]>([]);
   // `formats` null is a retry: the last round's formats, or after Today was left (they are gone) the day's defaults.
@@ -98,9 +98,10 @@ export function Today() {
       const use = chosen.length > 0 ? chosen : (await extendOptions(deps, sessionId)).defaults;
       lastFormats.current = use;
       return extendSession(deps, sessionId, use, onStage);
-    }).then(refresh);
+    }, today).then(refresh);
   };
   const close = (sessionId: number) => {
+    gen.clearError();
     setActionError(null);
     closeSession(deps.db, sessionId).then(
       () => {
@@ -111,6 +112,7 @@ export function Today() {
     );
   };
   const solve = (sessionId: number) => {
+    gen.clearError();
     setActionError(null);
     reopenSkipped(deps.db, sessionId, deps.clock.today())
       .then(async (n) => {
@@ -123,7 +125,7 @@ export function Today() {
   const lastLight = useRef(false);
   const rebuild = (sessionId: number, light: boolean) => {
     lastLight.current = light;
-    void gen.run((onStage) => rebuildSession(deps, sessionId, { light }, onStage));
+    void gen.run((onStage) => rebuildSession(deps, sessionId, { light }, onStage), today);
   };
   const loader: LoaderView | null = gen.progress
     ? { stages: GENERATION_STAGES, current: gen.progress.stage, attempt: gen.progress.attempt, ...waiting }

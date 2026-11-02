@@ -4,7 +4,7 @@ import type { ISODate } from '@/core/domain';
 import { formatTitleDate } from '@/core/dates';
 import { t } from '@/core/i18n';
 import { closeSession } from '@/core/db/repos/sessions';
-import type { LessonChoice, TaskFormat } from '@/core/session/choice';
+import { extendOptions, type LessonChoice, type TaskFormat } from '@/core/session/choice';
 import { extendSession } from '@/core/session/extend';
 import { generateSession, rebuildSession } from '@/core/session/generate';
 import { getTodayState, type TodayState } from '@/core/session/plan';
@@ -94,6 +94,17 @@ export function Today() {
     // Extending reopens the session, which the sidebar garden shows.
     void gen.run((onStage) => extendSession(deps, sessionId, formats, onStage)).then(refresh);
   };
+  // Retry of a failed added round: its formats, or after Today was left (they are gone) the day's defaults.
+  const retryAddMore = (sessionId: number) => {
+    if (lastFormats.current.length > 0) {
+      addMore(sessionId, lastFormats.current);
+      return;
+    }
+    extendOptions(deps, sessionId).then(
+      ({ defaults }) => addMore(sessionId, defaults),
+      (e: unknown) => setActionError({ message: e instanceof Error ? e.message : String(e) }),
+    );
+  };
   const close = (sessionId: number) => {
     setActionError(null);
     closeSession(deps.db, sessionId).then(
@@ -169,7 +180,7 @@ export function Today() {
             message={genError.message}
             code={genError.code}
             busy={generating}
-            onRetry={() => (shown.earlier ? start(shown.restDay) : closed ? addMore(shown.id, lastFormats.current) : rebuild(shown.id, lastLight.current))}
+            onRetry={() => (shown.earlier ? start(shown.restDay) : closed ? retryAddMore(shown.id) : rebuild(shown.id, lastLight.current))}
           />
         )}
         {shown.earlier && (

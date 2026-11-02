@@ -120,3 +120,19 @@ test.describe('lesson picker: added round', () => {
     await expect(page.getByRole('button', { name: 'Добавить', exact: true })).toHaveCount(0);
   });
 });
+
+test.describe('lesson picker: retry of an added round', () => {
+  test('retrying after leaving Today adds the round with the defaults', async ({ page }) => {
+    await page.goto('/?state=closed&fail=timeout#/today');
+    await page.getByRole('button', { name: 'Добавить вопросы' }).click();
+    await page.getByRole('button', { name: 'Добавить', exact: true }).click();
+    await expect(page.getByRole('alert')).toContainText('Preview failure: timeout', { timeout: 15_000 });
+    await page.getByRole('link', { name: 'Настройки' }).click();
+    await expect(page).toHaveURL(/#\/settings/);
+    await page.getByRole('link', { name: 'Сегодня' }).click();
+    // The formats of the failed round are gone with the page: Retry must still send the defaults.
+    await page.getByRole('button', { name: 'Повторить' }).click();
+    await expect(page.getByRole('alert')).toContainText('Preview failure: timeout', { timeout: 15_000 });
+    await expect(page.getByRole('alert')).not.toContainText('Choose at least one task');
+  });
+});

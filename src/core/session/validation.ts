@@ -16,9 +16,9 @@ export function violations(s: GeneratedSession, ctx: GenerationContext): string[
   const wanted = ctx.blocks.map((b) => b.kind).join(', ');
   if (kinds !== wanted) out.push(`blocks: got [${kinds}], the context asks for [${wanted}]`);
   s.blocks.forEach((b, i) => {
-    const taskFormat = ctx.extra ? ctx.blocks.find((x) => x.kind === 'task')?.format : ctx.plan.task?.format;
-    if (b.kind === 'task' && taskFormat && b.format !== taskFormat) {
-      out.push(`b${i} format: task block must be ${taskFormat}, got ${b.format}`);
+    const wantedBlock = ctx.blocks[i];
+    if (b.kind === 'task' && wantedBlock?.kind === 'task' && b.format !== wantedBlock.format) {
+      out.push(`b${i} format: task block must be ${wantedBlock.format}, got ${b.format}`);
     }
     if (b.kind === 'task' && ctx.extra && (b.items.length < 6 || b.items.length > 8)) {
       out.push(`b${i} items: ${b.items.length} items in an extra set, need 6 to 8`);

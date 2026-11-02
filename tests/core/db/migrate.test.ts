@@ -38,13 +38,13 @@ function counting(db: Db): { db: Db; executed: string[] } {
 }
 
 describe('runMigrations', () => {
-  test('fresh db returns 3; second run returns 3 and executes nothing new', async () => {
+  test('fresh db returns 4; second run returns 4 and executes nothing new', async () => {
     const raw = await createTestDb(); // already migrated once
     const rows = await raw.select<{ schema_version: number }>('SELECT schema_version FROM meta');
-    expect(rows).toEqual([{ schema_version: 3 }]);
+    expect(rows).toEqual([{ schema_version: 4 }]);
     const c = counting(raw);
     const list = [{ version: 1, sql: 'CREATE TABLE zzz (x INTEGER);' }];
-    expect(await runMigrations(c.db, list)).toBe(3);
+    expect(await runMigrations(c.db, list)).toBe(4);
     expect(c.executed.some((s) => s.includes('zzz'))).toBe(false);
     expect(await raw.select('SELECT * FROM meta')).toHaveLength(1);
   });
@@ -52,12 +52,12 @@ describe('runMigrations', () => {
   test('applies only newer migrations, in order', async () => {
     const db = await createTestDb();
     const v = await runMigrations(db, [
-      { version: 3, sql: 'CREATE TABLE ignored (x INTEGER);' },
-      { version: 4, sql: 'CREATE TABLE t2 (x INTEGER);' },
+      { version: 4, sql: 'CREATE TABLE ignored (x INTEGER);' },
+      { version: 5, sql: 'CREATE TABLE t2 (x INTEGER);' },
     ]);
-    expect(v).toBe(4);
+    expect(v).toBe(5);
     expect(await db.select('SELECT * FROM t2')).toEqual([]);
-    expect(await db.select('SELECT * FROM meta')).toEqual([{ schema_version: 4 }]);
+    expect(await db.select('SELECT * FROM meta')).toEqual([{ schema_version: 5 }]);
   });
 
   test('0003 adds rule_gap.base_version to an existing db; old rows get NULL', async () => {
@@ -74,7 +74,7 @@ describe('runMigrations', () => {
     };
     expect(await runMigrations(db, migrations.filter((m) => m.version <= 2))).toBe(2);
     await db.execute("INSERT INTO rule_gap (id, item_id, rule_id, proposal, explanation, sources) VALUES (1, 1, 1, 'p', 'e', '[]')");
-    expect(await runMigrations(db, migrations)).toBe(3);
+    expect(await runMigrations(db, migrations)).toBe(4);
     expect(await db.select('SELECT id, base_version FROM rule_gap')).toEqual([{ id: 1, base_version: null }]);
   });
 });

@@ -6,7 +6,9 @@ import { FakeLlm } from '@/adapters/test/fakeLlm';
 import { FixedClock } from '@/adapters/test/fixedClock';
 import { insertSeedRules, parseSeed, saveProgramme } from '@/core/programme/setup';
 import { setSetting } from '@/core/db/repos/settings';
-import { cleanupDrafts } from '@/core/db/repos/sessions';
+import { cleanupDrafts, getSessionChoice } from '@/core/db/repos/sessions';
+import type { LessonChoice } from '@/core/session/choice';
+import { violations } from '@/core/session/validation';
 import { buildGenerationContext, renderContext } from '@/core/session/context';
 import { getTodayState } from '@/core/session/plan';
 import { fillFormatExamples, generateSession, rebuildSession } from '@/core/session/generate';
@@ -466,5 +468,82 @@ describe('getTodayState', () => {
     expect((await getTodayState(deps)).kind).toBe('earlier_session');
     await db.execute("INSERT INTO session (date, title, is_light, status, created_at) VALUES ('2026-10-20','t',0,'generated','x')");
     expect((await getTodayState(deps)).kind).toBe('session');
+  });
+});
+
+describe('generation from a choice', () => {
+  const choice = (over: Partial<LessonChoice> = {}): LessonChoice => ({ review: false, formats: ['gap'], spelling: true, speaking: true, ...over });
+  const gapBlock = (): GeneratedBlock => ({
+    kind: 'task', format: 'gap', title: 'Gap', instruction: 'Fill the gap.', formatExample: 'She ___ tea. → drinks', minutes: 6,
+    items: [item(1), item(2), item(3)], paragraphs: [], question: '',
+  });
+
+  test('context for gap and spot has two task blocks, the gap one on the week topic', async () => {
+    const { deps } = await setup('2026-10-20', {});
+    const ctx = await buildGenerationContext(deps, '2026-10-20', false, choice({ formats: ['gap', 'spot'], speaking: false }));
+    expect(ctx.blocks).toEqual([
+      { kind: 'task', format: 'gap', topicKey: 'articles' },
+      { kind: 'task', format: 'spot' },
+    ]);
+    expect(ctx.taskTopic?.topic.key).toBe('articles');
+    const text = renderContext(ctx);
+    expect(text).toContain('1. task (format gap, topic articles)');
+    expect(text).toContain('2. task (format spot)\n');
+    expect(text).not.toContain('speaking (');
+  });
+
+  test('violations flag a wrong format in the second task block and accept the right sequence', async () => {
+    const { deps } = await setup('2026-10-20', {});
+    const ctx = await buildGenerationContext(deps, '2026-10-20', false, choice({ formats: ['gap', 'spot'] }));
+    const good: GeneratedSession = { blocks: [gapBlock(), spotBlock(), speaking] };
+    expect(violations(good, ctx)).toEqual([]);
+    const bad: GeneratedSession = { blocks: [gapBlock(), gapBlock(), speaking] };
+    expect(violations(bad, ctx).join('\n')).toContain('b1 format: task block must be spot, got gap');
+  });
+
+  test('spelling unticked: no spelling block is written', async () => {
+    const gen: GeneratedSession = { blocks: [gapBlock(), speaking] };
+    const { db, deps } = await setup('2026-10-20', { generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
+    await db.execute("INSERT INTO spelling_word (word, hint, created_at) VALUES ('word', 'hint', 'x')");
+    expect((await generateSession(deps, { light: false, choice: choice({ spelling: false }) })).ok).toBe(true);
+    const blocks = await db.select<{ kind: string }>('SELECT kind FROM block ORDER BY ord');
+    expect(blocks.map((b) => b.kind)).toEqual(['task', 'speaking']);
+  });
+
+  test('only spelling ticked: the lesson is built without a generate call', async () => {
+    const { db, llm, deps } = await setup('2026-10-20', {});
+    await db.execute("INSERT INTO spelling_word (word, hint, created_at) VALUES ('word', 'hint', 'x')");
+    const res = await generateSession(deps, { light: false, choice: choice({ formats: [], speaking: false }) });
+    expect(res.ok).toBe(true);
+    expect(llm.calls).toHaveLength(0);
+    const blocks = await db.select<{ kind: string }>('SELECT kind FROM block ORDER BY ord');
+    expect(blocks.map((b) => b.kind)).toEqual(['spelling']);
+    expect((await sessions(db))[0]).toMatchObject({ status: 'generated', title: 'Review, Tue 20 Oct' });
+  });
+
+  test('the choice is stored normalised and a rebuild reuses it', async () => {
+    const gen: GeneratedSession = { blocks: [gapBlock(), spotBlock()] };
+    const { db, llm, deps } = await setup('2026-10-20', {
+      generate_session: [ok(gen), ok(gen)], validate_session: [ok(allOk(gen)), ok(allOk(gen))],
+    });
+    const c = choice({ formats: ['spot', 'gap'], speaking: false });
+    await generateSession(deps, { light: false, choice: c });
+    expect(await getSessionChoice(db, 1)).toEqual({ review: false, formats: ['gap', 'spot'], spelling: true, speaking: false });
+    expect((await rebuildSession(deps, 1, { light: false })).ok).toBe(true);
+    expect(await getSessionChoice(db, 2)).toEqual({ review: false, formats: ['gap', 'spot'], spelling: true, speaking: false });
+    expect(llm.calls.filter((x) => x.kind === 'generate_session')[1]?.userPrompt).toContain('2. task (format spot)');
+  });
+
+  test('a rebuild of a session with a NULL choice works like before', async () => {
+    const gen = taskDay();
+    const { db, deps } = await setup('2026-10-20', {
+      generate_session: [ok(gen), ok(gen)], validate_session: [ok(allOk(gen)), ok(allOk(gen))],
+    });
+    await generateSession(deps, { light: false });
+    await db.execute('UPDATE session SET choice = NULL');
+    expect(await getSessionChoice(db, 1)).toBeNull();
+    expect((await rebuildSession(deps, 1, { light: false })).ok).toBe(true);
+    const blocks = await db.select<{ kind: string }>('SELECT kind FROM block ORDER BY ord');
+    expect(blocks.map((b) => b.kind)).toEqual(['task', 'speaking']);
   });
 });

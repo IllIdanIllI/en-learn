@@ -4,11 +4,12 @@ import { addDays, formatTitleDate } from '@/core/dates';
 import { dueTopicIds, replayTopics } from '@/core/schedule/topics';
 import { listGradedSessions } from '@/core/db/repos/sessions';
 import { listSkippedItems } from '@/core/db/repos/answers';
+import type { LessonChoice } from './choice';
 import { loadDayInfo, spottingTopics, taskTopic, type DayInfo } from './plan';
 
 export interface RuleRef { topic: Topic; ruleId: number; version: number; body: string }
 export interface ReviewEntry { prompt: string; answer: string; fix: string; topicKey: string | null; skipped: boolean }
-export interface BlockSpec { kind: 'review' | 'task' | 'speaking'; format: string }
+export interface BlockSpec { kind: 'review' | 'task' | 'speaking'; format: string; topicKey?: string }
 
 export interface GenerationContext {
   date: ISODate;
@@ -90,15 +91,18 @@ export async function reviewSources(deps: Deps, info: DayInfo, d: ISODate): Prom
   return { reviewDate: last?.date ?? null, reviewInputs, inattention, dueTopics };
 }
 
-export async function buildGenerationContext(deps: Deps, d: ISODate, light: boolean): Promise<GenerationContext> {
+/** Without a choice the blocks are the day's programme; with one, exactly what it ticks (review only when there is something to review). */
+export async function buildGenerationContext(deps: Deps, d: ISODate, light: boolean, choice?: LessonChoice): Promise<GenerationContext> {
   const info = await loadDayInfo(deps, d);
   if (!info) throw new Error('No programme');
   const { plan } = info;
 
-  const taskT = light ? null : taskTopic(info);
+  const weekT = plan.weekNo === null ? undefined : info.topics.find((t) => t.weekNo === plan.weekNo);
+  const gapOrFix = choice?.formats.some((f) => f === 'gap' || f === 'fix') ?? false;
+  const taskT = choice ? (gapOrFix ? (weekT ?? null) : choice.formats.includes('spot') ? taskTopic(info) : null) : light ? null : taskTopic(info);
   const taskRef = taskT ? ref(info, taskT) : null;
   if (taskT && !taskRef) throw new Error(`Rule for ${taskT.key} is missing`);
-  const spotTopics = spottingTopics(info, d).included.flatMap((t) => ref(info, t) ?? []);
+  const spotTopics = choice && !choice.formats.includes('spot') ? [] : spottingTopics(info, d).included.flatMap((t) => ref(info, t) ?? []);
 
   const { reviewDate, reviewInputs, inattention, dueTopics } = await reviewSources(deps, info, d);
 
@@ -111,9 +115,16 @@ export async function buildGenerationContext(deps: Deps, d: ISODate, light: bool
   }
 
   const blocks: BlockSpec[] = [];
-  if (reviewInputs.length > 0 || dueTopics.length > 0) blocks.push({ kind: 'review', format: 'gap or fix' });
-  if (!light && plan.task) blocks.push({ kind: 'task', format: plan.task.format });
-  blocks.push({ kind: 'speaking', format: 'question' });
+  if ((!choice || choice.review) && (reviewInputs.length > 0 || dueTopics.length > 0)) blocks.push({ kind: 'review', format: 'gap or fix' });
+  if (choice) {
+    for (const f of choice.formats) {
+      const key = f === 'spot' ? (plan.task?.format === 'spot' ? taskRef?.topic.key : undefined) : taskRef?.topic.key;
+      blocks.push(key ? { kind: 'task', format: f, topicKey: key } : { kind: 'task', format: f });
+    }
+  } else if (!light && plan.task) {
+    blocks.push(taskRef ? { kind: 'task', format: plan.task.format, topicKey: taskRef.topic.key } : { kind: 'task', format: plan.task.format });
+  }
+  if (!choice || choice.speaking) blocks.push({ kind: 'speaking', format: 'question' });
 
   return {
     date: d,
@@ -161,7 +172,7 @@ export function renderContext(ctx: GenerationContext): string {
   const printed = new Set<string>();
   const blocks = ctx.blocks
     .map((b, i) => {
-      const topic = b.kind === 'task' && ctx.taskTopic ? `, topic ${ctx.taskTopic.topic.key}` : '';
+      const topic = b.topicKey ? `, topic ${b.topicKey}` : '';
       return `${i + 1}. ${b.kind} (format ${b.format}${topic})`;
     })
     .join('\n');

@@ -1,6 +1,7 @@
 import type { Db } from '@/core/ports';
 import type { BlockFormat, BlockKind, ISODate, ItemStatus, SessionStatus } from '@/core/domain';
 import type { CallStat } from '@/core/progress/usage';
+import type { LessonChoice } from '@/core/session/choice';
 import { getSettings, setSetting } from './settings';
 
 export interface GradedSession {
@@ -107,13 +108,20 @@ export async function getLatestGeneratedBefore(db: Db, date: ISODate): Promise<{
 
 export async function insertDraftSession(
   db: Db,
-  s: { date: ISODate; title: string; isLight: boolean; createdAt: string },
+  s: { date: ISODate; title: string; isLight: boolean; createdAt: string; choice?: LessonChoice },
 ): Promise<number> {
   const res = await db.execute(
-    "INSERT INTO session (date, title, is_light, status, created_at) VALUES (?, ?, ?, 'draft', ?)",
-    [s.date, s.title, s.isLight ? 1 : 0, s.createdAt],
+    "INSERT INTO session (date, title, is_light, status, created_at, choice) VALUES (?, ?, ?, 'draft', ?, ?)",
+    [s.date, s.title, s.isLight ? 1 : 0, s.createdAt, s.choice ? JSON.stringify(s.choice) : null],
   );
   return res.lastInsertId;
+}
+
+/** The lesson choice a session was generated from; null for a session made before the picker. */
+export async function getSessionChoice(db: Db, sessionId: number): Promise<LessonChoice | null> {
+  const rows = await db.select<{ choice: string | null }>('SELECT choice FROM session WHERE id = ?', [sessionId]);
+  const raw = rows[0]?.choice;
+  return raw ? (JSON.parse(raw) as LessonChoice) : null;
 }
 
 export async function insertBlock(db: Db, sessionId: number, ord: number, b: NewBlock, round = 1): Promise<number> {

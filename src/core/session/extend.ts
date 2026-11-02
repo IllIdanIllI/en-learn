@@ -57,7 +57,7 @@ export async function extendSession(deps: Deps, sessionId: number, onStage?: OnS
   );
   const extended: GenerationContext = {
     ...ctx,
-    blocks: [{ kind: 'task', format }],
+    blocks: [{ kind: 'task', format, topicKey: taskRef.topic.key }],
     taskTopic: taskRef,
     spotTopics: [],
     reviewInputs: [],

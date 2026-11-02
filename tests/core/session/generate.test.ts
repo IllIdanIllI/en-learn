@@ -492,6 +492,27 @@ describe('generation from a choice', () => {
     expect(text).not.toContain('speaking (');
   });
 
+  test('gap and spot on an ordinary spot day: the spot block has no topic', async () => {
+    const { deps } = await setup('2026-10-19', {});
+    const ctx = await buildGenerationContext(deps, '2026-10-19', false, choice({ formats: ['gap', 'spot'] }));
+    expect(ctx.plan.task).toEqual({ format: 'spot', topicId: null });
+    const text = renderContext(ctx);
+    expect(text).toContain('1. task (format gap, topic articles)');
+    expect(text).toContain('2. task (format spot)\n');
+  });
+
+  test('gap and spot on a notice-topic day: the week topic is the notice topic, so both blocks name it', async () => {
+    const { db, deps } = await setup('2026-10-20', {});
+    await db.execute("UPDATE topic SET kind = 'notice' WHERE id = 1");
+    const ctx = await buildGenerationContext(deps, '2026-10-20', false, choice({ formats: ['gap', 'spot'], speaking: false }));
+    expect(ctx.plan.task).toEqual({ format: 'spot', topicId: 1 });
+    expect(ctx.blocks).toEqual([
+      { kind: 'task', format: 'gap', topicKey: 'articles' },
+      { kind: 'task', format: 'spot', topicKey: 'articles' },
+    ]);
+    expect(ctx.allowed.map((r) => r.topic.key)).toEqual(['articles']);
+  });
+
   test('violations flag a wrong format in the second task block and accept the right sequence', async () => {
     const { deps } = await setup('2026-10-20', {});
     const ctx = await buildGenerationContext(deps, '2026-10-20', false, choice({ formats: ['gap', 'spot'] }));

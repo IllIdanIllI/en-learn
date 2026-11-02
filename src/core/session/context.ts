@@ -102,12 +102,15 @@ export async function buildGenerationContext(deps: Deps, d: ISODate, light: bool
   const taskT = choice ? (gapOrFix ? (weekT ?? null) : choice.formats.includes('spot') ? taskTopic(info) : null) : light ? null : taskTopic(info);
   const taskRef = taskT ? ref(info, taskT) : null;
   if (taskT && !taskRef) throw new Error(`Rule for ${taskT.key} is missing`);
+  // A spot block has a topic of its own only on a notice-topic day (plan.task is spot with a topic).
+  const noticeT = plan.task?.format === 'spot' && plan.task.topicId != null ? info.topics.find((t) => t.id === plan.task?.topicId) : undefined;
+  const noticeRef = noticeT && (!choice || choice.formats.includes('spot')) ? ref(info, noticeT) : null;
   const spotTopics = choice && !choice.formats.includes('spot') ? [] : spottingTopics(info, d).included.flatMap((t) => ref(info, t) ?? []);
 
   const { reviewDate, reviewInputs, inattention, dueTopics } = await reviewSources(deps, info, d);
 
   const allowed = new Map<string, RuleRef>();
-  for (const r of [taskRef, ...spotTopics, ...dueTopics]) if (r) allowed.set(r.topic.key, r);
+  for (const r of [taskRef, noticeRef, ...spotTopics, ...dueTopics]) if (r) allowed.set(r.topic.key, r);
   for (const e of [...reviewInputs, ...inattention]) {
     const t = info.topics.find((x) => x.key === e.topicKey);
     const r = t ? ref(info, t) : null;
@@ -118,7 +121,7 @@ export async function buildGenerationContext(deps: Deps, d: ISODate, light: bool
   if ((!choice || choice.review) && (reviewInputs.length > 0 || dueTopics.length > 0)) blocks.push({ kind: 'review', format: 'gap or fix' });
   if (choice) {
     for (const f of choice.formats) {
-      const key = f === 'spot' ? (plan.task?.format === 'spot' ? taskRef?.topic.key : undefined) : taskRef?.topic.key;
+      const key = f === 'spot' ? noticeRef?.topic.key : taskRef?.topic.key;
       blocks.push(key ? { kind: 'task', format: f, topicKey: key } : { kind: 'task', format: f });
     }
   } else if (!light && plan.task) {

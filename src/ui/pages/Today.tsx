@@ -4,7 +4,7 @@ import type { ISODate } from '@/core/domain';
 import { formatTitleDate } from '@/core/dates';
 import { t } from '@/core/i18n';
 import { closeSession } from '@/core/db/repos/sessions';
-import { extendOptions } from '@/core/session/choice';
+import { extendOptions, type LessonChoice } from '@/core/session/choice';
 import { extendSession } from '@/core/session/extend';
 import { generateSession, rebuildSession } from '@/core/session/generate';
 import { getTodayState, type TodayState } from '@/core/session/plan';
@@ -83,7 +83,7 @@ export function Today() {
     return () => window.removeEventListener('focus', onFocus);
   }, [generating]);
 
-  const start = (light: boolean) => void gen.run((onStage) => generateSession(deps, { light }, onStage));
+  const start = (light: boolean, choice?: LessonChoice) => void gen.run((onStage) => generateSession(deps, { light, choice }, onStage));
   const addMore = (sessionId: number) => {
     setShowResults(false);
     // Extending reopens the session, which the sidebar garden shows.

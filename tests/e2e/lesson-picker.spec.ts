@@ -23,3 +23,51 @@ test.describe('lesson picker: generation outlives the page', () => {
     await expect(page.getByRole('textbox')).toHaveCount(fields);
   });
 });
+
+test.describe('lesson picker: before a lesson', () => {
+  test('shows the rows with the defaults ticked', async ({ page }) => {
+    await page.goto('/?state=no_session#/today');
+    await expect(page.getByRole('checkbox', { name: 'Правописание', exact: true })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'Говорение', exact: true })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'Задание: найти ошибки' })).not.toBeChecked();
+    const gap = page.getByRole('checkbox', { name: 'Задание: вставить пропуск' });
+    const fix = page.getByRole('checkbox', { name: 'Задание: исправить предложение' });
+    // The programme's format for today: exactly one of gap and fix.
+    await expect.poll(async () => [await gap.isChecked(), await fix.isChecked()].filter(Boolean).length).toBe(1);
+  });
+
+  test('unticking speaking gives a lesson without a speaking block', async ({ page }) => {
+    await page.goto('/?state=no_session#/today');
+    await page.getByRole('checkbox', { name: 'Говорение', exact: true }).uncheck();
+    await page.getByRole('button', { name: 'Начать сессию' }).click();
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: /Говорение/ })).toHaveCount(0);
+  });
+
+  test('ticking find-the-errors as well gives two task blocks', async ({ page }) => {
+    await page.goto('/?state=no_session#/today');
+    await page.getByRole('checkbox', { name: 'Задание: найти ошибки' }).check();
+    await page.getByRole('button', { name: 'Начать сессию' }).click();
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: /Найдите ошибки/ })).toHaveCount(1);
+    await expect(page.getByRole('heading', { name: /Задание дня/ })).toHaveCount(1);
+  });
+
+  test('unticking all rows disables Start session', async ({ page }) => {
+    await page.goto('/?state=no_session#/today');
+    const start = page.getByRole('button', { name: 'Начать сессию' });
+    await expect(start).toBeEnabled();
+    for (const box of await page.getByRole('checkbox').all()) {
+      if (await box.isChecked()) await box.uncheck();
+    }
+    await expect(start).toBeDisabled();
+  });
+
+  test('a rest day ticks only review (if shown) and spelling', async ({ page }) => {
+    await page.goto('/?state=rest#/today');
+    await expect(page.getByRole('checkbox', { name: 'Правописание', exact: true })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'Говорение', exact: true })).not.toBeChecked();
+    for (const box of await page.getByRole('checkbox', { name: /^Задание:/ }).all()) await expect(box).not.toBeChecked();
+    await expect(page.getByRole('button', { name: 'Начать лёгкий день' })).toBeEnabled();
+  });
+});

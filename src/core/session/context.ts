@@ -42,16 +42,17 @@ function ref(info: DayInfo, topic: Topic): RuleRef | null {
   return r ? { topic, ruleId: r.ruleId, version: r.version, body: r.body } : null;
 }
 
-export async function buildGenerationContext(deps: Deps, d: ISODate, light: boolean): Promise<GenerationContext> {
-  const info = await loadDayInfo(deps, d);
-  if (!info) throw new Error('No programme');
-  const { plan, facts } = info;
-  const byId = new Map(info.topics.map((t) => [t.id, t]));
+export interface ReviewSources {
+  reviewDate: ISODate | null;
+  reviewInputs: ReviewEntry[];
+  inattention: ReviewEntry[];
+  dueTopics: RuleRef[];
+}
 
-  const taskT = light ? null : taskTopic(info);
-  const taskRef = taskT ? ref(info, taskT) : null;
-  if (taskT && !taskRef) throw new Error(`Rule for ${taskT.key} is missing`);
-  const spotTopics = spottingTopics(info, d).included.flatMap((t) => ref(info, t) ?? []);
+/** Review input (last graded session's counted wrong answers and skipped items), inattention errors and due re-checks for day d. */
+export async function reviewSources(deps: Deps, info: DayInfo, d: ISODate): Promise<ReviewSources> {
+  const { facts } = info;
+  const byId = new Map(info.topics.map((t) => [t.id, t]));
 
   const due = dueTopicIds(replayTopics(facts.topicFacts), d);
   const dueTopics = due.flatMap((id) => {
@@ -86,6 +87,20 @@ export async function buildGenerationContext(deps: Deps, d: ISODate, light: bool
   const inattention = facts.errorRows
     .filter((r) => r.format !== 'spelling' && r.effective === 'wrong' && r.isInattention && r.date >= since && r.date < d)
     .map(entry);
+  return { reviewDate: last?.date ?? null, reviewInputs, inattention, dueTopics };
+}
+
+export async function buildGenerationContext(deps: Deps, d: ISODate, light: boolean): Promise<GenerationContext> {
+  const info = await loadDayInfo(deps, d);
+  if (!info) throw new Error('No programme');
+  const { plan } = info;
+
+  const taskT = light ? null : taskTopic(info);
+  const taskRef = taskT ? ref(info, taskT) : null;
+  if (taskT && !taskRef) throw new Error(`Rule for ${taskT.key} is missing`);
+  const spotTopics = spottingTopics(info, d).included.flatMap((t) => ref(info, t) ?? []);
+
+  const { reviewDate, reviewInputs, inattention, dueTopics } = await reviewSources(deps, info, d);
 
   const allowed = new Map<string, RuleRef>();
   for (const r of [taskRef, ...spotTopics, ...dueTopics]) if (r) allowed.set(r.topic.key, r);
@@ -110,7 +125,7 @@ export async function buildGenerationContext(deps: Deps, d: ISODate, light: bool
     blocks,
     taskTopic: taskRef,
     spotTopics,
-    reviewDate: last?.date ?? null,
+    reviewDate,
     reviewInputs,
     inattention,
     dueTopics,

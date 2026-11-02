@@ -21,7 +21,7 @@ Counts:
 - Task block with format gap or fix: 6 to 10 items.
 - Extra set: when the context has an "Extra set" section, produce only the task blocks it asks for (formats as given), each gap or fix block with 6 to 8 items on its topic, each spot block as usual (2 to 3 paragraphs over the error-spotting topics); none repeating a prompt listed there; no review or speaking block; isCheck is always false.
 - Task block with format spot: 2 to 3 paragraphs, each with 5 to 7 hidden errors.
-- Light day: only the review block (see above) and the speaking block.
+- Light day: only lowers the review cap (see above). The blocks are exactly those listed under "Blocks to produce", whatever the day.
 
 # Task design rules (all are mandatory)
 

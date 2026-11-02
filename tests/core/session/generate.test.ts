@@ -555,6 +555,34 @@ describe('generation from a choice', () => {
     expect(llm.calls.filter((x) => x.kind === 'generate_session')[1]?.userPrompt).toContain('2. task (format spot)');
   });
 
+  test('a light rebuild keeps the stored choice but drops its task block; a normal one keeps it', async () => {
+    const withTask: GeneratedSession = { blocks: [gapBlock(), speaking] };
+    const noTask: GeneratedSession = { blocks: [speaking] };
+    const { db, llm, deps } = await setup('2026-10-20', {
+      generate_session: [ok(withTask), ok(noTask), ok(noTask)],
+      validate_session: [ok(allOk(withTask)), ok(allOk(noTask)), ok(allOk(noTask))],
+    });
+    await generateSession(deps, { light: false, choice: choice() });
+    expect((await rebuildSession(deps, 1, { light: true })).ok).toBe(true);
+    const prompts = () => llm.calls.filter((x) => x.kind === 'generate_session').map((x) => x.userPrompt);
+    expect(prompts()[1]).toContain('Light day: yes');
+    expect(prompts()[1]).not.toContain('task (format');
+    expect(prompts()[1]).toContain('speaking');
+    expect(await getSessionChoice(db, 2)).toEqual({ review: false, formats: [], spelling: true, speaking: true });
+    // light: false uses the stored choice as it is (here the light one, without a task).
+    expect((await rebuildSession(deps, 2, { light: false })).ok).toBe(true);
+    expect(prompts()[2]).not.toContain('task (format');
+  });
+
+  test('a light day with a ticked task is consistent: the context lists it and the violations accept it', async () => {
+    const gen: GeneratedSession = { blocks: [gapBlock(), speaking] };
+    const { deps } = await setup('2026-10-20', {});
+    const ctx = await buildGenerationContext(deps, '2026-10-20', true, choice());
+    expect(renderContext(ctx)).toContain('- Light day: yes');
+    expect(renderContext(ctx)).toContain('1. task (format gap, topic articles)');
+    expect(violations(gen, ctx)).toEqual([]);
+  });
+
   test('a rebuild of a session with a NULL choice works like before', async () => {
     const gen = taskDay();
     const { db, deps } = await setup('2026-10-20', {

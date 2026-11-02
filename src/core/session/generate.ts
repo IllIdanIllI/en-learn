@@ -153,7 +153,9 @@ async function rebuildUnlocked(deps: Deps, sessionId: number, opts: { light: boo
   if (!row) throw new Error(`Session ${sessionId} not found`);
   if (row.status === 'graded') throw new Error('Cannot rebuild a graded session');
   if (row.date !== deps.clock.today()) throw new Error("Cannot rebuild a session of another day");
-  const choice = await getSessionChoice(deps.db, sessionId);
+  const stored = await getSessionChoice(deps.db, sessionId);
+  // A light rebuild keeps the stored choice but drops the task block.
+  const choice = stored && opts.light ? { ...stored, formats: [] } : stored;
   forgetAwaiting(sessionId);
   await deleteSession(deps.db, sessionId);
   return generateUnlocked(deps, choice ? { ...opts, choice } : opts, onStage);

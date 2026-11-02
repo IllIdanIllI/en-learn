@@ -43,6 +43,11 @@ export function StartSession({ lang, today, loader, error, rest = false, onStart
   // A rest day has no toggle: the only way to practise is a light day.
   const light = rest || lightChoice;
   const ready = choice !== null && (choice.review || choice.formats.length > 0 || choice.spelling || choice.speaking);
+  // The light toggle drops the task ticks; switching it off brings the day's default ticks back. The learner can still tick a task afterwards.
+  const toggleLight = (on: boolean) => {
+    setLight(on);
+    if (options !== null) setChoice((c) => (c === null ? c : { ...c, formats: on ? [] : options.defaults.formats }));
+  };
   const start = () => {
     if (choice !== null) onStart(light, choice);
   };
@@ -74,7 +79,7 @@ export function StartSession({ lang, today, loader, error, rest = false, onStart
           {t(lang, rest ? 'today.startLight' : 'today.start')}
         </Button>
         {!rest && (
-          <Toggle pressed={light} disabled={generating} onPressedChange={setLight}>
+          <Toggle pressed={light} disabled={generating} onPressedChange={toggleLight}>
             {t(lang, 'today.light')}
           </Toggle>
         )}

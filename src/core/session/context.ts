@@ -206,7 +206,7 @@ export function renderContext(ctx: GenerationContext): string {
       ? [
           '## Extra set',
           '',
-          `This is an extra set for today's finished lesson: 6 to 8 items, do not repeat these prompts:\n${ctx.extra.prompts.map((p) => `- ${p}`).join('\n')}`,
+          `This is an extra set for today's finished lesson: each gap or fix block has 6 to 8 items, do not repeat these prompts:\n${ctx.extra.prompts.map((p) => `- ${p}`).join('\n')}`,
           '',
         ]
       : []),

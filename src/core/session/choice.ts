@@ -1,6 +1,7 @@
 import type { ISODate } from '@/core/domain';
 import type { Deps } from '@/core/ports';
-import { reviewSources } from './context';
+import { buildGenerationContext, reviewSources } from './context';
+import { extensionTopic, firstRoundFormat } from './extend';
 import { loadDayInfo, spottingTopics } from './plan';
 
 export type TaskFormat = 'gap' | 'fix' | 'spot';
@@ -13,6 +14,18 @@ const FORMAT_ORDER: TaskFormat[] = ['gap', 'fix', 'spot'];
 
 export function normaliseChoice(c: LessonChoice): LessonChoice {
   return { ...c, formats: FORMAT_ORDER.filter((f) => c.formats.includes(f)) };
+}
+
+export interface ExtendOptions { formats: Record<TaskFormat, RowReason | null>; defaults: TaskFormat[] }
+
+/** The picker rows and default ticks for the added round of today's graded session. */
+export async function extendOptions(deps: Deps, sessionId: number): Promise<ExtendOptions> {
+  const d = deps.clock.today();
+  const ctx = await buildGenerationContext(deps, d, false);
+  const topicReason: RowReason | null = (await extensionTopic(deps, sessionId, d, ctx)) ? null : 'no_topics';
+  const formats: Record<TaskFormat, RowReason | null> = { gap: topicReason, fix: topicReason, spot: ctx.spotTopics.length > 0 ? null : 'no_topics' };
+  const preferred = await firstRoundFormat(deps, sessionId);
+  return { formats, defaults: [preferred].filter((f) => formats[f] === null) };
 }
 
 /**

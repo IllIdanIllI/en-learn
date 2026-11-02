@@ -20,7 +20,7 @@ export function violations(s: GeneratedSession, ctx: GenerationContext): string[
     if (b.kind === 'task' && wantedBlock?.kind === 'task' && b.format !== wantedBlock.format) {
       out.push(`b${i} format: task block must be ${wantedBlock.format}, got ${b.format}`);
     }
-    if (b.kind === 'task' && ctx.extra && (b.items.length < 6 || b.items.length > 8)) {
+    if (b.kind === 'task' && b.format !== 'spot' && ctx.extra && (b.items.length < 6 || b.items.length > 8)) {
       out.push(`b${i} items: ${b.items.length} items in an extra set, need 6 to 8`);
     }
     if (b.kind === 'review') {

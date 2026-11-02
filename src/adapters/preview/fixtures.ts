@@ -5,6 +5,7 @@ import { CLAUDE_LOCATIONS } from '@/core/llm/claude';
 import { bundledPrompts } from '@/core/llm/bundledPrompts';
 import { startApp } from '@/core/startup';
 import { insertSeedRules, saveProgramme, type SeedRule } from '@/core/programme/setup';
+import { extendOptions } from '@/core/session/choice';
 import { extendSession } from '@/core/session/extend';
 import { generateSession } from '@/core/session/generate';
 import { gradeSession } from '@/core/grading/grade';
@@ -208,7 +209,7 @@ export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
     const session = await getSessionByDate(deps.db, today);
     if (!session) throw new Error('Preview fixture: no session');
     if (state === 'closed') await closeSession(deps.db, session.id);
-    else requireOk(await extendSession(deps, session.id), 'extendSession');
+    else requireOk(await extendSession(deps, session.id, (await extendOptions(deps, session.id)).defaults), 'extendSession');
     if (state === 'round-graded') await answerToday(deps, 'graded');
     // Round 2 answered with blanks and the lesson finished: the skipped items belong to the added round.
     if (state === 'skipped-round') await answerToday(deps, 'skipped');

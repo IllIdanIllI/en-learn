@@ -4,6 +4,7 @@ import type { ISODate } from '@/core/domain';
 import { formatTitleDate } from '@/core/dates';
 import { t } from '@/core/i18n';
 import { closeSession } from '@/core/db/repos/sessions';
+import { extendOptions } from '@/core/session/choice';
 import { extendSession } from '@/core/session/extend';
 import { generateSession, rebuildSession, type GenerateResult, type GenStage, type OnStage } from '@/core/session/generate';
 import { getTodayState, type TodayState } from '@/core/session/plan';
@@ -102,7 +103,10 @@ export function Today() {
   const addMore = (sessionId: number) => {
     setShowResults(false);
     // Extending reopens the session, which the sidebar garden shows.
-    void build((onStage) => extendSession(deps, sessionId, onStage)).then(refresh);
+    void build(async (onStage) => {
+      const { defaults } = await extendOptions(deps, sessionId);
+      return extendSession(deps, sessionId, defaults, onStage);
+    }).then(refresh);
   };
   const close = (sessionId: number) => {
     setGenError(null);

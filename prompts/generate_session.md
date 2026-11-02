@@ -19,7 +19,7 @@ Produce exactly the blocks listed under "Blocks to produce", in that order; ther
 Counts:
 - Review block: format is always gap or fix, never spot. At most 12 items; on a light day at most 5. Every gap or fix block, review included, has at least 3 items: if the review input gives fewer than 3, pad the block with fresh sentences on the same topics (only constructions the rules cover). Every topic whose re-check is due today or overdue gets at least one item in the review block with isCheck = true, and these check items always win over the caps: on a light day the review block has at most 5 items unless more topics are due, in which case it has one check item per due topic. All other items have isCheck = false. Outside the review block isCheck is always false.
 - Task block with format gap or fix: 6 to 10 items.
-- Extra set: when the context has an "Extra set" section, produce only the one task block it asks for (format as given), with 6 to 8 items on the given task topic, none repeating a prompt listed there; no review, speaking or spot block, and isCheck is always false.
+- Extra set: when the context has an "Extra set" section, produce only the task blocks it asks for (formats as given), each gap or fix block with 6 to 8 items on its topic, each spot block as usual (2 to 3 paragraphs over the error-spotting topics); none repeating a prompt listed there; no review or speaking block; isCheck is always false.
 - Task block with format spot: 2 to 3 paragraphs, each with 5 to 7 hidden errors.
 - Light day: only the review block (see above) and the speaking block.
 

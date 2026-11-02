@@ -50,6 +50,7 @@ export function ErrorNotice({ kind, message, code, busy, onRetry, className }: {
     );
   }
   if (code === 'session_exists') return <Notice className={className}>{t(lang, 'error.sessionExists')}</Notice>;
+  if (code === 'busy') return <Notice className={className}>{t(lang, 'error.busy')}</Notice>;
   if (code === 'session_not_found') return <Notice className={className}>{t(lang, 'error.sessionNotFound')}</Notice>;
   if (code === 'session_not_ready') {
     return (

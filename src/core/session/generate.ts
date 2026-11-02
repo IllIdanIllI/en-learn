@@ -13,18 +13,22 @@ import { selectSpellingWords } from '@/core/schedule/spelling';
 import { forgetAwaiting } from '@/core/grading/grade';
 import { normaliseChoice, type LessonChoice } from './choice';
 import { buildGenerationContext, renderContext, type GenerationContext } from './context';
+import { withJobLock } from './jobLock';
 import { writeBlocks } from './store';
 import { applyValidation, renderValidationInput, violations, type Defects } from './validation';
 
 export { cleanupDrafts };
 
 /** `code` lets the UI show its own text; without it the message is shown as is. */
-export type GenerateErrorCode = LlmErrorCode | 'session_exists';
+export type GenerateErrorCode = LlmErrorCode | 'session_exists' | 'busy';
 /** Where a generation run is: the model writes, the code and a reviewer check, the result is saved. */
 export type GenStage = 'writing' | 'checking' | 'saving';
 /** Reports the stage and the attempt number (1 or 2) a run is in. */
 export type OnStage = (stage: GenStage, attempt: number) => void;
 export type GenerateResult = { ok: true; sessionId: number } | { ok: false; message: string; code?: GenerateErrorCode };
+
+/** What a job returns when another one holds the lock. */
+export const BUSY: GenerateResult = { ok: false, message: 'A lesson is already being generated', code: 'busy' };
 
 const MAX_ATTEMPTS = 2;
 /** Retrying cannot help with these. */
@@ -42,7 +46,11 @@ function title(lang: 'ru' | 'en', ctx: GenerationContext): string {
  * Spec 6.2 steps 2-5. The draft row is inserted before the LLM calls so their llm_call rows carry its id
  * (they become unlinked if the draft is deleted on failure). The status flips to 'generated' as the last write.
  */
-export async function generateSession(deps: Deps, opts: { light: boolean; choice?: LessonChoice }, onStage?: OnStage): Promise<GenerateResult> {
+export function generateSession(deps: Deps, opts: { light: boolean; choice?: LessonChoice }, onStage?: OnStage): Promise<GenerateResult> {
+  return withJobLock(deps.db, () => generateUnlocked(deps, opts, onStage), BUSY);
+}
+
+async function generateUnlocked(deps: Deps, opts: { light: boolean; choice?: LessonChoice }, onStage?: OnStage): Promise<GenerateResult> {
   const d = deps.clock.today();
   const choice = opts.choice && normaliseChoice(opts.choice);
   await cleanupDrafts(deps.db);
@@ -135,7 +143,11 @@ async function fail(deps: Deps, sessionId: number, message: string, code?: LlmEr
 }
 
 /** Deletes an ungraded session (rows cascade) and builds a new one for today. */
-export async function rebuildSession(deps: Deps, sessionId: number, opts: { light: boolean }, onStage?: OnStage): Promise<GenerateResult> {
+export function rebuildSession(deps: Deps, sessionId: number, opts: { light: boolean }, onStage?: OnStage): Promise<GenerateResult> {
+  return withJobLock(deps.db, () => rebuildUnlocked(deps, sessionId, opts, onStage), BUSY);
+}
+
+async function rebuildUnlocked(deps: Deps, sessionId: number, opts: { light: boolean }, onStage?: OnStage): Promise<GenerateResult> {
   const rows = await deps.db.select<{ status: string; date: string }>('SELECT status, date FROM session WHERE id = ?', [sessionId]);
   const row = rows[0];
   if (!row) throw new Error(`Session ${sessionId} not found`);
@@ -144,5 +156,5 @@ export async function rebuildSession(deps: Deps, sessionId: number, opts: { ligh
   const choice = await getSessionChoice(deps.db, sessionId);
   forgetAwaiting(sessionId);
   await deleteSession(deps.db, sessionId);
-  return generateSession(deps, choice ? { ...opts, choice } : opts, onStage);
+  return generateUnlocked(deps, choice ? { ...opts, choice } : opts, onStage);
 }

@@ -110,6 +110,14 @@ describe('extendSession', () => {
     expect(await db.select("SELECT status FROM session WHERE id = ?", [sid])).toEqual([{ status: 'graded' }]);
   });
 
+  test('two concurrent extensions: one runs, the other is busy, and only one round is added', async () => {
+    const gen = extra(7);
+    const { db, deps, sid } = await setup({ generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
+    const results = await Promise.all([extendSession(deps, sid, ['fix']), extendSession(deps, sid, ['fix'])]);
+    expect(results).toEqual([{ ok: true, sessionId: sid }, { ok: false, message: 'A lesson is already being generated', code: 'busy' }]);
+    expect((await db.select<{ round: number }>('SELECT MAX(round) AS round FROM block'))[0]!.round).toBe(2);
+  });
+
   test('the user prompt lists every round-1 prompt under Extra set and asks for one task block', async () => {
     const gen = extra(6);
     const { db, llm, deps, sid } = await setup({ generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });

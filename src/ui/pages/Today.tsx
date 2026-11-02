@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { ISODate } from '@/core/domain';
 import { formatTitleDate } from '@/core/dates';
@@ -6,10 +6,11 @@ import { t } from '@/core/i18n';
 import { closeSession } from '@/core/db/repos/sessions';
 import { extendOptions } from '@/core/session/choice';
 import { extendSession } from '@/core/session/extend';
-import { generateSession, rebuildSession, type GenerateResult, type GenStage, type OnStage } from '@/core/session/generate';
+import { generateSession, rebuildSession } from '@/core/session/generate';
 import { getTodayState, type TodayState } from '@/core/session/plan';
 import { reopenSkipped, skippedToSolve } from '@/core/session/skipped';
 import { useCore } from '@/ui/app/CoreProvider';
+import { useGeneration } from '@/ui/app/GenerationProvider';
 import { Button } from '@/ui/components/ui/button';
 import { Notice } from '@/ui/today/chips';
 import { LessonClosed } from '@/ui/today/LessonClosed';
@@ -25,9 +26,12 @@ export function Today() {
   const noClaude = prereq !== null && !prereq.ok;
   const [state, setState] = useState<TodayState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [genError, setGenError] = useState<GenError | null>(null);
-  const [progress, setProgress] = useState<{ stage: GenStage; attempt: number }>({ stage: 'writing', attempt: 1 });
+  // The job lives above the routes: it keeps running, and its loader stays, when the page is left.
+  const gen = useGeneration();
+  const generating = gen.running;
+  // Errors of closing a lesson or reopening skipped questions; those of a job are `gen.error`.
+  const [actionError, setActionError] = useState<GenError | null>(null);
+  const genError = gen.error ?? actionError;
   const waiting = useWaitInfo(GENERATION_KINDS, generating);
   // A graded session of an earlier day stays on screen after grading, until the page is left.
   const [pinned, setPinned] = useState<number | null>(null);
@@ -37,9 +41,8 @@ export function Today() {
   const [skipped, setSkipped] = useState<{ sessionId: number; count: number } | null>(null);
   const [solving, setSolving] = useState<number | null>(null);
   const [reload, setReload] = useState(0);
-  // Bumped after every build: a deleted session's id can be reused, and the page must not keep its answers.
-  const [epoch, setEpoch] = useState(0);
-  const starting = useRef(false);
+  // Changes after every job: a deleted session's id can be reused, and the page must not keep its answers.
+  const epoch = gen.version;
 
   useEffect(() => {
     let live = true;
@@ -54,7 +57,7 @@ export function Today() {
     return () => {
       live = false;
     };
-  }, [deps, version, reload]);
+  }, [deps, version, reload, gen.version]);
 
   useEffect(() => {
     let live = true;
@@ -69,72 +72,53 @@ export function Today() {
     return () => {
       live = false;
     };
-  }, [deps, version, reload]);
+  }, [deps, version, reload, gen.version]);
 
   // The state is read again when the window gets focus (a midnight rollover), except while a session is being built.
   useEffect(() => {
     const onFocus = () => {
-      if (!starting.current) setReload((n) => n + 1);
+      if (!generating) setReload((n) => n + 1);
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, []);
+  }, [generating]);
 
-  const build = useCallback(async (job: (onStage: OnStage) => Promise<GenerateResult>) => {
-    if (starting.current) return;
-    starting.current = true;
-    setGenerating(true);
-    setGenError(null);
-    setProgress({ stage: 'writing', attempt: 1 });
-    try {
-      const res = await job((stage, attempt) => setProgress({ stage, attempt }));
-      if (!res.ok) setGenError({ message: res.message, code: res.code });
-    } catch (e) {
-      setGenError({ message: e instanceof Error ? e.message : String(e) });
-    } finally {
-      starting.current = false;
-      setGenerating(false);
-      // A failed rebuild has already removed the old session, so the state is read in every case.
-      setEpoch((n) => n + 1);
-      setReload((n) => n + 1);
-    }
-  }, []);
-  const start = (light: boolean) => void build((onStage) => generateSession(deps, { light }, onStage));
+  const start = (light: boolean) => void gen.run((onStage) => generateSession(deps, { light }, onStage));
   const addMore = (sessionId: number) => {
     setShowResults(false);
     // Extending reopens the session, which the sidebar garden shows.
-    void build(async (onStage) => {
+    void gen.run(async (onStage) => {
       const { defaults } = await extendOptions(deps, sessionId);
       return extendSession(deps, sessionId, defaults, onStage);
     }).then(refresh);
   };
   const close = (sessionId: number) => {
-    setGenError(null);
+    setActionError(null);
     closeSession(deps.db, sessionId).then(
       () => {
         setReload((n) => n + 1);
         refresh();
       },
-      (e: unknown) => setGenError({ message: e instanceof Error ? e.message : String(e) }),
+      (e: unknown) => setActionError({ message: e instanceof Error ? e.message : String(e) }),
     );
   };
   const solve = (sessionId: number) => {
-    setGenError(null);
+    setActionError(null);
     reopenSkipped(deps.db, sessionId, deps.clock.today())
       .then(async (n) => {
         // A stale count (another window): with nothing left to solve, refresh instead of showing an empty page.
         if (n === 0 && (await skippedToSolve(deps))?.sessionId !== sessionId) setReload((r) => r + 1);
         else setSolving(sessionId);
       })
-      .catch((e: unknown) => setGenError({ message: e instanceof Error ? e.message : String(e) }));
+      .catch((e: unknown) => setActionError({ message: e instanceof Error ? e.message : String(e) }));
   };
   const lastLight = useRef(false);
   const rebuild = (sessionId: number, light: boolean) => {
     lastLight.current = light;
-    void build((onStage) => rebuildSession(deps, sessionId, { light }, onStage));
+    void gen.run((onStage) => rebuildSession(deps, sessionId, { light }, onStage));
   };
-  const loader: LoaderView | null = generating
-    ? { stages: GENERATION_STAGES, current: progress.stage, attempt: progress.attempt, ...waiting }
+  const loader: LoaderView | null = gen.progress
+    ? { stages: GENERATION_STAGES, current: gen.progress.stage, attempt: gen.progress.attempt, ...waiting }
     : null;
 
   if (loadError) {

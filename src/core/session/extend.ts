@@ -5,7 +5,8 @@ import { deleteRound, getSession, hasOpenItems, reopenSession } from '@/core/db/
 import { listGradedAnswerRows } from '@/core/db/repos/answers';
 import { buildGenerationContext, type BlockSpec, type GenerationContext, type RuleRef } from './context';
 import type { TaskFormat } from './choice';
-import { produce, type GenerateResult, type OnStage } from './generate';
+import { BUSY, produce, type GenerateResult, type OnStage } from './generate';
+import { withJobLock } from './jobLock';
 import { loadDayInfo } from './plan';
 import { writeBlocks } from './store';
 
@@ -47,7 +48,11 @@ export async function firstRoundFormat(deps: Deps, sessionId: number): Promise<T
  * "Add more questions": one added round for today's graded session, as round max + 1, with one task block per chosen format
  * (gap and fix on the task topic, spot on the error-spotting topics). The session stays graded; the new round is open until it is answered.
  */
-export async function extendSession(deps: Deps, sessionId: number, formats: TaskFormat[], onStage?: OnStage): Promise<GenerateResult> {
+export function extendSession(deps: Deps, sessionId: number, formats: TaskFormat[], onStage?: OnStage): Promise<GenerateResult> {
+  return withJobLock(deps.db, () => extendUnlocked(deps, sessionId, formats, onStage), BUSY);
+}
+
+async function extendUnlocked(deps: Deps, sessionId: number, formats: TaskFormat[], onStage?: OnStage): Promise<GenerateResult> {
   const d = deps.clock.today();
   const session = await getSession(deps.db, sessionId);
   if (!session) return { ok: false, message: 'Session not found' };

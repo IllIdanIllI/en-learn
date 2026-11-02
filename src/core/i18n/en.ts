@@ -199,6 +199,7 @@ export const en = {
   'error.budget': 'The budget per call was reached.',
   'error.budgetLink': 'Change it in Settings',
   'error.sessionExists': 'A session for today already exists.',
+  'error.busy': 'A lesson is already being generated',
   'error.sessionNotFound': 'The session was not found.',
   'error.sessionNotReady': 'The session is not ready yet.',
   'error.boundary.title': 'Something went wrong.',

@@ -6,7 +6,7 @@ S2's writing part: a writing task, a rewrite task, the errors-per-100-words metr
 - **Block:** new kind `writing`, format `essay`. An IELTS Task 2 prompt (opinion or discussion), target 250 words. No timer.
 - **Prompt:** produced by the lesson's generate call as the block's `instruction`. Where natural, the prompt invites this week's grammar topic (for example a conditionals prompt in the conditionals week); it never names the grammar topic.
 - **Editor:** a full-width textarea in Reading style; below it a quiet footer with the live word count ("212 / 250 слов" / "212 / 250 words"). Spellcheck and autocorrect off, as everywhere.
-- **Draft:** saved as the learner types, through the existing draft store, under the key `${blockId}:text`.
+- **Draft:** saved as the learner types, through the existing draft store, under the key `w:${blockId}` (next to `i:` and `p:`).
 - **Choice:** `LessonChoice` gains `writing: boolean` and `rewrite: boolean` (W3). Ticked by default:
   - `writing` on a `writing` slot day;
   - `rewrite` on a `review_rewrite` slot day, when a graded text exists.

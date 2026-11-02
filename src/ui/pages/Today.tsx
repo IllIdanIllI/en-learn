@@ -88,22 +88,17 @@ export function Today() {
   const start = (light: boolean, choice?: LessonChoice) => void gen.run((onStage) => generateSession(deps, { light, choice }, onStage));
   // The formats of the last added round, so that its retry adds the same round.
   const lastFormats = useRef<TaskFormat[]>([]);
-  const addMore = (sessionId: number, formats: TaskFormat[]) => {
+  // `formats` null is a retry: the last round's formats, or after Today was left (they are gone) the day's defaults.
+  // The formats are resolved inside the job, so the loader, the busy state and a failure all go through the generation.
+  const addMore = (sessionId: number, formats: TaskFormat[] | null) => {
     setShowResults(false);
-    lastFormats.current = formats;
     // Extending reopens the session, which the sidebar garden shows.
-    void gen.run((onStage) => extendSession(deps, sessionId, formats, onStage)).then(refresh);
-  };
-  // Retry of a failed added round: its formats, or after Today was left (they are gone) the day's defaults.
-  const retryAddMore = (sessionId: number) => {
-    if (lastFormats.current.length > 0) {
-      addMore(sessionId, lastFormats.current);
-      return;
-    }
-    extendOptions(deps, sessionId).then(
-      ({ defaults }) => addMore(sessionId, defaults),
-      (e: unknown) => setActionError({ message: e instanceof Error ? e.message : String(e) }),
-    );
+    void gen.run(async (onStage) => {
+      const chosen = formats ?? lastFormats.current;
+      const use = chosen.length > 0 ? chosen : (await extendOptions(deps, sessionId)).defaults;
+      lastFormats.current = use;
+      return extendSession(deps, sessionId, use, onStage);
+    }).then(refresh);
   };
   const close = (sessionId: number) => {
     setActionError(null);
@@ -180,7 +175,7 @@ export function Today() {
             message={genError.message}
             code={genError.code}
             busy={generating}
-            onRetry={() => (shown.earlier ? start(shown.restDay) : closed ? retryAddMore(shown.id) : rebuild(shown.id, lastLight.current))}
+            onRetry={() => (shown.earlier ? start(shown.restDay) : closed ? addMore(shown.id, null) : rebuild(shown.id, lastLight.current))}
           />
         )}
         {shown.earlier && (

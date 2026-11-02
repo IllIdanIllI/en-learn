@@ -122,7 +122,7 @@ test.describe('lesson picker: added round', () => {
 });
 
 test.describe('lesson picker: retry of an added round', () => {
-  test('retrying after leaving Today adds the round with the defaults', async ({ page }) => {
+  test('retrying after leaving Today sends the defaults, not an empty choice', async ({ page }) => {
     await page.goto('/?state=closed&fail=timeout#/today');
     await page.getByRole('button', { name: 'Добавить вопросы' }).click();
     await page.getByRole('button', { name: 'Добавить', exact: true }).click();

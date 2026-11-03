@@ -11,6 +11,7 @@ import { itemDraftKey, loadDraftAnswers, saveDraftAnswer } from '@/core/db/repos
 import { rebuildSession } from '@/core/session/generate';
 import { gradeSession, hasAwaiting } from '@/core/grading/grade';
 import type { Submission } from '@/core/grading/precheck';
+import { hasOpenItems } from '@/core/db/repos/sessions';
 import { blockScores } from '@/core/progress/derive';
 import { loadGradedFacts, getTopicStates } from '@/core/progress/history';
 import type { Db, Deps, LlmResult } from '@/core/ports';
@@ -31,7 +32,7 @@ const entry = (ref: string, verdict: Entry['verdict'], o: Partial<Entry> = {}): 
   ref, verdict, fix: '', ruleSection: '', explanation: '', vocabularyNote: '', question: '', ...o,
 });
 const result = (o: Partial<GradeResult> = {}): GradeResult => ({
-  items: [], spot: [], patterns: [], tomorrow: [], spellingErrors: [], ruleGaps: [], ...o,
+  items: [], spot: [], patterns: [], tomorrow: [], spellingErrors: [], ruleGaps: [], texts: [], ...o,
 });
 
 const SPOT_REFS = [0, 1, 2, 3, 4].map((e) => `b2.p0.e${e}`);
@@ -53,6 +54,7 @@ const SPOT_BLOCK = 3;
 const subm = (o: { items?: Record<number, string>; spot?: string } = {}): Submission => ({
   items: { 1: 'necessary', 2: 'an', 3: '✓', 4: 'a', ...o.items },
   spot: { [`${SPOT_BLOCK}:0`]: o.spot ?? 'a apple → an apple\na hour → an hour' },
+  texts: {},
 });
 
 async function setup(date: string, today: string, script: LlmResult<unknown>[], status: 'generated' | 'draft' = 'generated') {
@@ -134,7 +136,7 @@ describe('gradeSession', () => {
     await insertItem(db, b4, 0, { ...it, prompt: 'I saw a owl.', expected: 'an', wrong: 'a owl' });
     await insertItem(db, b4, 1, { ...it, prompt: 'He ate a pear.', expected: '✓', wrong: null });
 
-    expect(await gradeSession(deps, sid, { items: { 10: 'a', 11: '✓' }, spot: {} }, [])).toEqual({ kind: 'graded' });
+    expect(await gradeSession(deps, sid, { items: { 10: 'a', 11: '✓' }, spot: {}, texts: {} }, [])).toEqual({ kind: 'graded' });
     const second = userPrompt(llm, 1);
     expect(second.match(/^### b\d+\.i\d+/gm)).toEqual(['### b4.i0']);
     expect(await rows(db, 'SELECT * FROM answer WHERE item_id <= 9 ORDER BY item_id')).toEqual(before);
@@ -159,7 +161,7 @@ describe('gradeSession', () => {
     await gradeSession(deps, sid, subm(), []);
     const b4 = await insertBlock(db, sid, 4, { instruction: 'i', formatExample: null, minutes: 5, kind: 'task', format: 'fix', title: 'More', passage: null }, 2);
     await insertItem(db, b4, 0, { paragraph: null, topicId: 1, ruleId: 1, ruleVersion: 1, ruleSection: 'Basics', spellingWordId: null, isCheck: false, status: 'active', note: null, prompt: 'I saw a owl.', expected: 'an', wrong: 'a owl' });
-    expect(await gradeSession(deps, sid, { items: {}, spot: {} }, [], { finish: true })).toEqual({ kind: 'graded' });
+    expect(await gradeSession(deps, sid, { items: {}, spot: {}, texts: {} }, [], { finish: true })).toEqual({ kind: 'graded' });
     expect(await verdicts(db)).toMatchObject({ 4: 'wrong', 10: 'skipped' });
   });
 
@@ -553,5 +555,133 @@ describe('gradeSession', () => {
     expect(await gradeSession(deps, sid, subm(), [])).toEqual({ kind: 'graded' });
     expect(llm.calls).toHaveLength(2);
     expect(await rows(db, 'SELECT proposal FROM rule_gap')).toEqual([{ proposal: '## Formula\nP' }]);
+  });
+});
+
+describe('gradeSession: writing texts', () => {
+  const FIRST = 'Yesterday he goes to the market and buy some fruit';
+  const longText = `${FIRST}. ${'plain words '.repeat(25).trim()}.`; // 10 + 50 words
+  const shortText = `${FIRST}. ${'plain words '.repeat(10).trim()}.`;
+  type TextEntry = GradeResult['texts'][number];
+  const err = (o: Partial<TextEntry['errors'][number]>): TextEntry['errors'][number] => ({
+    fragment: 'goes', fix: 'went', topicKey: '', suggestedTopic: '', ruleSection: '', explanation: 'Past simple.', ...o,
+  });
+  const twoErrors = (): TextEntry => ({
+    blockRef: 'b3',
+    errors: [err({ topicKey: 'articles', ruleSection: 'Basics' }), err({ fragment: 'buy', fix: 'bought', suggestedTopic: 'word choice' })],
+  });
+
+  async function withBlock(script: LlmResult<unknown>[], format: 'essay' | 'rewrite' = 'essay') {
+    const t = await setup('2026-10-20', '2026-10-20', script);
+    const blockId = await insertBlock(t.db, t.sid, 3, {
+      instruction: 'Some people think X. Discuss.', formatExample: null, minutes: 0, kind: 'writing', format, title: 'Writing',
+      passage: format === 'rewrite' ? JSON.stringify({ sourceBlockId: 1, text: 'old' }) : null,
+    });
+    return { ...t, blockId };
+  }
+  const textRows = (db: Db) => rows<{ block_id: number; text: string; words: number; source_block_id: number | null }>(db, 'SELECT * FROM writing_text');
+
+  test('the grade input has a Texts section and the programme topics with their rule sections', async () => {
+    const t = await withBlock([ok(fullResult({ texts: [twoErrors()] }))]);
+    const sub = { ...subm(), texts: { [t.blockId]: longText } };
+    expect(await gradeSession(t.deps, t.sid, sub, [])).toEqual({ kind: 'graded' });
+    const p = userPrompt(t.llm);
+    expect(p).toContain(`## Texts\n\n### b3 (essay)\nPrompt: Some people think X. Discuss.\nText:\n${longText}`);
+    expect(p).toMatch(/## Programme topics\n\n- articles: .+ \| sections: "Basics"/);
+  });
+
+  test('every error becomes an item and a wrong answer; the text is stored with its word count', async () => {
+    const t = await withBlock([ok(fullResult({ texts: [twoErrors()] }))]);
+    await gradeSession(t.deps, t.sid, { ...subm(), texts: { [t.blockId]: longText } }, []);
+    const items = await rows<{ ord: number; prompt: string; expected: string; topic_id: number | null; rule_id: number | null; rule_version: number | null; id: number }>(
+      t.db, 'SELECT * FROM item WHERE block_id = ? ORDER BY ord', [t.blockId],
+    );
+    expect(items.map((i) => [i.ord, i.prompt, i.expected])).toEqual([[0, FIRST, 'went'], [1, FIRST, 'bought']]);
+    expect(items.map((i) => [i.topic_id, i.rule_id, i.rule_version])).toEqual([[1, 1, 1], [null, null, null]]);
+    const answers = await rows<{ text: string; verdict: string; fix: string; rule_section: string | null; suggested_topic: string | null }>(
+      t.db, 'SELECT a.* FROM answer a JOIN item i ON i.id = a.item_id WHERE i.block_id = ? ORDER BY i.ord', [t.blockId],
+    );
+    expect(answers.map((a) => [a.text, a.verdict, a.fix, a.rule_section, a.suggested_topic])).toEqual([
+      ['goes', 'wrong', 'went', 'Basics', null],
+      ['buy', 'wrong', 'bought', null, 'word choice'],
+    ]);
+    expect(await textRows(t.db)).toEqual([{ block_id: t.blockId, text: longText, words: 60, source_block_id: null, created_at: expect.any(String) }]);
+  });
+
+  test('a rewrite keeps its source block id', async () => {
+    const t = await withBlock([ok(fullResult({ texts: [{ blockRef: 'b3', errors: [] }] }))], 'rewrite');
+    await gradeSession(t.deps, t.sid, { ...subm(), texts: { [t.blockId]: longText } }, []);
+    expect(userPrompt(t.llm)).toContain('### b3 (rewrite)\nPrompt: Some people think X. Discuss.');
+    expect((await textRows(t.db))[0]!.source_block_id).toBe(1);
+  });
+
+  test('a text under 50 words is stored without a check and without items', async () => {
+    const t = await withBlock([ok(fullResult())]);
+    expect(await gradeSession(t.deps, t.sid, { ...subm(), texts: { [t.blockId]: shortText } }, [])).toEqual({ kind: 'graded' });
+    expect(userPrompt(t.llm)).not.toContain('## Texts');
+    expect((await textRows(t.db)).map((r) => r.words)).toEqual([30]);
+    expect(await rows(t.db, 'SELECT id FROM item WHERE block_id = ?', [t.blockId])).toEqual([]);
+  });
+
+  test('a text that is the only thing to check and is too short makes no call', async () => {
+    const t = await withBlock([]);
+    await t.db.execute("UPDATE session SET status = 'graded'");
+    await t.db.execute('DELETE FROM item WHERE block_id != ?', [t.blockId]);
+    expect(await gradeSession(t.deps, t.sid, { items: {}, spot: {}, texts: { [t.blockId]: shortText } }, [])).toEqual({ kind: 'graded' });
+    expect(t.llm.calls).toHaveLength(0);
+    expect((await textRows(t.db)).map((r) => r.words)).toEqual([30]);
+  });
+
+  test('an empty text stores nothing and the block stays open', async () => {
+    const t = await withBlock([ok(fullResult())]);
+    await gradeSession(t.deps, t.sid, { ...subm(), texts: { [t.blockId]: '  ' } }, []);
+    expect(await textRows(t.db)).toEqual([]);
+    expect(await hasOpenItems(t.db, t.sid)).toBe(true);
+  });
+
+  test.each([
+    ['a fragment is not in the text', result({ texts: [{ blockRef: 'b3', errors: [err({ fragment: 'not here' })] }] }), 'text b3: fragment "not here" is not in the text'],
+    ['a topicKey is not a programme topic', result({ texts: [{ blockRef: 'b3', errors: [err({ topicKey: 'nope' })] }] }), 'nope'],
+    ['a sent text has no entry', result({ texts: [] }), 'b3'],
+  ])('the check retries when %s', async (_name, bad, message) => {
+    const withRest = (r: GradeResult) => ({ ...fullResult(), texts: r.texts });
+    const t = await withBlock([ok(withRest(bad)), ok(withRest(result({ texts: [twoErrors()] })))]);
+    expect(await gradeSession(t.deps, t.sid, { ...subm(), texts: { [t.blockId]: longText } }, [])).toEqual({ kind: 'graded' });
+    expect(t.llm.calls).toHaveLength(2);
+    const failed = await rows<{ error: string }>(t.db, 'SELECT error FROM llm_call WHERE ok = 0');
+    expect(failed).toHaveLength(1);
+    expect(failed[0]!.error).toContain(message);
+  });
+
+  test('grading again after a failed apply does not duplicate the errors', async () => {
+    const t = await withBlock([ok(fullResult({ texts: [twoErrors()] })), ok(fullResult({ texts: [twoErrors()] }))]);
+    t.failure.pending = /INSERT INTO writing_text/;
+    const sub = { ...subm(), texts: { [t.blockId]: longText } };
+    expect((await gradeSession(t.deps, t.sid, sub, [])).kind).toBe('error');
+    expect(await gradeSession(t.deps, t.sid, sub, [])).toEqual({ kind: 'graded' });
+    expect((await rows(t.db, 'SELECT id FROM item WHERE block_id = ?', [t.blockId]))).toHaveLength(2);
+  });
+
+  test('editing the text discards a waiting partial result', async () => {
+    const t = await withBlock([
+      ok(fullResult({ texts: [twoErrors()], items: [entry('b1.i0', 'correct'), entry('b1.i1', 'needs_clarification', { question: 'Q?' }), ...fullResult().items.slice(2)] })),
+    ]);
+    const sub = { ...subm({ items: { 3: 'a/an' } }), texts: { [t.blockId]: longText } };
+    expect((await gradeSession(t.deps, t.sid, sub, [])).kind).toBe('questions');
+    expect(hasAwaiting(t.sid)).toBe(true);
+    // The edited text is graded afresh (the unscripted second call fails), not resumed from the partial result.
+    expect((await gradeSession(t.deps, t.sid, { ...sub, texts: { [t.blockId]: `${longText} More.` } }, [])).kind).toBe('error');
+    expect(t.llm.calls).toHaveLength(2);
+    expect(hasAwaiting(t.sid)).toBe(false);
+  });
+
+  test('hasOpenItems is true for a graded session whose added round has only a writing block without a text', async () => {
+    const t = await setup('2026-10-20', '2026-10-20', [ok(fullResult())]);
+    await gradeSession(t.deps, t.sid, subm(), []);
+    expect(await hasOpenItems(t.db, t.sid)).toBe(false);
+    const blockId = await insertBlock(t.db, t.sid, 4, { instruction: 'i', formatExample: null, minutes: 0, kind: 'writing', format: 'essay', title: 'W', passage: null }, 2);
+    expect(await hasOpenItems(t.db, t.sid)).toBe(true);
+    await t.db.execute("INSERT INTO writing_text (block_id, text, words, source_block_id, created_at) VALUES (?, 'x', 1, NULL, 'x')", [blockId]);
+    expect(await hasOpenItems(t.db, t.sid)).toBe(false);
   });
 });

@@ -48,6 +48,10 @@ export interface GradeResult {
   tomorrow: string[];
   spellingErrors: { word: string; hint: string }[];
   ruleGaps: { ref: string; ruleTopicKey: string; proposal: string; explanation: string; sources: Source[] }[];
+  texts: {
+    blockRef: string;
+    errors: { fragment: string; fix: string; topicKey: string; suggestedTopic: string; ruleSection: string; explanation: string }[];
+  }[];
 }
 
 export interface RuleDraft { body: string; sources: Source[] }

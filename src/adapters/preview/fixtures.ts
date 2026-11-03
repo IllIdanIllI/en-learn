@@ -143,7 +143,7 @@ async function answerToday(deps: Deps, state: 'questions' | 'graded' | 'skipped'
       }
     });
   }
-  const outcome = await gradeSession(deps, session.id, { items: answers, spot }, [], { finish: state === 'skipped' });
+  const outcome = await gradeSession(deps, session.id, { items: answers, spot, texts: {} }, [], { finish: state === 'skipped' });
   if (state !== 'questions' && outcome.kind !== 'graded') throw new Error(`Preview fixture: grading gave ${outcome.kind}`);
   if (state === 'questions' && outcome.kind !== 'questions') throw new Error(`Preview fixture: expected questions, got ${outcome.kind}`);
 }

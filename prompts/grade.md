@@ -26,6 +26,17 @@ Vocabulary is not replaced while fixing grammar (FR-27). If the learner's word i
 
 For each paragraph produce one entry in "spot": blockRef (for example "b2"), paragraph (0-based index), found (the refs of listed hidden errors that a learner line fixes correctly: the line names the wrong fragment, or a span that contains it, and gives a correct fix, possibly a different correct fix than the key), and extra (a learner line that is not one of the listed hidden errors: put the line in "text" and explain, in {{nativeLanguage}}, why it is not an error under the rulebook or why the change is not needed). Add an entry to "items" only for a listed hidden error that a learner line targets with a wrong fix: verdict "wrong", with fix, ruleSection and explanation. Do not add entries for hidden errors that no learner line targets; the application reports them itself. Do not report extras as errors and do not lower anything because of them.
 
+# Texts
+
+For each text in the "Texts" section produce one entry in "texts": blockRef (for example "b3", copied from the heading) and errors. The section gives the prompt (for a rewrite, the instruction) and the learner's text, followed by the programme topics, each as "key: title | sections: ...". Texts are not graded item by item: there is no entry in "items" for them.
+
+- List every error of the text once. fragment is the exact wrong text, copied character for character as it is written in the text, so that it occurs in it. Keep the fragment as short as the error allows.
+- fix is the minimal correction of that fragment: change only what the error requires and keep the learner's own words otherwise.
+- topicKey: only a key from the programme topics, when the error belongs to that topic. Then ruleSection is exactly one of the sections listed for that topic. Otherwise topicKey is "" and ruleSection is "".
+- When topicKey is "", suggestedTopic is a short English name of the grammar or usage area of the error (for example "prepositions of time" or "word choice"). When topicKey is set, suggestedTopic is "".
+- explanation is short and factual, in {{nativeLanguage}}, and follows the tone rules below.
+- A text without errors gets an entry with an empty errors array. Do not report style preferences, and do not report a correct fragment as an error.
+
 # Rule gaps
 
 For every "rule_gap" item add one entry to "ruleGaps": ref (the item's ref), ruleTopicKey (the topic key given with the item), proposal (the complete new rule body for that topic: the existing rule text from the input kept in full, with the missing case added in the right section, same section order and headings, written in {{nativeLanguage}} with English examples), explanation (what the rule does not cover and what the proposal adds, in {{nativeLanguage}}) and sources (real pages that support the new text: British Council, Cambridge Dictionary grammar, Swan "Practical English Usage"). Never invent a URL. If you cannot name a real page, use an empty sources array. Swan is a book: put the entry in the title and an empty string as the url. The learner decides whether the rule changes; you only propose.

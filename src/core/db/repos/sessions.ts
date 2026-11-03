@@ -229,13 +229,15 @@ export async function reopenSession(db: Db, id: number): Promise<void> {
   if (closedSessions.includes(id)) await setSetting(db, 'closedSessions', closedSessions.filter((x) => x !== id));
 }
 
-/** True when an active item of the session (a speaking question aside) has no answer row yet. */
+/** True when an active item of the session (a speaking question aside) has no answer row yet, or a writing block has no stored text. */
 export async function hasOpenItems(db: Db, sessionId: number): Promise<boolean> {
   const rows = await db.select<{ n: number }>(
-    `SELECT COUNT(*) AS n FROM item i JOIN block b ON b.id = i.block_id
-     WHERE b.session_id = ? AND i.status = 'active' AND b.format != 'question'
-       AND NOT EXISTS (SELECT 1 FROM answer a WHERE a.item_id = i.id)`,
-    [sessionId],
+    `SELECT (SELECT COUNT(*) FROM item i JOIN block b ON b.id = i.block_id
+             WHERE b.session_id = ? AND i.status = 'active' AND b.format != 'question'
+               AND NOT EXISTS (SELECT 1 FROM answer a WHERE a.item_id = i.id))
+          + (SELECT COUNT(*) FROM block b WHERE b.session_id = ? AND b.kind = 'writing'
+               AND NOT EXISTS (SELECT 1 FROM writing_text w WHERE w.block_id = b.id)) AS n`,
+    [sessionId, sessionId],
   );
   return (rows[0]?.n ?? 0) > 0;
 }

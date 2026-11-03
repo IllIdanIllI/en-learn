@@ -43,7 +43,7 @@ async function main(): Promise<void> {
   const answers: Record<number, string> = {};
   items.filter((i) => i.status === 'active' && i.format !== 'spot' && i.format !== 'question')
     .forEach((it, n) => { answers[it.id] = n % 2 === 0 ? it.expected : 'wrongword'; });
-  const out = await gradeSession(deps, gen.sessionId, { items: answers, spot: {} }, []);
+  const out = await gradeSession(deps, gen.sessionId, { items: answers, spot: {}, texts: {} }, []);
   console.log('grade ok:', out.kind === 'graded', out.kind === 'error' ? out.message : out.kind === 'questions' ? JSON.stringify(out.questions) : '');
   await report(db, out.kind === 'graded', violations.length === 0);
 }

@@ -239,13 +239,13 @@ describe('reopenSkipped', () => {
 
   test('grading afterwards grades only the reopened items; scores, spelling and the error bank include them; they stop being review input', async () => {
     const wrong: GradeResult['items'][number] = { ref: 'b1.i0', verdict: 'wrong', fix: 'an', ruleSection: 'Basics', explanation: 'Use an.', vocabularyNote: '', question: '' };
-    const { db, deps, llm } = await setup('2026-10-20', [ok({ items: [wrong], spot: [], patterns: [], tomorrow: [], spellingErrors: [], ruleGaps: [] })]);
+    const { db, deps, llm } = await setup('2026-10-20', [ok({ items: [wrong], spot: [], patterns: [], tomorrow: [], spellingErrors: [], ruleGaps: [], texts: [] })]);
     const { sid, ids } = await addSession(db, '2026-10-20', ['skipped', 'correct', 'skipped', 'correct', 'correct']);
     expect(await listSkippedItems(db, sid)).toHaveLength(1);
     await reopenSkipped(db, sid, '2026-10-20');
     expect(await listSkippedItems(db, sid)).toHaveLength(0);
 
-    const sub = { items: { [ids[0]!]: 'necessary', [ids[2]!]: 'a' }, spot: {} };
+    const sub = { items: { [ids[0]!]: 'necessary', [ids[2]!]: 'a' }, spot: {}, texts: {} };
     expect(await gradeSession(deps, sid, sub, [])).toEqual({ kind: 'graded' });
     expect(llm.calls).toHaveLength(1);
     expect(llm.calls[0]!.userPrompt).toContain('She has a apple.');

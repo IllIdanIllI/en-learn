@@ -7,5 +7,6 @@
   "patterns": ["Будущее время после if вместо настоящего"],
   "tomorrow": ["if + настоящее время в условных предложениях"],
   "spellingErrors": [ { "word": "necessary", "hint": "one collar, two sleeves" } ],
-  "ruleGaps": [ { "ref": "b0.i1", "ruleTopicKey": "conditionals", "proposal": "## Формула\n...", "explanation": "Ответ естественный, но правило его не описывает.", "sources": [ { "title": "British Council", "url": "https://learnenglish.britishcouncil.org/grammar" } ] } ]
+  "ruleGaps": [ { "ref": "b0.i1", "ruleTopicKey": "conditionals", "proposal": "## Формула\n...", "explanation": "Ответ естественный, но правило его не описывает.", "sources": [ { "title": "British Council", "url": "https://learnenglish.britishcouncil.org/grammar" } ] } ],
+  "texts": [ { "blockRef": "b3", "errors": [ { "fragment": "goes", "fix": "went", "topicKey": "", "suggestedTopic": "past simple", "ruleSection": "", "explanation": "Для прошедшего времени нужна форма went." } ] } ]
 }

@@ -74,9 +74,23 @@ export function spotParagraphs(items: GradingItem[], texts: Record<string, strin
   return out.filter((p) => p.errors.length > 0);
 }
 
+export interface WritingToCheck {
+  blockId: number;
+  blockOrd: number;
+  format: 'essay' | 'rewrite';
+  prompt: string;
+  text: string;
+}
+
+/** A programme topic with a rule, as the grader may name it for a writing error. */
+export interface ProgrammeTopic { key: string; title: string; sections: string[] }
+
 export interface GradeBatch {
   items: { item: GradingItem; answer: string }[];
   spots: SpotParagraph[];
+  texts: WritingToCheck[];
+  /** Offered to the grader when there are texts. */
+  topics: ProgrammeTopic[];
 }
 
 /** The grade user message: settings, the full rule body once per topic, every item, every spot paragraph. */
@@ -109,6 +123,13 @@ export function renderGradeInput(batch: GradeBatch, refs: Refs, settings: Settin
       out.push(`- ${refs.refOf.get(e.id)} | wrong fragment: "${e.prompt}" | expected correction: "${e.expected}" | topic key: ${e.topicKey ?? ''} | rule section: ${e.ruleSection ?? ''}`);
     }
   }
+
+  if (batch.texts.length > 0) out.push('', '## Texts');
+  for (const t of batch.texts) out.push('', `### b${t.blockOrd} (${t.format})`, `Prompt: ${t.prompt}`, 'Text:', t.text);
+  if (batch.texts.length > 0) {
+    out.push('', '## Programme topics', '');
+    for (const t of batch.topics) out.push(`- ${t.key}: ${t.title} | sections: ${t.sections.map((h) => `"${h}"`).join(', ')}`);
+  }
   return `${out.join('\n')}\n`;
 }
 
@@ -119,15 +140,29 @@ export function proseOf(r: GradeResult): string[] {
     ...r.items.flatMap((i) => [i.explanation, i.vocabularyNote]),
     ...r.tomorrow,
     ...r.spot.flatMap((s) => s.extra.map((e) => e.explanation)),
+    ...r.texts.flatMap((t) => t.errors.map((e) => e.explanation)),
   ].filter((t) => t !== '');
 }
 
-/** Refs the batch needs an answer for but the result omitted; spot paragraphs need an entry of their own. */
+/** Refs the batch needs an answer for but the result omitted; spot paragraphs and texts need an entry of their own. */
 export function missingRefs(batch: GradeBatch, refs: Refs, r: GradeResult): string[] {
   const have = new Set(r.items.map((i) => i.ref));
   const out = batch.items.map((i) => refs.refOf.get(i.item.id)!).filter((ref) => !have.has(ref));
   for (const s of batch.spots) {
     if (!r.spot.some((e) => e.blockRef === `b${s.blockOrd}` && e.paragraph === s.paragraph)) out.push(`b${s.blockOrd}.p${s.paragraph}`);
   }
+  for (const t of batch.texts) if (!r.texts.some((e) => e.blockRef === `b${t.blockOrd}`)) out.push(`text b${t.blockOrd}`);
   return out;
+}
+
+/** What is wrong with the errors listed for the texts: a fragment that is not in the text, or a topic key outside the programme topics. */
+export function textProblems(batch: GradeBatch, r: GradeResult): string | null {
+  const keys = new Set(batch.topics.map((t) => t.key));
+  for (const t of batch.texts) {
+    for (const e of r.texts.find((x) => x.blockRef === `b${t.blockOrd}`)?.errors ?? []) {
+      if (e.fragment === '' || !t.text.includes(e.fragment)) return `text b${t.blockOrd}: fragment "${e.fragment}" is not in the text`;
+      if (e.topicKey !== '' && !keys.has(e.topicKey)) return `text b${t.blockOrd}: topicKey "${e.topicKey}" is not a programme topic`;
+    }
+  }
+  return null;
 }

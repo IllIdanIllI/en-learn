@@ -250,8 +250,33 @@ function field(block: string, name: string): string {
   return new RegExp(`^${name}: ?(.*)$`, 'm').exec(block)?.[1]?.trim() ?? '';
 }
 
+/** Writing errors: "goes" (fix "go", the first programme topic) and "are" (fix "is", no topic) when they occur in a text. */
+function gradeTexts(prompt: string): GradeResult['texts'] {
+  const [textPart = '', topicPart = ''] = (prompt.split('## Texts')[1] ?? '').split('## Programme topics');
+  const first = /^- ([^:\n]+): .*? \| sections: (?:"([^"]*)")?/m.exec(topicPart);
+  return textPart.split(/^### /m).slice(1).flatMap((block) => {
+    const blockRef = /^(b\d+) /.exec(block)?.[1];
+    const text = block.split('\nText:\n')[1] ?? '';
+    if (!blockRef) return [];
+    const errors: GradeResult['texts'][number]['errors'] = [];
+    if (first && text.includes('goes')) {
+      errors.push({
+        fragment: 'goes', fix: 'go', topicKey: first[1] as string, suggestedTopic: '', ruleSection: first[2] ?? '',
+        explanation: feedbackFor(first[1] as string).explanation,
+      });
+    }
+    if (text.includes('are')) {
+      errors.push({
+        fragment: 'are', fix: 'is', topicKey: '', suggestedTopic: 'subject-verb agreement', ruleSection: '',
+        explanation: 'Глагол согласуется с подлежащим в числе.',
+      });
+    }
+    return [{ blockRef, errors }];
+  });
+}
+
 function grade(prompt: string): GradeResult {
-  const result: GradeResult = { items: [], spot: [], patterns: [], tomorrow: [], spellingErrors: [], ruleGaps: [] };
+  const result: GradeResult = { items: [], spot: [], patterns: [], tomorrow: [], spellingErrors: [], ruleGaps: [], texts: [] };
   const wrongKeys: string[] = [];
   const [itemPart = '', spotPart = ''] = prompt.split('## Error-spotting paragraphs');
   for (const block of itemPart.split(/^### /m).slice(1)) {
@@ -292,6 +317,7 @@ function grade(prompt: string): GradeResult {
       extra: [],
     });
   }
+  result.texts = gradeTexts(prompt);
   if (wrongKeys.length > 0) {
     const fb = feedbackFor(wrongKeys[0] as string);
     result.patterns = [fb.pattern];

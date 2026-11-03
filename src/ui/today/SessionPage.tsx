@@ -47,6 +47,7 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
   const [draftsReady, setDraftsReady] = useState(false);
   const [items, setItems] = useState<Record<number, string>>({});
   const [spot, setSpot] = useState<Record<string, string>>({});
+  const [texts, setTexts] = useState<Record<number, string>>({});
   const [questions, setQuestions] = useState<Question[]>([]);
   const [replies, setReplies] = useState<Record<number, Reply>>({});
   const [finish, setFinish] = useState(false);
@@ -91,6 +92,7 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
         const restored = draftsToAnswers(drafts);
         setItems(restored.items);
         setSpot(restored.spot);
+        setTexts(restored.texts);
         setDraftsReady(true);
       },
       (e: unknown) => {
@@ -173,7 +175,7 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
       setFinish(finishing);
       void run(async () => {
         await flushAll(); // a late draft write must not land after the drafts are deleted by grading
-        return gradeSession(deps, sessionId, { items, spot }, clarifications(), { finish: finishing });
+        return gradeSession(deps, sessionId, { items, spot, texts }, clarifications(), { finish: finishing });
       });
     }
   };

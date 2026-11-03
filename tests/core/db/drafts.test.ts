@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { createTestDb } from '@/adapters/test/sqliteDb';
 import {
-  deleteDraftAnswers, draftsToAnswers, itemDraftKey, loadDraftAnswers, saveDraftAnswer, spotDraftKey,
+  deleteDraftAnswers, draftsToAnswers, itemDraftKey, loadDraftAnswers, saveDraftAnswer, spotDraftKey, writingDraftKey,
 } from '@/core/db/repos/drafts';
 import { insertDraftSession } from '@/core/db/repos/sessions';
 import type { Db } from '@/core/ports';
@@ -16,6 +16,7 @@ describe('draft answers', () => {
   test('keys follow the stored format', () => {
     expect(itemDraftKey(7)).toBe('i:7');
     expect(spotDraftKey(3, 1)).toBe('p:3:1');
+    expect(writingDraftKey(5)).toBe('w:5');
   });
 
   test('save then load returns the text per key; saving again overwrites', async () => {
@@ -34,9 +35,11 @@ describe('draft answers', () => {
     const { a } = await twoSessions(db);
     await saveDraftAnswer(db, a, itemDraftKey(4), 'an');
     await saveDraftAnswer(db, a, spotDraftKey(3, 1), 'a apple → an apple\na hour → an hour');
+    await saveDraftAnswer(db, a, writingDraftKey(5), 'My essay.');
     expect(draftsToAnswers(await loadDraftAnswers(db, a))).toEqual({
       items: { 4: 'an' },
       spot: { '3:1': 'a apple → an apple\na hour → an hour' },
+      texts: { 5: 'My essay.' },
     });
   });
 

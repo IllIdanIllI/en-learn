@@ -2,16 +2,21 @@ import type { Db } from '@/core/ports';
 
 export const itemDraftKey = (itemId: number): string => `i:${itemId}`;
 export const spotDraftKey = (blockId: number, paragraph: number): string => `p:${blockId}:${paragraph}`;
+export const writingDraftKey = (blockId: number): string => `w:${blockId}`;
 
-/** Splits stored drafts into the shape of a submission: item answers by id, spot answers by `${blockId}:${paragraph}`. */
-export function draftsToAnswers(drafts: Map<string, string>): { items: Record<number, string>; spot: Record<string, string> } {
+/** Splits stored drafts into the shape of a submission: item answers by id, spot answers by `${blockId}:${paragraph}`, writing texts by block id. */
+export function draftsToAnswers(
+  drafts: Map<string, string>,
+): { items: Record<number, string>; spot: Record<string, string>; texts: Record<number, string> } {
   const items: Record<number, string> = {};
   const spot: Record<string, string> = {};
+  const texts: Record<number, string> = {};
   for (const [key, text] of drafts) {
     if (key.startsWith('i:')) items[Number(key.slice(2))] = text;
     else if (key.startsWith('p:')) spot[key.slice(2)] = text;
+    else if (key.startsWith('w:')) texts[Number(key.slice(2))] = text;
   }
-  return { items, spot };
+  return { items, spot, texts };
 }
 
 /** An empty text removes the draft. */

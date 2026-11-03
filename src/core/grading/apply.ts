@@ -1,12 +1,13 @@
 import type { Clock, Db } from '@/core/ports';
 import type { GradeResult } from '@/core/llm/types';
 import type { GradingItem } from '@/core/db/repos/sessions';
-import { markSessionGraded } from '@/core/db/repos/sessions';
+import { insertItem, markSessionGraded } from '@/core/db/repos/sessions';
 import {
   appendSessionFeedback, markItemDefect, upsertAnswer, upsertExtraFinding, upsertRuleGap, upsertSpellingAttempt,
   upsertSpotAnswer,
 } from '@/core/db/repos/answers';
 import { deleteDraftAnswers } from '@/core/db/repos/drafts';
+import { findTopicRule, insertWritingText, type OpenWritingBlock } from '@/core/db/repos/writing';
 import { findOrCreateSpellingWord } from '@/core/db/repos/spelling';
 import { buildRefs, matchingLine } from './input';
 
@@ -18,7 +19,21 @@ export interface Graded {
   skipped: Set<number>;
   /** Learner text per `${blockId}:${paragraph}` for every spot paragraph with hidden errors. */
   spot: Map<string, string>;
+  /** Writing texts to store: every non-empty one, checked (errors in `result.texts`) or too short (no errors). */
+  writing: (OpenWritingBlock & { text: string; words: number })[];
   result: GradeResult;
+}
+
+const SENTENCE_END = /[.!?\n]/;
+
+/** The text between the nearest sentence end before the fragment and the next one, trimmed. */
+function sentenceOf(text: string, fragment: string): string {
+  const at = text.indexOf(fragment);
+  let start = at;
+  while (start > 0 && !SENTENCE_END.test(text[start - 1]!)) start--;
+  let end = at + fragment.length;
+  while (end < text.length && !SENTENCE_END.test(text[end]!)) end++;
+  return text.slice(start, end).trim();
 }
 
 const norm = (s: string) => s.trim().toLowerCase();
@@ -74,6 +89,26 @@ export async function applyGraded(db: Db, clock: Clock, items: GradingItem[], g:
         explanation: e.explanation, vocabularyNote: e.vocabularyNote,
       });
     }
+  }
+
+  // Writing: the errors of a block are rewritten whole, and the text goes last, so a crash in between is repaired by grading again.
+  for (const w of g.writing) {
+    await db.execute('DELETE FROM item WHERE block_id = ?', [w.blockId]);
+    const errors = g.result.texts.find((t) => t.blockRef === `b${w.blockOrd}`)?.errors ?? [];
+    for (const [ord, e] of errors.entries()) {
+      const rule = e.topicKey === '' ? null : await findTopicRule(db, e.topicKey);
+      await insertItem(db, w.blockId, ord, {
+        prompt: sentenceOf(w.text, e.fragment), expected: e.fix, paragraph: null, topicId: rule?.topicId ?? null,
+        ruleId: rule?.ruleId ?? null, ruleVersion: rule?.ruleVersion ?? null, ruleSection: e.ruleSection || null,
+        spellingWordId: null, isCheck: false, status: 'active', note: null, wrong: null,
+      });
+      const [item] = await db.select<{ id: number }>('SELECT id FROM item WHERE block_id = ? AND ord = ?', [w.blockId, ord]);
+      await upsertAnswer(db, {
+        itemId: item!.id, text: e.fragment, verdict: 'wrong', fix: e.fix, ruleSection: e.ruleSection || null,
+        explanation: e.explanation, vocabularyNote: null, suggestedTopic: e.suggestedTopic || null,
+      });
+    }
+    await insertWritingText(db, { blockId: w.blockId, text: w.text, words: w.words, sourceBlockId: w.sourceBlockId, createdAt: clock.now() });
   }
 
   for (const [key, text] of g.spot) {

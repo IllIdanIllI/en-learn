@@ -249,7 +249,7 @@ describe('extendSession', () => {
 
   test('extendOptions defaults to the first round format and disables spot without spotting topics', async () => {
     const { db, deps, sid } = await setup({});
-    expect(await extendOptions(deps, sid)).toEqual({ formats: { gap: null, fix: null, spot: null }, defaults: ['fix'] });
+    expect(await extendOptions(deps, sid)).toEqual({ formats: { gap: null, fix: null, spot: null }, defaults: ['fix'], writing: true });
     await db.execute('UPDATE topic SET archived = 1');
     expect((await extendOptions(deps, sid)).formats.spot).toBe('no_topics');
   });

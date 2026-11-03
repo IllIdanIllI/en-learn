@@ -7,6 +7,7 @@ const REASON_KEY: Record<RowReason, MessageKey> = {
   no_week_topic: 'picker.reason.no_week_topic',
   no_rule: 'picker.reason.no_rule',
   no_topics: 'picker.reason.no_topics',
+  no_text: 'picker.reason.no_text',
 };
 
 /** One checkbox row: a native input inside its label. A disabled row shows its reason after the label. */

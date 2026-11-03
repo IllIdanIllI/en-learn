@@ -472,7 +472,7 @@ describe('getTodayState', () => {
 });
 
 describe('generation from a choice', () => {
-  const choice = (over: Partial<LessonChoice> = {}): LessonChoice => ({ review: false, formats: ['gap'], spelling: true, speaking: true, ...over });
+  const choice = (over: Partial<LessonChoice> = {}): LessonChoice => ({ review: false, formats: ['gap'], spelling: true, speaking: true, writing: false, rewrite: false, ...over });
   const gapBlock = (): GeneratedBlock => ({
     kind: 'task', format: 'gap', title: 'Gap', instruction: 'Fill the gap.', formatExample: 'She ___ tea. → drinks', minutes: 6,
     items: [item(1), item(2), item(3)], paragraphs: [], question: '',
@@ -549,9 +549,9 @@ describe('generation from a choice', () => {
     });
     const c = choice({ formats: ['spot', 'gap'], speaking: false });
     await generateSession(deps, { light: false, choice: c });
-    expect(await getSessionChoice(db, 1)).toEqual({ review: false, formats: ['gap', 'spot'], spelling: true, speaking: false });
+    expect(await getSessionChoice(db, 1)).toEqual({ review: false, formats: ['gap', 'spot'], spelling: true, speaking: false, writing: false, rewrite: false });
     expect((await rebuildSession(deps, 1, { light: false })).ok).toBe(true);
-    expect(await getSessionChoice(db, 2)).toEqual({ review: false, formats: ['gap', 'spot'], spelling: true, speaking: false });
+    expect(await getSessionChoice(db, 2)).toEqual({ review: false, formats: ['gap', 'spot'], spelling: true, speaking: false, writing: false, rewrite: false });
     expect(llm.calls.filter((x) => x.kind === 'generate_session')[1]?.userPrompt).toContain('2. task (format spot)');
   });
 
@@ -568,7 +568,7 @@ describe('generation from a choice', () => {
     expect(prompts()[1]).toContain('Light day: yes');
     expect(prompts()[1]).not.toContain('task (format');
     expect(prompts()[1]).toContain('speaking');
-    expect(await getSessionChoice(db, 2)).toEqual({ review: false, formats: [], spelling: true, speaking: true });
+    expect(await getSessionChoice(db, 2)).toEqual({ review: false, formats: [], spelling: true, speaking: true, writing: false, rewrite: false });
     // light: false uses the stored choice as it is (here the light one, without a task).
     expect((await rebuildSession(deps, 2, { light: false })).ok).toBe(true);
     expect(prompts()[2]).not.toContain('task (format');

@@ -121,7 +121,10 @@ export async function insertDraftSession(
 export async function getSessionChoice(db: Db, sessionId: number): Promise<LessonChoice | null> {
   const rows = await db.select<{ choice: string | null }>('SELECT choice FROM session WHERE id = ?', [sessionId]);
   const raw = rows[0]?.choice;
-  return raw ? (JSON.parse(raw) as LessonChoice) : null;
+  if (!raw) return null;
+  // Choices stored before writing existed have no writing or rewrite keys.
+  const stored = JSON.parse(raw) as Omit<LessonChoice, 'writing' | 'rewrite'> & Partial<Pick<LessonChoice, 'writing' | 'rewrite'>>;
+  return { writing: false, rewrite: false, ...stored };
 }
 
 export async function insertBlock(db: Db, sessionId: number, ord: number, b: NewBlock, round = 1): Promise<number> {

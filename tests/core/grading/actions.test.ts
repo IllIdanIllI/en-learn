@@ -147,6 +147,23 @@ describe('disputeItems', () => {
   });
 });
 
+describe('disputeItem on a writing error', () => {
+  test('an error item of a writing block without a topic is disputed and the decision stored', async () => {
+    const { db, ids, blockId } = await gradedSession([{ ...WRONG, prompt: 'Yesterday he goes home', text: 'goes', fix: 'went' }]);
+    await db.execute("UPDATE block SET kind = 'writing', format = 'essay' WHERE id = ?", [blockId]);
+    await db.execute('UPDATE item SET topic_id = NULL, rule_id = NULL, rule_version = NULL, rule_section = NULL WHERE id = ?', [ids[0]]);
+    await db.execute("UPDATE answer SET suggested_topic = 'past simple' WHERE item_id = ?", [ids[0]]);
+    const llm = new FakeLlm({ dispute: [one(reply('drop'))] });
+    const res = await disputeItem(depsFor(db, llm), ids[0]!, 'Historic present.');
+    expect(res.ok).toBe(true);
+    expect(llm.calls[0]!.userPrompt).toContain('Topic key: (none)\nPrompt: Yesterday he goes home');
+    await decideDispute(db, ids[0]!, 'drop');
+    expect(await db.select('SELECT dispute_text, dispute_decision FROM answer WHERE item_id = ?', [ids[0]])).toEqual([
+      { dispute_text: 'Historic present.', dispute_decision: 'drop' },
+    ]);
+  });
+});
+
 describe('disputeItem', () => {
   test('wrong item: saves dispute_text and the reply JSON, returns the LLM result', async () => {
     const { db, ids, sid } = await gradedSession([{ ...WRONG }]);

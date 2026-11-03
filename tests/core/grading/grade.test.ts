@@ -568,7 +568,7 @@ describe('gradeSession: writing texts', () => {
   });
   const twoErrors = (): TextEntry => ({
     blockRef: 'b3',
-    errors: [err({ topicKey: 'articles', ruleSection: 'Basics' }), err({ fragment: 'buy', fix: 'bought', suggestedTopic: 'word choice' })],
+    errors: [err({ topicKey: 'articles', ruleSection: 'Basics', suggestedTopic: 'past simple' }), err({ fragment: 'buy', fix: 'bought', suggestedTopic: 'word choice' })],
   });
 
   async function withBlock(script: LlmResult<unknown>[], format: 'essay' | 'rewrite' = 'essay') {
@@ -642,6 +642,7 @@ describe('gradeSession: writing texts', () => {
   test.each([
     ['a fragment is not in the text', result({ texts: [{ blockRef: 'b3', errors: [err({ fragment: 'not here' })] }] }), 'text b3: fragment "not here" is not in the text'],
     ['a topicKey is not a programme topic', result({ texts: [{ blockRef: 'b3', errors: [err({ topicKey: 'nope' })] }] }), 'nope'],
+    ['an error has no explanation', result({ texts: [{ blockRef: 'b3', errors: [err({ explanation: '  ' })] }] }), 'text b3: error "goes" has no explanation'],
     ['a sent text has no entry', result({ texts: [] }), 'b3'],
   ])('the check retries when %s', async (_name, bad, message) => {
     const withRest = (r: GradeResult) => ({ ...fullResult(), texts: r.texts });

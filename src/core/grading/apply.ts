@@ -105,7 +105,7 @@ export async function applyGraded(db: Db, clock: Clock, items: GradingItem[], g:
       const [item] = await db.select<{ id: number }>('SELECT id FROM item WHERE block_id = ? AND ord = ?', [w.blockId, ord]);
       await upsertAnswer(db, {
         itemId: item!.id, text: e.fragment, verdict: 'wrong', fix: e.fix, ruleSection: e.ruleSection || null,
-        explanation: e.explanation, vocabularyNote: null, suggestedTopic: e.suggestedTopic || null,
+        explanation: e.explanation, vocabularyNote: null, suggestedTopic: rule ? null : e.suggestedTopic || null,
       });
     }
     await insertWritingText(db, { blockId: w.blockId, text: w.text, words: w.words, sourceBlockId: w.sourceBlockId, createdAt: clock.now() });

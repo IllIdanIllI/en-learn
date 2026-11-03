@@ -155,12 +155,13 @@ export function missingRefs(batch: GradeBatch, refs: Refs, r: GradeResult): stri
   return out;
 }
 
-/** What is wrong with the errors listed for the texts: a fragment that is not in the text, or a topic key outside the programme topics. */
+/** What is wrong with the errors listed for the texts: a fragment that is not in the text, no explanation, or a topic key outside the programme topics. */
 export function textProblems(batch: GradeBatch, r: GradeResult): string | null {
   const keys = new Set(batch.topics.map((t) => t.key));
   for (const t of batch.texts) {
     for (const e of r.texts.find((x) => x.blockRef === `b${t.blockOrd}`)?.errors ?? []) {
       if (e.fragment === '' || !t.text.includes(e.fragment)) return `text b${t.blockOrd}: fragment "${e.fragment}" is not in the text`;
+      if (e.explanation.trim() === '') return `text b${t.blockOrd}: error "${e.fragment}" has no explanation`;
       if (e.topicKey !== '' && !keys.has(e.topicKey)) return `text b${t.blockOrd}: topicKey "${e.topicKey}" is not a programme topic`;
     }
   }

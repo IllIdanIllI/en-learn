@@ -12,7 +12,7 @@ export function answerSegments(view: SessionView, items: Record<number, string>,
 /** One entry per counted graded item (spot errors included), in block and item order. */
 export function scoreSegments(view: SessionView): ('ok' | 'bad')[] {
   return view.blocks.flatMap((b) => {
-    if (b.kind === 'speaking' || b.format === 'question') return [];
+    if (b.kind === 'speaking' || b.format === 'question' || b.kind === 'writing') return [];
     const graded = [...b.items, ...b.paragraphs.flatMap((p) => p.errors ?? [])];
     return graded.flatMap((i) => (i.effective == null ? [] : [i.effective === 'correct' ? ('ok' as const) : ('bad' as const)]));
   });

@@ -23,7 +23,7 @@ export function Block({ block, number, lang, hideTitle = false, divider: withDiv
         </div>
       )}
       <p className="mt-2 text-muted-foreground">{block.format === 'spot' ? t(lang, 'spot.hint') : block.instruction}</p>
-      {block.format !== 'spot' && block.formatExample && (
+      {block.format !== 'spot' && block.kind !== 'writing' && block.formatExample && (
         <p className="answer mt-2 inline-block rounded-sm bg-input px-2.5 py-1 text-foreground">{block.formatExample}</p>
       )}
       <div className="mt-6">{children}</div>

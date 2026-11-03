@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { disputeItems, recordSupport } from '@/core/grading/actions';
-import { draftsToAnswers, itemDraftKey, loadDraftAnswers, saveDraftAnswer, spotDraftKey } from '@/core/db/repos/drafts';
+import { draftsToAnswers, itemDraftKey, loadDraftAnswers, saveDraftAnswer, spotDraftKey, writingDraftKey } from '@/core/db/repos/drafts';
 import { gradeSession, type ClarificationAnswer, type GradeOutcome, type Question } from '@/core/grading/grade';
 import { t } from '@/core/i18n';
 import { loadSessionView, type SessionView } from '@/core/session/view';
@@ -18,6 +18,7 @@ import { Questions, type Reply } from './Questions';
 import { SessionHeader } from './SessionHeader';
 import { SpellingRow } from './SpellingRow';
 import { SpotBlock } from './SpotBlock';
+import { WritingBlock } from './WritingBlock';
 import { AnswerMeter } from '@/ui/grove/AnswerMeter';
 import { answerSegments } from '@/ui/grove/segments';
 import { Notice } from './chips';
@@ -175,7 +176,9 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
       setFinish(finishing);
       void run(async () => {
         await flushAll(); // a late draft write must not land after the drafts are deleted by grading
-        return gradeSession(deps, sessionId, { items, spot, texts }, clarifications(), { finish: finishing });
+        // A rewrite field still holding its prefilled source text submits that text.
+        const prefilled = Object.fromEntries((view?.blocks ?? []).flatMap((b) => (b.writing?.text === null && b.writing.source ? [[b.id, b.writing.source.text] as const] : [])));
+        return gradeSession(deps, sessionId, { items, spot, texts: { ...prefilled, ...texts } }, clarifications(), { finish: finishing });
       });
     }
   };
@@ -285,6 +288,17 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
       <Block key={block.id} block={block} number={i + 1} lang={lang} hideTitle={hideTitle} divider={divider}>
         {block.format === 'question' ? (
           <QuestionBlock block={block} />
+        ) : block.kind === 'writing' ? (
+          <WritingBlock
+            block={block}
+            lang={lang}
+            value={texts[block.id] ?? block.writing?.source?.text ?? ''}
+            onChange={(value) => {
+              setFinish(false);
+              setTexts((prev) => ({ ...prev, [block.id]: value }));
+              persist(writingDraftKey(block.id), value);
+            }}
+          />
         ) : block.format === 'spot' ? (
           <SpotBlock
             block={block}

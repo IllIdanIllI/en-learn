@@ -82,7 +82,7 @@ export function StartSession({ lang, today, loader, error, rest = false, onStart
             {t(lang, rest ? 'today.startLight' : 'today.start')}
           </Button>
           <Button
-            className="rounded-l-none border-l border-primary-foreground/30 px-2.5 aria-expanded:bg-[oklch(from_var(--primary)_calc(l+0.04)_c_h)]"
+            className="rounded-l-none border-l border-primary-foreground/30 px-2.5"
             aria-label={t(lang, 'today.setup')}
             aria-expanded={setupOpen}
             disabled={options === null}

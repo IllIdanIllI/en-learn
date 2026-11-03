@@ -117,16 +117,29 @@ test.describe('lesson picker: before a lesson', () => {
     const defaultGap = (await gap.getAttribute('aria-pressed')) === 'true';
     await writing.click();
     await expect(writing).toHaveAttribute('aria-pressed', 'true');
-    await page.getByRole('button', { name: 'Лёгкий день' }).click();
+    await page.getByRole('button', { name: 'Лёгкий день', exact: true }).click();
     await expect.poll(pressed).toBe(0);
     await expect(writing).toHaveAttribute('aria-pressed', 'false');
     await expect(card(page, 'Правописание')).toHaveAttribute('aria-pressed', 'true');
+    // Writing and rewrite are not available on a light day.
+    await expect(writing).toBeDisabled();
+    await expect(writing).toContainText('не в лёгкий день');
+    await expect(card(page, 'Переписать')).toBeDisabled();
+    await expect(card(page, 'Переписать')).toContainText('не в лёгкий день');
     // A task can still be pressed on a light day.
     await gap.click();
     await expect.poll(pressed).toBe(1);
-    await page.getByRole('button', { name: 'Лёгкий день' }).click();
+    await page.getByRole('button', { name: 'Лёгкий день', exact: true }).click();
     await expect(gap).toHaveAttribute('aria-pressed', String(defaultGap));
     await expect(fix).toHaveAttribute('aria-pressed', String(!defaultGap));
+    await expect(writing).toBeEnabled();
+  });
+
+  test('on a rest day the Writing card is unavailable with its reason', async ({ page }) => {
+    await page.goto('/?state=rest#/today');
+    await openSetup(page);
+    await expect(card(page, 'Письмо')).toBeDisabled();
+    await expect(card(page, 'Письмо')).toContainText('не в лёгкий день');
   });
 
   test('pressing every card off disables Start session', async ({ page }) => {

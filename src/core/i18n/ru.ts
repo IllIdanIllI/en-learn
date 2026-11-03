@@ -240,6 +240,7 @@ export const ru: Record<keyof typeof en, string> = {
   'picker.reason.no_rule': 'нет правила',
   'picker.reason.no_topics': 'нет тем',
   'picker.reason.no_text': 'нет текста',
+  'picker.reason.light': 'не в лёгкий день',
   'today.rebuild': 'Пересобрать',
   'today.missingSpotRules': 'Для этих тем ещё нет правил, поэтому поиск ошибок их пропускает:',
   'today.earlier': 'Эта сессия от {date}. Сессия на сегодня не начата.',

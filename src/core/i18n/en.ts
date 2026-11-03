@@ -238,6 +238,7 @@ export const en = {
   'picker.reason.no_rule': 'no rule',
   'picker.reason.no_topics': 'no topics',
   'picker.reason.no_text': 'no text',
+  'picker.reason.light': 'not on a light day',
   'today.rebuild': 'Rebuild',
   'today.missingSpotRules': 'These topics have no rule yet, so error spotting skips them:',
   'today.earlier': "This session is from {date}. Today's session has not been started.",

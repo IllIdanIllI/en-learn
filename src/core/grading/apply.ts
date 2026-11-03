@@ -19,7 +19,7 @@ export interface Graded {
   skipped: Set<number>;
   /** Learner text per `${blockId}:${paragraph}` for every spot paragraph with hidden errors. */
   spot: Map<string, string>;
-  /** Writing texts to store: every non-empty one, checked (errors in `result.texts`) or too short (no errors). */
+  /** Writing texts to store: every non-empty one, checked (errors in `result.texts`) or too short (no errors); on finish also empty ones (words 0, skipped). */
   writing: (OpenWritingBlock & { text: string; words: number })[];
   result: GradeResult;
 }
@@ -100,7 +100,7 @@ export async function applyGraded(db: Db, clock: Clock, items: GradingItem[], g:
       await insertItem(db, w.blockId, ord, {
         prompt: sentenceOf(w.text, e.fragment), expected: e.fix, paragraph: null, topicId: rule?.topicId ?? null,
         ruleId: rule?.ruleId ?? null, ruleVersion: rule?.ruleVersion ?? null, ruleSection: e.ruleSection || null,
-        spellingWordId: null, isCheck: false, status: 'active', note: null, wrong: null,
+        spellingWordId: null, isCheck: false, status: 'active', note: null, wrong: e.fragment,
       });
       const [item] = await db.select<{ id: number }>('SELECT id FROM item WHERE block_id = ? AND ord = ?', [w.blockId, ord]);
       await upsertAnswer(db, {

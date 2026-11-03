@@ -5,21 +5,23 @@ import type { ExtendOptions, LessonChoice, LessonOptions, RowReason, TaskFormat 
 
 type CardKey = 'review' | 'gap' | 'fix' | 'spot' | 'spelling' | 'speaking' | 'writing' | 'rewrite';
 const FORMATS: TaskFormat[] = ['gap', 'fix', 'spot'];
-const REASON_KEY: Record<RowReason, MessageKey> = {
+type CardReason = RowReason | 'light';
+const REASON_KEY: Record<CardReason, MessageKey> = {
   no_week_topic: 'picker.reason.no_week_topic',
   no_rule: 'picker.reason.no_rule',
   no_topics: 'picker.reason.no_topics',
   no_text: 'picker.reason.no_text',
+  light: 'picker.reason.light',
 };
 
 /** The round the learner adds: the ticked task formats and whether it ends with an essay. */
 export interface AddRound { formats: TaskFormat[]; writing: boolean }
 
-/** One card: a toggle button with the title, a one-line example and a description. An unavailable card is dimmed and shows its reason instead of the example. */
-function Card({ lang, id, reason, unavailable = false, selected, disabled, onToggle }: {
-  lang: Lang; id: CardKey; reason?: RowReason | null; unavailable?: boolean; selected: boolean; disabled: boolean; onToggle: () => void;
+/** One card: a toggle button with the title, a one-line example and a description. An unavailable card (one with a reason) is dimmed and shows its reason instead of the example. */
+function Card({ lang, id, reason, selected, disabled, onToggle }: {
+  lang: Lang; id: CardKey; reason?: CardReason | null; selected: boolean; disabled: boolean; onToggle: () => void;
 }) {
-  const off = unavailable || (reason !== undefined && reason !== null);
+  const off = reason !== undefined && reason !== null;
   return (
     <button
       type="button"
@@ -56,8 +58,8 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /** The cards before a lesson, in three groups: review (when shown), the task formats, and spelling, speaking, writing and rewrite. */
-export function LessonCards({ lang, options, value, disabled, onChange }: {
-  lang: Lang; options: LessonOptions; value: LessonChoice; disabled: boolean; onChange: (value: LessonChoice) => void;
+export function LessonCards({ lang, options, value, light, disabled, onChange }: {
+  lang: Lang; options: LessonOptions; value: LessonChoice; light: boolean; disabled: boolean; onChange: (value: LessonChoice) => void;
 }) {
   const flip = (f: TaskFormat) => onChange({ ...value, formats: FORMATS.filter((x) => (x === f ? !value.formats.includes(f) : value.formats.includes(x))) });
   return (
@@ -75,8 +77,8 @@ export function LessonCards({ lang, options, value, disabled, onChange }: {
       <Group title={t(lang, 'picker.group.more')}>
         <Card lang={lang} id="spelling" selected={value.spelling} disabled={disabled} onToggle={() => onChange({ ...value, spelling: !value.spelling })} />
         <Card lang={lang} id="speaking" selected={value.speaking} disabled={disabled} onToggle={() => onChange({ ...value, speaking: !value.speaking })} />
-        <Card lang={lang} id="writing" selected={value.writing} disabled={disabled} onToggle={() => onChange({ ...value, writing: !value.writing })} />
-        <Card lang={lang} id="rewrite" reason={options.rewriteReason} selected={value.rewrite} disabled={disabled} onToggle={() => onChange({ ...value, rewrite: !value.rewrite })} />
+        <Card lang={lang} id="writing" reason={light ? 'light' : null} selected={value.writing} disabled={disabled} onToggle={() => onChange({ ...value, writing: !value.writing })} />
+        <Card lang={lang} id="rewrite" reason={light ? 'light' : options.rewriteReason} selected={value.rewrite} disabled={disabled} onToggle={() => onChange({ ...value, rewrite: !value.rewrite })} />
       </Group>
     </div>
   );
@@ -92,7 +94,7 @@ export function AddRoundCards({ lang, options, value, disabled, onChange }: {
       {FORMATS.map((f) => (
         <Card key={f} lang={lang} id={f} reason={options.formats[f]} selected={value.formats.includes(f)} disabled={disabled} onToggle={() => flip(f)} />
       ))}
-      <Card lang={lang} id="writing" unavailable={!options.writing} selected={value.writing} disabled={disabled} onToggle={() => onChange({ ...value, writing: !value.writing })} />
+      <Card lang={lang} id="writing" reason={options.writing ? null : 'light'} selected={value.writing} disabled={disabled} onToggle={() => onChange({ ...value, writing: !value.writing })} />
     </div>
   );
 }

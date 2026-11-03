@@ -44,7 +44,7 @@ export function StartSession({ lang, today, loader, error, rest = false, onStart
   const generating = loader !== null;
   // A rest day has no toggle: the only way to practise is a light day.
   const light = rest || lightChoice;
-  const ready = choice !== null && (choice.review || choice.formats.length > 0 || choice.spelling || choice.speaking || choice.writing || choice.rewrite);
+  const ready = choice !== null && (choice.review || choice.formats.length > 0 || choice.spelling || choice.speaking || (!light && (choice.writing || choice.rewrite)));
   // The light toggle drops the task, writing and rewrite ticks; switching it off brings the day's default ticks back. The learner can still tick a card afterwards.
   const toggleLight = (on: boolean) => {
     setLight(on);
@@ -99,7 +99,7 @@ export function StartSession({ lang, today, loader, error, rest = false, onStart
       </div>
       {setupOpen && options !== null && choice !== null && (
         <div className="mt-4">
-          <LessonCards lang={lang} options={options} value={choice} disabled={generating} onChange={setChoice} />
+          <LessonCards lang={lang} options={options} value={choice} light={light} disabled={generating} onChange={setChoice} />
         </div>
       )}
       {loader !== null && <Loader lang={lang} {...loader} />}

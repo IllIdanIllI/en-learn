@@ -633,6 +633,7 @@ describe('writing blocks', () => {
     const ctx = await buildGenerationContext(deps, '2026-10-20', false, choice({ writing: true }));
     expect(violations({ blocks: [essay()] }, ctx)).toEqual([]);
     expect(violations({ blocks: [essay({ instruction: '  ' })] }, ctx)).toEqual(['b0 instruction: writing block has no prompt']);
+    expect(violations({ blocks: [essay({ format: 'question' })] }, ctx)).toEqual(['b0 format: writing block must be essay, got question']);
   });
 
   test('an essay block is stored with its prompt as the instruction and no passage', async () => {

@@ -1,6 +1,6 @@
 import type { ISODate } from '@/core/domain';
 import type { Db } from '@/core/ports';
-import { errorRate } from '@/core/writing/text';
+import { MIN_WORDS, errorRate } from '@/core/writing/text';
 import { loadGradedFacts } from './history';
 
 export type WritingTextRow = {
@@ -34,8 +34,9 @@ export async function loadWritingTexts(db: Db): Promise<WritingTextRow[]> {
        FROM writing_text wt
        JOIN block b ON b.id = wt.block_id
        JOIN session s ON s.id = b.session_id
-       WHERE s.status = 'graded'
+       WHERE s.status = 'graded' AND wt.words >= ?
        ORDER BY s.date DESC, s.id DESC, b.ord`,
+      [MIN_WORDS],
     ),
     loadGradedFacts(db),
   ]);

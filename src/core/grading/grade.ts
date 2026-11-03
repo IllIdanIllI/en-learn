@@ -169,10 +169,11 @@ async function run(
       if (found.length > 0) result.spot.push({ blockRef: `b${s.blockOrd}`, paragraph: s.paragraph, found: found.map((id) => refs.refOf.get(id)!), extra: [] });
       return leftover.length > 0 ? [{ ...s, learnerText: leftover.join('\n'), errors: s.errors.filter((e) => !found.includes(e.id)) }] : [];
     });
-    // A text under MIN_WORDS is stored without a check; an empty one is not stored, so its block stays open.
+    // A text under MIN_WORDS is stored without a check. An empty one is not stored (its block stays open) until the lesson is finished: then it is stored as skipped.
     const written = (await listOpenWritingBlocks(deps.db, sessionId)).flatMap((b) => {
       const text = sub.texts[b.blockId] ?? '';
-      return text.trim() === '' ? [] : [{ ...b, text, words: countWords(text) }];
+      if (text.trim() === '') return finish ? [{ ...b, text: '', words: 0 }] : [];
+      return [{ ...b, text, words: countWords(text) }];
     });
     const toCheck = written.filter((w) => w.words >= MIN_WORDS);
     const topics = toCheck.length === 0 ? [] : await programmeTopics(deps);

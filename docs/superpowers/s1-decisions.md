@@ -129,6 +129,9 @@ Spec `specs/2026-10-31-security-round-1.md`, plan `plans/2026-10-31-security-rou
 Spec `specs/2026-11-02-writing-design.md`, plan `plans/2026-11-02-writing.md`.
 
 - D16 (S1 core-loop spec: speaking, writing and rewrite slots produce error spotting until S2/S3) is closed for writing and rewrite: those slots now give a writing or rewrite block, and spotting only on non-learn days — cost if wrong: the spot fallback comes back for writing and rewrite slots.
+- "Объяснить" is not extended to writing errors: each writing error always carries the grader's explanation — cost if wrong: a writing error has no on-demand explanation beyond the stored one.
+- The gear segment keeps the Start button's background while open (learner's request) — cost if wrong: the open state is less visible on the button.
+- An empty essay is not stored until the lesson is finished (then it counts as skipped, with no check and no items) — cost if wrong: an essay left empty keeps the lesson open until "Завершить урок".
 
 ## Still open
 

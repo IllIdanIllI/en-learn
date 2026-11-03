@@ -597,6 +597,7 @@ describe('gradeSession: writing texts', () => {
       t.db, 'SELECT * FROM item WHERE block_id = ? ORDER BY ord', [t.blockId],
     );
     expect(items.map((i) => [i.ord, i.prompt, i.expected])).toEqual([[0, FIRST, 'went'], [1, FIRST, 'bought']]);
+    expect((await rows<{ wrong: string | null }>(t.db, 'SELECT wrong FROM item WHERE block_id = ? ORDER BY ord', [t.blockId])).map((i) => i.wrong)).toEqual(['goes', 'buy']);
     expect(items.map((i) => [i.topic_id, i.rule_id, i.rule_version])).toEqual([[1, 1, 1], [null, null, null]]);
     const answers = await rows<{ text: string; verdict: string; fix: string; rule_section: string | null; suggested_topic: string | null }>(
       t.db, 'SELECT a.* FROM answer a JOIN item i ON i.id = a.item_id WHERE i.block_id = ? ORDER BY i.ord', [t.blockId],
@@ -637,6 +638,16 @@ describe('gradeSession: writing texts', () => {
     await gradeSession(t.deps, t.sid, { ...subm(), texts: { [t.blockId]: '  ' } }, []);
     expect(await textRows(t.db)).toEqual([]);
     expect(await hasOpenItems(t.db, t.sid)).toBe(true);
+  });
+
+  test('finishing stores an empty text as skipped: no check, no items, the lesson closes', async () => {
+    const t = await withBlock([ok(fullResult())]);
+    const outcome = await gradeSession(t.deps, t.sid, { ...subm(), texts: { [t.blockId]: '  ' } }, [], { finish: true });
+    expect(outcome).toEqual({ kind: 'graded' });
+    expect(await textRows(t.db)).toEqual([{ block_id: t.blockId, text: '', words: 0, source_block_id: null, created_at: expect.any(String) }]);
+    expect(userPrompt(t.llm)).not.toContain('## Texts');
+    expect(await rows(t.db, 'SELECT id FROM item WHERE block_id = ?', [t.blockId])).toEqual([]);
+    expect(await hasOpenItems(t.db, t.sid)).toBe(false);
   });
 
   test.each([

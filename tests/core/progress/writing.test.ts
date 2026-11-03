@@ -35,21 +35,9 @@ async function seed() {
 }
 
 describe('loadWritingTexts', () => {
-  test('lists checked texts of graded sessions, newest session first, then display order within a session, with errors counted after disputes', async () => {
+  test('lists checked texts (at least 50 words) of graded sessions, newest session first, then display order within a session, with errors counted after disputes', async () => {
     const rows = await loadWritingTexts(await seed());
     expect(rows).toEqual([
-      {
-        blockId: 4,
-        sessionId: 3,
-        date: '2026-10-22',
-        format: 'essay',
-        prompt: 'Short prompt',
-        text: 'short text',
-        words: 30,
-        errors: 0,
-        rate: null,
-        sourceBlockId: null,
-      },
       {
         blockId: 1,
         sessionId: 1,

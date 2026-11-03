@@ -161,9 +161,10 @@ export async function markSessionGraded(db: Db, id: number, gradedAt: string): P
   await db.execute("UPDATE session SET status = 'graded', graded_at = ? WHERE id = ?", [gradedAt, id]);
 }
 
-export async function getSession(db: Db, id: number): Promise<{ id: number; date: ISODate; status: SessionStatus } | null> {
-  const rows = await db.select<{ id: number; date: string; status: SessionStatus }>('SELECT id, date, status FROM session WHERE id = ?', [id]);
-  return rows[0] ?? null;
+export async function getSession(db: Db, id: number): Promise<{ id: number; date: ISODate; status: SessionStatus; isLight: boolean } | null> {
+  const rows = await db.select<{ id: number; date: string; status: SessionStatus; is_light: number }>('SELECT id, date, status, is_light FROM session WHERE id = ?', [id]);
+  const r = rows[0];
+  return r ? { id: r.id, date: r.date, status: r.status, isLight: r.is_light === 1 } : null;
 }
 
 export interface GradingItem {

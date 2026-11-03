@@ -254,6 +254,12 @@ describe('extendSession', () => {
     expect((await extendOptions(deps, sid)).formats.spot).toBe('no_topics');
   });
 
+  test('extendOptions offers no writing on a light session', async () => {
+    const { db, deps, sid } = await setup({});
+    await db.execute('UPDATE session SET is_light = 1 WHERE id = ?', [sid]);
+    expect((await extendOptions(deps, sid)).writing).toBe(false);
+  });
+
   test('extending removes the session from the closed list', async () => {
     const gen = extra(6);
     const { db, deps, sid } = await setup({ generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
@@ -298,5 +304,20 @@ describe('extendSession with writing', () => {
     expect(await extendSession(deps, sid, ['fix'], true)).toEqual({ ok: true, sessionId: sid });
     expect(llm.calls.filter((c) => c.kind === 'generate_session').at(-1)!.userPrompt).toContain('1. task (format fix, topic articles)\n2. writing (format essay)\n');
     expect((await db.select<{ kind: string }>('SELECT kind FROM block WHERE round = 2 ORDER BY ord')).map((b) => b.kind)).toEqual(['task', 'writing']);
+  });
+
+  test('on a light session writing is ignored: only the task block is added', async () => {
+    const gen: GeneratedSession = { blocks: [fixBlock(6, 'Extra')] };
+    const { db, llm, deps, sid } = await setup({ generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
+    await db.execute('UPDATE session SET is_light = 1 WHERE id = ?', [sid]);
+    expect(await extendSession(deps, sid, ['fix'], true)).toEqual({ ok: true, sessionId: sid });
+    expect(llm.calls.filter((c) => c.kind === 'generate_session').at(-1)!.userPrompt).not.toContain('writing (format essay)');
+    expect((await db.select<{ kind: string }>('SELECT kind FROM block WHERE round = 2 ORDER BY ord')).map((b) => b.kind)).toEqual(['task']);
+  });
+
+  test('on a light session writing alone is an empty choice', async () => {
+    const { db, deps, sid } = await setup({});
+    await db.execute('UPDATE session SET is_light = 1 WHERE id = ?', [sid]);
+    expect(await extendSession(deps, sid, [], true)).toEqual({ ok: false, message: 'Choose at least one task' });
   });
 });

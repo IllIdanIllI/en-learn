@@ -60,7 +60,9 @@ async function extendUnlocked(deps: Deps, sessionId: number, formats: TaskFormat
   if (await hasOpenItems(deps.db, sessionId)) return { ok: false, message: 'The session has questions to answer first' };
 
   const chosen = FORMAT_ORDER.filter((f) => formats.includes(f));
-  if (chosen.length === 0 && !writing) return { ok: false, message: 'Choose at least one task' };
+  // A light session never gets an essay, even in an added round.
+  const withWriting = writing && !session.isLight;
+  if (chosen.length === 0 && !withWriting) return { ok: false, message: 'Choose at least one task' };
 
   let ctx: GenerationContext;
   try {
@@ -83,7 +85,7 @@ async function extendUnlocked(deps: Deps, sessionId: number, formats: TaskFormat
   const specs: BlockSpec[] = chosen.map((format) =>
     format === 'spot' || !taskRef ? { kind: 'task', format } : { kind: 'task', format, topicKey: taskRef.topic.key },
   );
-  if (writing) specs.push({ kind: 'writing', format: 'essay' });
+  if (withWriting) specs.push({ kind: 'writing', format: 'essay' });
   const extended: GenerationContext = {
     ...ctx,
     blocks: specs,

@@ -4,7 +4,7 @@ import type { ISODate } from '@/core/domain';
 import { formatTitleDate } from '@/core/dates';
 import { t } from '@/core/i18n';
 import { closeSession } from '@/core/db/repos/sessions';
-import { extendOptions, type LessonChoice, type TaskFormat } from '@/core/session/choice';
+import { extendOptions, type LessonChoice } from '@/core/session/choice';
 import { extendSession } from '@/core/session/extend';
 import { generateSession, rebuildSession } from '@/core/session/generate';
 import { getTodayState, type TodayState } from '@/core/session/plan';
@@ -14,6 +14,7 @@ import { errorOfDay, useGeneration } from '@/ui/app/GenerationProvider';
 import { Button } from '@/ui/components/ui/button';
 import { Notice } from '@/ui/today/chips';
 import { LessonClosed } from '@/ui/today/LessonClosed';
+import type { AddRound } from '@/ui/today/LessonCards';
 import { RuleDraft } from '@/ui/today/RuleDraft';
 import { SessionPage } from '@/ui/today/SessionPage';
 import { ErrorNotice } from '@/ui/today/ErrorNotice';
@@ -87,17 +88,17 @@ export function Today() {
 
   const start = (light: boolean, choice?: LessonChoice) => void gen.run((onStage) => generateSession(deps, { light, choice }, onStage), today);
   // The formats of the last added round, so that its retry adds the same round.
-  const lastFormats = useRef<TaskFormat[]>([]);
-  // `formats` null is a retry: the last round's formats, or after Today was left (they are gone) the day's defaults.
+  const lastRound = useRef<AddRound>({ formats: [], writing: false });
+  // `round` null is a retry: the last round's cards, or after Today was left (they are gone) the day's default formats.
   // The formats are resolved inside the job, so the loader, the busy state and a failure all go through the generation.
-  const addMore = (sessionId: number, formats: TaskFormat[] | null) => {
+  const addMore = (sessionId: number, round: AddRound | null) => {
     setShowResults(false);
     // Extending reopens the session, which the sidebar garden shows.
     void gen.run(async (onStage) => {
-      const chosen = formats ?? lastFormats.current;
-      const use = chosen.length > 0 ? chosen : (await extendOptions(deps, sessionId)).defaults;
-      lastFormats.current = use;
-      return extendSession(deps, sessionId, use, false, onStage);
+      const chosen = round ?? lastRound.current;
+      const use: AddRound = chosen.formats.length > 0 || chosen.writing ? chosen : { formats: (await extendOptions(deps, sessionId)).defaults, writing: false };
+      lastRound.current = use;
+      return extendSession(deps, sessionId, use.formats, use.writing, onStage);
     }, today).then(refresh);
   };
   const close = (sessionId: number) => {
@@ -204,7 +205,7 @@ export function Today() {
             loader={loader}
             showingResults={showResults}
             onToggleResults={() => setShowResults((v) => !v)}
-            onAdd={(formats) => addMore(shown.id, formats)}
+            onAdd={(round) => addMore(shown.id, round)}
           >
             {solveButton}
           </LessonClosed>

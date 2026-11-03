@@ -1,8 +1,8 @@
 export type ISODate = string;
 export type TopicKind = 'learn' | 'notice';
 export type Slot = 'error_spotting' | 'topic' | 'second_set' | 'speaking' | 'writing' | 'review_rewrite' | 'rest';
-export type BlockKind = 'spelling' | 'review' | 'task' | 'speaking';
-export type BlockFormat = 'gap' | 'fix' | 'spot' | 'spelling' | 'question';
+export type BlockKind = 'spelling' | 'review' | 'task' | 'speaking' | 'writing';
+export type BlockFormat = 'gap' | 'fix' | 'spot' | 'spelling' | 'question' | 'essay' | 'rewrite';
 export type ItemStatus = 'active' | 'dropped' | 'defect';
 export type Verdict = 'correct' | 'wrong' | 'rule_gap' | 'skipped';
 export type DisputeDecision = 'keep' | 'correct' | 'drop';

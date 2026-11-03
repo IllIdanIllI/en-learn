@@ -53,7 +53,9 @@ export function generateSession(deps: Deps, opts: { light: boolean; choice?: Les
 
 async function generateUnlocked(deps: Deps, opts: { light: boolean; choice?: LessonChoice }, onStage?: OnStage): Promise<GenerateResult> {
   const d = deps.clock.today();
-  const choice = opts.choice && normaliseChoice(opts.choice);
+  // A light lesson never has writing or rewrite.
+  const normalised = opts.choice && normaliseChoice(opts.choice);
+  const choice = normalised && opts.light ? { ...normalised, writing: false, rewrite: false } : normalised;
   await cleanupDrafts(deps.db);
   if (await getSessionByDate(deps.db, d)) return { ok: false, message: 'Session exists', code: 'session_exists' };
 

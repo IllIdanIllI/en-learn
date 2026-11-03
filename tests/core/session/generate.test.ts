@@ -677,4 +677,20 @@ describe('writing blocks', () => {
     expect(llm.calls).toHaveLength(0);
     expect((await db.select<{ kind: string }>("SELECT kind FROM block WHERE session_id = (SELECT id FROM session WHERE status = 'generated') ORDER BY ord")).map((b) => b.kind)).toEqual(['spelling', 'writing']);
   });
+  test('a light lesson writes neither writing nor rewrite, also on a rebuild of a stored choice', async () => {
+    const gen: GeneratedSession = { blocks: [speaking] };
+    const { db, llm, deps } = await setup('2026-10-20', { generate_session: [ok(gen), ok(gen)], validate_session: [ok(allOk(gen)), ok(allOk(gen))] });
+    await addSource(db);
+    const all = choice({ speaking: true, writing: true, rewrite: true });
+    expect((await generateSession(deps, { light: true, choice: all })).ok).toBe(true);
+    const kinds = () => db.select<{ kind: string }>("SELECT kind FROM block WHERE session_id = (SELECT id FROM session WHERE status = 'generated') ORDER BY ord");
+    expect((await kinds()).map((b) => b.kind)).toEqual(['speaking']);
+    expect(llm.calls[0]!.userPrompt).not.toContain('writing (');
+    // A stored choice with writing and rewrite, rebuilt light.
+    await db.execute('DELETE FROM session WHERE status = \'generated\'');
+    await db.execute("INSERT INTO session (date, title, status, created_at, choice) VALUES ('2026-10-20', 'x', 'generated', 'x', ?)", [JSON.stringify(all)]);
+    const sid = (await db.select<{ id: number }>("SELECT id FROM session WHERE status = 'generated'"))[0]!.id;
+    expect((await rebuildSession(deps, sid, { light: true })).ok).toBe(true);
+    expect((await kinds()).map((b) => b.kind)).toEqual(['speaking']);
+  });
 });

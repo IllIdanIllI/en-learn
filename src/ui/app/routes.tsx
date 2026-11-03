@@ -10,6 +10,7 @@ import { Progress } from '@/ui/pages/Progress';
 import { Rules } from '@/ui/pages/Rules';
 import { RuleView } from '@/ui/pages/RuleView';
 import { ErrorBank } from '@/ui/pages/ErrorBank';
+import { Writing } from '@/ui/pages/Writing';
 
 export function AppRoutes() {
   return (
@@ -24,6 +25,7 @@ export function AppRoutes() {
               <Route path="rules" element={<Rules />} />
               <Route path="rules/:id" element={<RuleView />} />
               <Route path="errors" element={<ErrorBank />} />
+              <Route path="writing" element={<Writing />} />
               <Route path="settings" element={<Settings />} />
               <Route path="setup" element={<Setup />} />
               <Route path="prerequisites" element={<Prerequisites />} />

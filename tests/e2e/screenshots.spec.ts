@@ -8,7 +8,7 @@ test('shell renders sidebar', async ({ page }) => {
   for (const label of ['Сегодня', 'Прогресс', 'Правила', 'Банк ошибок', 'Настройки']) {
     await expect(nav.getByText(label)).toBeVisible();
   }
-  await expect(nav.getByRole('link')).toHaveCount(5);
+  await expect(nav.getByRole('link')).toHaveCount(6);
   await page.screenshot({ path: `${SHOTS}/shell-no_session.png` });
 });
 
@@ -16,7 +16,7 @@ test('shell collapses to icons below 1100px', async ({ page }) => {
   await page.setViewportSize({ width: 1000, height: 700 });
   await page.goto('/#/today');
   const nav = page.getByRole('navigation');
-  await expect(nav.getByRole('link')).toHaveCount(5);
+  await expect(nav.getByRole('link')).toHaveCount(6);
   await expect(nav.getByText('Сегодня')).toBeHidden();
   expect((await nav.boundingBox())?.width).toBe(56);
   await page.screenshot({ path: `${SHOTS}/shell-collapsed.png` });

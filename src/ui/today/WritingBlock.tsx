@@ -25,6 +25,16 @@ function RateLine({ errors, words, lang }: { errors: number; words: number; lang
   return <p className="label tabular mt-3 text-muted-foreground">{rate === null ? t(lang, 'writing.tooShort') : t(lang, 'writing.rate', { errors, rate })}</p>;
 }
 
+/** A checked text: its errors underlined, then the rate line. Read-only; the error list is the caller's. */
+export function WritingResult({ text, fragments, words, lang }: { text: string; fragments: string[]; words: number; lang: Lang }) {
+  return (
+    <>
+      <Marked text={text} fragments={fragments} />
+      <RateLine errors={fragments.length} words={words} lang={lang} />
+    </>
+  );
+}
+
 /**
  * An essay or a rewrite: an editor with a word count until the text is checked, then the text with its errors
  * underlined, the error list (graded items, so disputes work) and the rate. A rewrite also shows the text it started from.
@@ -61,20 +71,14 @@ export function WritingBlock({ block, lang, value, onChange }: {
   }
 
   const wrong = block.items.filter((i) => i.effective === 'wrong');
-  const mine = (
-    <>
-      <Marked text={w.text} fragments={wrong.map((i) => i.answer?.text ?? '')} />
-      <RateLine errors={wrong.length} words={w.words ?? 0} lang={lang} />
-    </>
-  );
+  const mine = <WritingResult text={w.text} fragments={wrong.map((i) => i.answer?.text ?? '')} words={w.words ?? 0} lang={lang} />;
   return (
     <div className="flex flex-col gap-6">
       {source ? (
         <div className="grid gap-8 min-[900px]:grid-cols-2">
           <div>
             <h3 className="label mb-2 text-muted-foreground">{t(lang, 'writing.before')}</h3>
-            <Marked text={source.text} fragments={source.errors.map((e) => e.was)} />
-            <RateLine errors={source.errors.length} words={countWords(source.text)} lang={lang} />
+            <WritingResult text={source.text} fragments={source.errors.map((e) => e.was)} words={countWords(source.text)} lang={lang} />
           </div>
           <div>
             <h3 className="label mb-2 text-muted-foreground">{t(lang, 'writing.after')}</h3>

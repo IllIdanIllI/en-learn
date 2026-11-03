@@ -15,6 +15,11 @@ const Context = createContext<SessionActions | null>(null);
 
 export const SessionActionsProvider = Context.Provider;
 
+/** The session actions when rendered inside SessionPage, else null (the Writing page's read-only results). */
+export function useOptionalSessionActions(): SessionActions | null {
+  return useContext(Context);
+}
+
 export function useSessionActions(): SessionActions {
   const actions = useContext(Context);
   if (!actions) throw new Error('useSessionActions must be used inside SessionPage');

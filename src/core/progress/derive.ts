@@ -9,7 +9,7 @@ export type BlockScore = { blockId: number; correct: number; counted: number };
 export function blockScores(items: ScoredItem[]): BlockScore[] {
   const byBlock = new Map<number, BlockScore>();
   for (const it of items) {
-    if (it.blockKind === 'speaking' || it.format === 'question') continue;
+    if (it.blockKind === 'speaking' || it.format === 'question' || it.format === 'essay' || it.format === 'rewrite') continue;
     let s = byBlock.get(it.blockId);
     if (!s) {
       s = { blockId: it.blockId, correct: 0, counted: 0 };
@@ -31,6 +31,7 @@ export type ErrorBankRow = {
   kind: 'grammar' | 'spelling' | 'inattention';
   topicId: number | null;
   itemId: number;
+  suggestedTopic: string | null;
 };
 
 export type ErrorBankInput = {
@@ -45,6 +46,8 @@ export type ErrorBankInput = {
   paragraph: string | null;
   topicId: number | null;
   itemId: number;
+  /** Writing errors without a programme topic: the grader's name for the area. */
+  suggestedTopic: string | null;
   effective: EffectiveVerdict;
   isInattention: boolean;
   verdict: Verdict;
@@ -56,7 +59,7 @@ export function errorBank(rows: ErrorBankInput[]): ErrorBankRow[] {
     if (r.effective !== 'wrong') continue;
     const kind = r.isInattention && r.verdict === 'wrong' ? 'inattention' : r.format === 'spelling' ? 'spelling' : 'grammar';
     const { was, shouldBe, sentence, hint } = errorContext(r);
-    out.push({ date: r.date, was, shouldBe, sentence, hint, kind, topicId: r.topicId, itemId: r.itemId });
+    out.push({ date: r.date, was, shouldBe, sentence, hint, kind, topicId: r.topicId, itemId: r.itemId, suggestedTopic: r.suggestedTopic });
   }
   return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.itemId - b.itemId));
 }

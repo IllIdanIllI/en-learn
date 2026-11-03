@@ -32,6 +32,7 @@ export interface GradedAnswerRow {
   disputeDecision: DisputeDecision | null;
   gapStatus: GapStatus | null;
   supported: boolean;
+  suggestedTopic: string | null;
 }
 
 interface RawRow {
@@ -56,6 +57,7 @@ interface RawRow {
   dispute_decision: DisputeDecision | null;
   gap_status: GapStatus | null;
   supported: number;
+  suggested_topic: string | null;
 }
 
 /** Every answered item of every graded session, oldest first. */
@@ -65,7 +67,7 @@ export async function listGradedAnswerRows(db: Db): Promise<GradedAnswerRow[]> {
             i.id AS item_id, i.topic_id AS topic_id, i.is_check AS is_check, i.status AS item_status,
             i.prompt AS prompt, i.expected AS expected, i.wrong AS wrong, i.paragraph AS paragraph, b.passage AS passage,
             a.text AS text, a.verdict AS verdict, a.fix AS fix, a.is_inattention AS is_inattention,
-            a.dispute_decision AS dispute_decision, g.status AS gap_status,
+            a.dispute_decision AS dispute_decision, g.status AS gap_status, a.suggested_topic AS suggested_topic,
             EXISTS (SELECT 1 FROM session_support ss WHERE ss.session_id = s.id AND ss.topic_id = i.topic_id) AS supported
      FROM session s
      JOIN block b ON b.session_id = s.id
@@ -97,6 +99,7 @@ export async function listGradedAnswerRows(db: Db): Promise<GradedAnswerRow[]> {
     disputeDecision: r.dispute_decision,
     gapStatus: r.gap_status,
     supported: r.supported === 1,
+    suggestedTopic: r.suggested_topic,
   }));
 }
 

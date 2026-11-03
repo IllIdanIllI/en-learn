@@ -21,6 +21,16 @@ describe('blockScores', () => {
     ]);
     expect(out).toEqual([{ blockId: 1, correct: 1, counted: 2 }]);
   });
+
+  test('writing blocks (essay and rewrite) get no block score', () => {
+    const out = blockScores([
+      item(1, 'correct', { blockKind: 'writing', format: 'essay' }),
+      item(1, 'wrong', { blockKind: 'writing', format: 'essay' }),
+      item(2, 'wrong', { blockKind: 'writing', format: 'rewrite' }),
+      item(3, 'correct'),
+    ]);
+    expect(out).toEqual([{ blockId: 3, correct: 1, counted: 1 }]);
+  });
 });
 
 const row = (over: Partial<Parameters<typeof errorBank>[0][number]> = {}): Parameters<typeof errorBank>[0][number] => ({
@@ -37,6 +47,7 @@ const row = (over: Partial<Parameters<typeof errorBank>[0][number]> = {}): Param
   effective: 'wrong',
   isInattention: false,
   verdict: 'wrong',
+  suggestedTopic: null,
   ...over,
 });
 
@@ -56,6 +67,14 @@ describe('errorBank', () => {
       [3, 'inattention'],
       [6, 'spelling'],
       [2, 'grammar'],
+    ]);
+  });
+
+  test('carries the suggested topic of a writing error', () => {
+    const out = errorBank([row({ itemId: 1, suggestedTopic: 'Articles' }), row({ itemId: 2 })]);
+    expect(out.map((r) => [r.itemId, r.suggestedTopic])).toEqual([
+      [1, 'Articles'],
+      [2, null],
     ]);
   });
 

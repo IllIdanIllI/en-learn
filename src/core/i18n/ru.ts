@@ -5,6 +5,8 @@ export const ru: Record<keyof typeof en, string> = {
   'title.review': 'Повторение, {date}',
   'spelling.title': 'Орфография',
   'spelling.instruction': 'Впишите слово по подсказке.',
+  'writing.rewrite.title': 'Переписать текст',
+  'writing.rewrite.instruction': 'Перепишите свой последний текст без ошибок.',
   'nav.today': 'Сегодня',
   'nav.progress': 'Прогресс',
   'nav.rules': 'Правила',

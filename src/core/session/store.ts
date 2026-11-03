@@ -8,6 +8,7 @@ import type { GenerationContext } from './context';
 import type { Defects } from './validation';
 
 const SPELLING_WORDS_PER_MINUTE = 3;
+const REWRITE_MINUTES = 20;
 
 /** Writes the blocks and items of a draft session: the spelling block first, then the generated blocks. An added round starts at `at`. */
 export async function writeBlocks(
@@ -19,6 +20,7 @@ export async function writeBlocks(
   defects: Defects,
   spelling: SpellingWord[],
   at: { ord: number; round: number } = { ord: 0, round: 1 },
+  rewrite: { sourceBlockId: number; text: string } | null = null,
 ): Promise<void> {
   const byKey = new Map(ctx.allowed.map((r) => [normaliseTopicKey(r.topic.key), r]));
   let ord = at.ord;
@@ -57,7 +59,23 @@ export async function writeBlocks(
     };
   };
 
+  // The rewrite block goes right before the speaking block, or last.
+  const writeRewrite = async (): Promise<void> => {
+    if (!rewrite) return;
+    await insertBlock(db, sessionId, ord++, {
+      kind: 'writing',
+      format: 'rewrite',
+      title: t(lang, 'writing.rewrite.title'),
+      instruction: t(lang, 'writing.rewrite.instruction'),
+      formatExample: null,
+      passage: JSON.stringify(rewrite),
+      minutes: REWRITE_MINUTES,
+    }, at.round);
+    rewrite = null;
+  };
+
   for (const [bi, b] of gen.blocks.entries()) {
+    if (b.kind === 'speaking') await writeRewrite();
     const blockId = await insertBlock(db, sessionId, ord++, {
       kind: b.kind,
       format: b.format,
@@ -83,4 +101,5 @@ export async function writeBlocks(
       }
     }
   }
+  await writeRewrite();
 }

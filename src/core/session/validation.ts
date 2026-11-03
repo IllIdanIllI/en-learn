@@ -29,7 +29,8 @@ export function violations(s: GeneratedSession, ctx: GenerationContext): string[
       if (b.items.length > cap) out.push(`b${i} items: ${b.items.length} review items, at most ${cap}`);
     }
     if (b.kind === 'speaking' && b.question.trim() === '') out.push(`b${i} question: speaking block has no question`);
-    if (b.kind !== 'speaking' && b.items.length === 0 && b.paragraphs.every((p) => p.errors.length === 0)) {
+    if (b.kind === 'writing' && b.instruction.trim() === '') out.push(`b${i} instruction: writing block has no prompt`);
+    if (b.kind !== 'speaking' && b.kind !== 'writing' && b.items.length === 0 && b.paragraphs.every((p) => p.errors.length === 0)) {
       out.push(`b${i} items: block has no active items`);
     }
   });

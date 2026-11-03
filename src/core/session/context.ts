@@ -9,7 +9,7 @@ import { loadDayInfo, spottingTopics, taskTopic, type DayInfo } from './plan';
 
 export interface RuleRef { topic: Topic; ruleId: number; version: number; body: string }
 export interface ReviewEntry { prompt: string; answer: string; fix: string; topicKey: string | null; skipped: boolean }
-export interface BlockSpec { kind: 'review' | 'task' | 'speaking'; format: string; topicKey?: string }
+export interface BlockSpec { kind: 'review' | 'task' | 'writing' | 'speaking'; format: string; topicKey?: string }
 
 export interface GenerationContext {
   date: ISODate;
@@ -127,6 +127,7 @@ export async function buildGenerationContext(deps: Deps, d: ISODate, light: bool
   } else if (!light && plan.task) {
     blocks.push(taskRef ? { kind: 'task', format: plan.task.format, topicKey: taskRef.topic.key } : { kind: 'task', format: plan.task.format });
   }
+  if (choice?.writing) blocks.push({ kind: 'writing', format: 'essay' });
   if (!choice || choice.speaking) blocks.push({ kind: 'speaking', format: 'question' });
 
   return {

@@ -209,7 +209,7 @@ export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
     const session = await getSessionByDate(deps.db, today);
     if (!session) throw new Error('Preview fixture: no session');
     if (state === 'closed') await closeSession(deps.db, session.id);
-    else requireOk(await extendSession(deps, session.id, (await extendOptions(deps, session.id)).defaults), 'extendSession');
+    else requireOk(await extendSession(deps, session.id, (await extendOptions(deps, session.id)).defaults, false), 'extendSession');
     if (state === 'round-graded') await answerToday(deps, 'graded');
     // Round 2 answered with blanks and the lesson finished: the skipped items belong to the added round.
     if (state === 'skipped-round') await answerToday(deps, 'skipped');

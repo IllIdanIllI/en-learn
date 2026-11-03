@@ -219,10 +219,17 @@ function generate(prompt: string): GeneratedSession {
   const due = (/in the review block: ([^.\n]+)\./.exec(prompt)?.[1] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   const extra = prompt.includes('## Extra set');
   const blocks: GeneratedBlock[] = [];
-  for (const m of prompt.matchAll(/^\d+\. (review|task|speaking) \(format ([^,)]+)(?:, topic ([^)]+))?\)$/gm)) {
+  for (const m of prompt.matchAll(/^\d+\. (review|task|writing|speaking) \(format ([^,)]+)(?:, topic ([^)]+))?\)$/gm)) {
     const [, kind, format, topic] = m;
     if (kind === 'review') blocks.push(reviewBlock(allowed, due));
     else if (kind === 'task') blocks.push(taskBlock(format as string, topic ?? allowed[0] ?? FALLBACK, extra));
+    else if (kind === 'writing') {
+      blocks.push({
+        kind: 'writing', format: 'essay', title: 'Эссе',
+        instruction: 'Some people think that working from home is better than working in an office. Discuss both views and give your opinion.',
+        formatExample: '', minutes: 40, items: [], paragraphs: [], question: '',
+      });
+    }
     else {
       blocks.push({
         kind: 'speaking', format: 'question', title: 'Говорение',

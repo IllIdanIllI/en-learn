@@ -10,16 +10,17 @@ Every task item, text, expected answer, correction, format example and speaking 
 
 # Blocks
 
-Produce exactly the blocks listed under "Blocks to produce", in that order; there may be several task blocks. Spelling is built by the application, never by you. Omit the review block if the context has no review input and no due topic. Every block has: kind, format, title, instruction, formatExample, minutes (a realistic time estimate), items, paragraphs, question. All fields are always present: use an empty array or an empty string when a field does not apply.
+Produce exactly the blocks listed under "Blocks to produce", in that order; there may be several task blocks. Spelling and the rewrite of the learner's own earlier text are built by the application, never by you. Omit the review block if the context has no review input and no due topic. Every block has: kind, format, title, instruction, formatExample, minutes (a realistic time estimate), items, paragraphs, question. All fields are always present: use an empty array or an empty string when a field does not apply.
 
 - format "gap" or "fix": fill "items"; "paragraphs" is [] and "question" is "".
 - format "spot" (error spotting): fill "paragraphs"; "items" is [] and "question" is "".
+- format "essay" (writing block, kind "writing"): the "instruction" is the essay prompt, in English: an IELTS Task 2 prompt (opinion or discussion) for an essay of about 250 words. Where it fits naturally, the prompt invites the use of the week's grammar topic, without naming the topic. formatExample is "", "items" and "paragraphs" are [], "question" is "", minutes 40.
 - format "question" (speaking block, kind "speaking"): fill "question"; "items" and "paragraphs" are [] and formatExample is "". Always exactly one question, and it always starts with "Describe a time when".
 
 Counts:
 - Review block: format is always gap or fix, never spot. At most 12 items; on a light day at most 5. Every gap or fix block, review included, has at least 3 items: if the review input gives fewer than 3, pad the block with fresh sentences on the same topics (only constructions the rules cover). Every topic whose re-check is due today or overdue gets at least one item in the review block with isCheck = true, and these check items always win over the caps: on a light day the review block has at most 5 items unless more topics are due, in which case it has one check item per due topic. All other items have isCheck = false. Outside the review block isCheck is always false.
 - Task block with format gap or fix: 6 to 10 items.
-- Extra set: when the context has an "Extra set" section, produce only the task blocks it asks for (formats as given), each gap or fix block with 6 to 8 items on its topic, each spot block as usual (2 to 3 paragraphs over the error-spotting topics); none repeating a prompt listed there; no review or speaking block; isCheck is always false.
+- Extra set: when the context has an "Extra set" section, produce only the task blocks it asks for (formats as given), each gap or fix block with 6 to 8 items on its topic, each spot block as usual (2 to 3 paragraphs over the error-spotting topics); none repeating a prompt listed there; no review or speaking block (a writing block only if it is listed); isCheck is always false.
 - Task block with format spot: 2 to 3 paragraphs, each with 5 to 7 hidden errors.
 - Light day: only lowers the review cap (see above). The blocks are exactly those listed under "Blocks to produce", whatever the day.
 

@@ -8,6 +8,7 @@ import {
   cleanupDrafts, deleteSession, getSessionByDate, getSessionChoice, insertDraftSession, setSessionStatus,
 } from '@/core/db/repos/sessions';
 import { listSpellingWords } from '@/core/db/repos/spelling';
+import { latestWritingSource } from '@/core/db/repos/writing';
 import { getSpellingStates } from '@/core/progress/history';
 import { selectSpellingWords } from '@/core/schedule/spelling';
 import { forgetAwaiting } from '@/core/grading/grade';
@@ -75,7 +76,9 @@ async function generateUnlocked(deps: Deps, opts: { light: boolean; choice?: Les
     const words = await listSpellingWords(deps.db);
     const ids = choice?.spelling === false ? [] : selectSpellingWords(await getSpellingStates(deps.db), words.map((w) => w.id), d, opts.light);
     const chosen = ids.flatMap((id) => words.find((w) => w.id === id) ?? []);
-    await writeBlocks(deps.db, sessionId, settings.nativeLanguage, ctx, made.gen, made.defects, chosen);
+    const source = choice?.rewrite ? await latestWritingSource(deps.db, d) : null;
+    const rewrite = source ? { sourceBlockId: source.blockId, text: source.text } : null;
+    await writeBlocks(deps.db, sessionId, settings.nativeLanguage, ctx, made.gen, made.defects, chosen, undefined, rewrite);
     await setSessionStatus(deps.db, sessionId, 'generated');
     return { ok: true, sessionId };
   } catch (e) {

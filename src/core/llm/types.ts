@@ -15,8 +15,8 @@ export interface GeneratedParagraph {
 }
 
 export interface GeneratedBlock {
-  kind: 'review' | 'task' | 'speaking';
-  format: 'gap' | 'fix' | 'spot' | 'question';
+  kind: 'review' | 'task' | 'writing' | 'speaking';
+  format: 'gap' | 'fix' | 'spot' | 'essay' | 'question';
   title: string;
   instruction: string;
   formatExample: string;

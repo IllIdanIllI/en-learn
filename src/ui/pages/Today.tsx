@@ -97,7 +97,7 @@ export function Today() {
       const chosen = formats ?? lastFormats.current;
       const use = chosen.length > 0 ? chosen : (await extendOptions(deps, sessionId)).defaults;
       lastFormats.current = use;
-      return extendSession(deps, sessionId, use, onStage);
+      return extendSession(deps, sessionId, use, false, onStage);
     }, today).then(refresh);
   };
   const close = (sessionId: number) => {

@@ -3,6 +3,8 @@ export const en = {
   'title.review': 'Review, {date}',
   'spelling.title': 'Spelling',
   'spelling.instruction': 'Type the word that matches each hint.',
+  'writing.rewrite.title': 'Rewrite your text',
+  'writing.rewrite.instruction': 'Rewrite your last text without the errors.',
   'nav.today': 'Today',
   'nav.progress': 'Progress',
   'nav.rules': 'Rules',

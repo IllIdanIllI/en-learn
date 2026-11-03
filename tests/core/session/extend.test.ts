@@ -93,7 +93,7 @@ describe('extendSession', () => {
     const gen = extra(7);
     const { db, deps, sid } = await setup({ generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
     const before = await db.select('SELECT * FROM answer ORDER BY item_id');
-    expect(await extendSession(deps, sid, ['fix'])).toEqual({ ok: true, sessionId: sid });
+    expect(await extendSession(deps, sid, ['fix'], false)).toEqual({ ok: true, sessionId: sid });
     const blocks = await db.select<{ ord: number; kind: string; format: string; round: number }>('SELECT ord, kind, format, round FROM block ORDER BY ord');
     expect(blocks).toEqual([
       { ord: 0, kind: 'task', format: 'fix', round: 1 },
@@ -113,7 +113,7 @@ describe('extendSession', () => {
   test('two concurrent extensions: one runs, the other is busy, and only one round is added', async () => {
     const gen = extra(7);
     const { db, deps, sid } = await setup({ generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
-    const results = await Promise.all([extendSession(deps, sid, ['fix']), extendSession(deps, sid, ['fix'])]);
+    const results = await Promise.all([extendSession(deps, sid, ['fix'], false), extendSession(deps, sid, ['fix'], false)]);
     expect(results).toEqual([{ ok: true, sessionId: sid }, { ok: false, message: 'A lesson is already being generated', code: 'busy' }]);
     expect((await db.select<{ round: number }>('SELECT MAX(round) AS round FROM block'))[0]!.round).toBe(2);
   });
@@ -121,7 +121,7 @@ describe('extendSession', () => {
   test('the user prompt lists every round-1 prompt under Extra set and asks for one task block', async () => {
     const gen = extra(6);
     const { db, llm, deps, sid } = await setup({ generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
-    await extendSession(deps, sid, ['fix']);
+    await extendSession(deps, sid, ['fix'], false);
     const prompt = llm.calls.filter((c) => c.kind === 'generate_session').at(-1)!.userPrompt;
     const section = prompt.split('## Extra set')[1]!.split('## Task topic')[0]!;
     const prompts = await db.select<{ prompt: string }>('SELECT i.prompt AS prompt FROM item i JOIN block b ON b.id = i.block_id WHERE b.round = 1');
@@ -136,22 +136,22 @@ describe('extendSession', () => {
     const a = extra(6);
     const b: GeneratedSession = { blocks: [fixBlock(8, 'Third')] };
     const { db, deps, sid } = await setup({ generate_session: [ok(a), ok(b)], validate_session: [ok(allOk(a)), ok(allOk(b))] });
-    await extendSession(deps, sid, ['fix']);
-    expect(await extendSession(deps, sid, ['fix'])).toEqual({ ok: false, message: 'The session has questions to answer first' });
+    await extendSession(deps, sid, ['fix'], false);
+    expect(await extendSession(deps, sid, ['fix'], false)).toEqual({ ok: false, message: 'The session has questions to answer first' });
     await db.execute("INSERT INTO answer (item_id, text, verdict) SELECT i.id, 'x', 'correct' FROM item i WHERE NOT EXISTS (SELECT 1 FROM answer a WHERE a.item_id = i.id)");
-    expect((await extendSession(deps, sid, ['fix'])).ok).toBe(true);
+    expect((await extendSession(deps, sid, ['fix'], false)).ok).toBe(true);
     expect((await db.select<{ round: number }>('SELECT MAX(round) AS round FROM block'))[0]!.round).toBe(3);
   });
 
   test('refuses an open session and a session of another day', async () => {
     const gen = extra(6);
     const { db, deps, sid } = await setup({ generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
-    await extendSession(deps, sid, ['fix']);
-    const open = await extendSession(deps, sid, ['fix']);
+    await extendSession(deps, sid, ['fix'], false);
+    const open = await extendSession(deps, sid, ['fix'], false);
     expect(open.ok).toBe(false);
     const late: Deps = { ...deps, clock: new FixedClock('2026-10-21') };
     await db.execute("INSERT INTO answer (item_id, text, verdict) SELECT i.id, 'x', 'correct' FROM item i WHERE NOT EXISTS (SELECT 1 FROM answer a WHERE a.item_id = i.id)");
-    const other = await extendSession(late, sid, ['fix']);
+    const other = await extendSession(late, sid, ['fix'], false);
     expect(other.ok).toBe(false);
     expect((await db.select('SELECT id FROM block')).length).toBe(3);
   });
@@ -160,7 +160,7 @@ describe('extendSession', () => {
     const bad = extra(9);
     const good = extra(8);
     const { db, llm, deps, sid } = await setup({ generate_session: [ok(bad), ok(good)], validate_session: [ok(allOk(good))] });
-    expect(await extendSession(deps, sid, ['fix'])).toEqual({ ok: true, sessionId: sid });
+    expect(await extendSession(deps, sid, ['fix'], false)).toEqual({ ok: true, sessionId: sid });
     expect(llm.calls.filter((c) => c.kind === 'generate_session')).toHaveLength(3);
     expect(llm.calls.filter((c) => c.kind === 'generate_session').at(-1)!.userPrompt).toContain('need 6 to 8');
     expect((await db.select('SELECT id FROM item i WHERE i.block_id IN (SELECT id FROM block WHERE round = 2)')).length).toBe(8);
@@ -169,7 +169,7 @@ describe('extendSession', () => {
   test('two failed attempts leave the graded session untouched', async () => {
     const bad = extra(9);
     const { db, deps, sid } = await setup({ generate_session: [ok(bad), ok(bad)] });
-    const res = await extendSession(deps, sid, ['fix']);
+    const res = await extendSession(deps, sid, ['fix'], false);
     expect(res.ok).toBe(false);
     expect((await db.select('SELECT id FROM block')).length).toBe(2);
     expect(await db.select('SELECT status FROM session')).toEqual([{ status: 'graded' }]);
@@ -181,7 +181,7 @@ describe('extendSession', () => {
     await db.execute("UPDATE session SET date = '2026-10-24'");
     const sat: Deps = { ...deps, clock: new FixedClock('2026-10-24') };
     expect((await buildGenerationContext(sat, '2026-10-24', false)).taskTopic).toBeNull();
-    expect(await extendSession(sat, sid, ['fix'])).toEqual({ ok: true, sessionId: sid });
+    expect(await extendSession(sat, sid, ['fix'], false)).toEqual({ ok: true, sessionId: sid });
     expect(llm.calls.filter((c) => c.kind === 'generate_session').at(-1)!.userPrompt).toContain('1. task (format fix, topic articles)');
   });
 
@@ -200,11 +200,11 @@ describe('extendSession', () => {
       },
     };
     await closeSession(db, sid);
-    await expect(extendSession(flaky, sid, ['fix'])).rejects.toThrow('disk full');
+    await expect(extendSession(flaky, sid, ['fix'], false)).rejects.toThrow('disk full');
     expect(await db.select('SELECT id FROM block WHERE round = 2')).toEqual([]);
     expect((await loadSessionView(db, sid)).open).toBe(false);
     expect((await getSettings(db)).closedSessions).toEqual([sid]);
-    expect(await extendSession(deps, sid, ['fix'])).toEqual({ ok: true, sessionId: sid });
+    expect(await extendSession(deps, sid, ['fix'], false)).toEqual({ ok: true, sessionId: sid });
     expect((await db.select<{ round: number }>('SELECT MAX(round) AS round FROM block'))[0]!.round).toBe(2);
     expect(llm.calls.filter((c) => c.kind === 'generate_session')).toHaveLength(3);
   });
@@ -212,7 +212,7 @@ describe('extendSession', () => {
   test('fix and spot make one added round of two task blocks, the spot block over the error-spotting topics', async () => {
     const gen: GeneratedSession = { blocks: [fixBlock(6, 'Extra'), spotBlock(2)] };
     const { db, llm, deps, sid } = await setup({ generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
-    expect(await extendSession(deps, sid, ['fix', 'spot'])).toEqual({ ok: true, sessionId: sid });
+    expect(await extendSession(deps, sid, ['fix', 'spot'], false)).toEqual({ ok: true, sessionId: sid });
     const calls = llm.calls.filter((c) => c.kind === 'generate_session');
     expect(calls).toHaveLength(2);
     const prompt = calls.at(-1)!.userPrompt;
@@ -230,20 +230,20 @@ describe('extendSession', () => {
   test('a spot-only added round passes the check without items', async () => {
     const gen: GeneratedSession = { blocks: [spotBlock(2)] };
     const { llm, deps, sid } = await setup({ generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
-    expect(await extendSession(deps, sid, ['spot'])).toEqual({ ok: true, sessionId: sid });
+    expect(await extendSession(deps, sid, ['spot'], false)).toEqual({ ok: true, sessionId: sid });
     expect(llm.calls.filter((c) => c.kind === 'generate_session')).toHaveLength(2);
   });
 
   test('no format chosen is refused without a call', async () => {
     const { llm, deps, sid } = await setup({});
-    expect((await extendSession(deps, sid, [])).ok).toBe(false);
+    expect((await extendSession(deps, sid, [], false)).ok).toBe(false);
     expect(llm.calls.filter((c) => c.kind === 'generate_session')).toHaveLength(1);
   });
 
   test('spot with no error-spotting topic is refused without a call', async () => {
     const { db, llm, deps, sid } = await setup({});
     await db.execute('UPDATE topic SET archived = 1');
-    expect(await extendSession(deps, sid, ['spot'])).toEqual({ ok: false, message: 'No topics to spot errors in' });
+    expect(await extendSession(deps, sid, ['spot'], false)).toEqual({ ok: false, message: 'No topics to spot errors in' });
     expect(llm.calls.filter((c) => c.kind === 'generate_session')).toHaveLength(1);
   });
 
@@ -259,7 +259,7 @@ describe('extendSession', () => {
     const { db, deps, sid } = await setup({ generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
     await closeSession(db, sid);
     expect(await getTodayState(deps)).toMatchObject({ kind: 'session', status: 'graded', closed: true });
-    await extendSession(deps, sid, ['fix']);
+    await extendSession(deps, sid, ['fix'], false);
     expect((await getSettings(db)).closedSessions).toEqual([]);
     expect(await getTodayState(deps)).toMatchObject({ closed: false });
   });
@@ -276,5 +276,27 @@ describe('closeSession', () => {
     expect(closed).toHaveLength(30);
     expect(closed.at(-1)).toBe(134);
     expect(closed).not.toContain(5);
+  });
+});
+
+describe('extendSession with writing', () => {
+  const essay: GeneratedBlock = {
+    kind: 'writing', format: 'essay', title: 'Essay', instruction: 'Some people think that cities are too big. Discuss both views and give your opinion.',
+    formatExample: '', minutes: 40, items: [], paragraphs: [], question: '',
+  };
+
+  test('writing alone adds one essay block in round 2', async () => {
+    const gen: GeneratedSession = { blocks: [essay] };
+    const { db, deps, sid } = await setup({ generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
+    expect(await extendSession(deps, sid, [], true)).toEqual({ ok: true, sessionId: sid });
+    expect(await db.select('SELECT kind, format, round FROM block WHERE round = 2')).toEqual([{ kind: 'writing', format: 'essay', round: 2 }]);
+  });
+
+  test('writing after the task blocks of the round', async () => {
+    const gen: GeneratedSession = { blocks: [fixBlock(6, 'Extra'), essay] };
+    const { db, llm, deps, sid } = await setup({ generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
+    expect(await extendSession(deps, sid, ['fix'], true)).toEqual({ ok: true, sessionId: sid });
+    expect(llm.calls.filter((c) => c.kind === 'generate_session').at(-1)!.userPrompt).toContain('1. task (format fix, topic articles)\n2. writing (format essay)\n');
+    expect((await db.select<{ kind: string }>('SELECT kind FROM block WHERE round = 2 ORDER BY ord')).map((b) => b.kind)).toEqual(['task', 'writing']);
   });
 });

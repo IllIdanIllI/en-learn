@@ -46,13 +46,13 @@ export async function firstRoundFormat(deps: Deps, sessionId: number): Promise<T
 
 /**
  * "Add more questions": one added round for today's graded session, as round max + 1, with one task block per chosen format
- * (gap and fix on the task topic, spot on the error-spotting topics). The session stays graded; the new round is open until it is answered.
+ * (gap and fix on the task topic, spot on the error-spotting topics), then an essay block when `writing`. The session stays graded; the new round is open until it is answered.
  */
-export function extendSession(deps: Deps, sessionId: number, formats: TaskFormat[], onStage?: OnStage): Promise<GenerateResult> {
-  return withJobLock(deps.db, () => extendUnlocked(deps, sessionId, formats, onStage), BUSY);
+export function extendSession(deps: Deps, sessionId: number, formats: TaskFormat[], writing: boolean, onStage?: OnStage): Promise<GenerateResult> {
+  return withJobLock(deps.db, () => extendUnlocked(deps, sessionId, formats, writing, onStage), BUSY);
 }
 
-async function extendUnlocked(deps: Deps, sessionId: number, formats: TaskFormat[], onStage?: OnStage): Promise<GenerateResult> {
+async function extendUnlocked(deps: Deps, sessionId: number, formats: TaskFormat[], writing: boolean, onStage?: OnStage): Promise<GenerateResult> {
   const d = deps.clock.today();
   const session = await getSession(deps.db, sessionId);
   if (!session) return { ok: false, message: 'Session not found' };
@@ -60,7 +60,7 @@ async function extendUnlocked(deps: Deps, sessionId: number, formats: TaskFormat
   if (await hasOpenItems(deps.db, sessionId)) return { ok: false, message: 'The session has questions to answer first' };
 
   const chosen = FORMAT_ORDER.filter((f) => formats.includes(f));
-  if (chosen.length === 0) return { ok: false, message: 'Choose at least one task' };
+  if (chosen.length === 0 && !writing) return { ok: false, message: 'Choose at least one task' };
 
   let ctx: GenerationContext;
   try {
@@ -83,6 +83,7 @@ async function extendUnlocked(deps: Deps, sessionId: number, formats: TaskFormat
   const specs: BlockSpec[] = chosen.map((format) =>
     format === 'spot' || !taskRef ? { kind: 'task', format } : { kind: 'task', format, topicKey: taskRef.topic.key },
   );
+  if (writing) specs.push({ kind: 'writing', format: 'essay' });
   const extended: GenerationContext = {
     ...ctx,
     blocks: specs,

@@ -596,3 +596,85 @@ describe('generation from a choice', () => {
     expect(blocks.map((b) => b.kind)).toEqual(['task', 'speaking']);
   });
 });
+
+describe('writing blocks', () => {
+  const choice = (over: Partial<LessonChoice> = {}): LessonChoice => ({ review: false, formats: [], spelling: false, speaking: false, writing: false, rewrite: false, ...over });
+  const essay = (over: Partial<GeneratedBlock> = {}): GeneratedBlock => ({
+    kind: 'writing', format: 'essay', title: 'Essay', instruction: 'Some people think that cities are too big. Discuss both views and give your opinion.',
+    formatExample: '', minutes: 40, items: [], paragraphs: [], question: '', ...over,
+  });
+  const gapBlock = (): GeneratedBlock => ({
+    kind: 'task', format: 'gap', title: 'Gap', instruction: 'Fill the gap.', formatExample: 'She ___ tea. → drinks', minutes: 6,
+    items: [item(1), item(2), item(3)], paragraphs: [], question: '',
+  });
+  const text = 'word '.repeat(60).trim();
+  async function addSource(db: Deps['db']) {
+    const { lastInsertId: sid } = await db.execute("INSERT INTO session (date, title, status, created_at) VALUES ('2026-10-19', 'Essay', 'graded', 'x')");
+    const { lastInsertId: bid } = await db.execute(
+      "INSERT INTO block (session_id, ord, kind, format, title, instruction, minutes) VALUES (?, 0, 'writing', 'essay', 'Essay', 'Write.', 20)", [sid],
+    );
+    await db.execute("INSERT INTO writing_text (block_id, text, words, created_at) VALUES (?, ?, 60, 'x')", [bid, text]);
+    return bid;
+  }
+
+  test('the context lists the writing block after the task blocks and before speaking', async () => {
+    const { deps } = await setup('2026-10-20', {});
+    const ctx = await buildGenerationContext(deps, '2026-10-20', false, choice({ formats: ['gap'], speaking: true, writing: true }));
+    expect(ctx.blocks).toEqual([
+      { kind: 'task', format: 'gap', topicKey: 'articles' },
+      { kind: 'writing', format: 'essay' },
+      { kind: 'speaking', format: 'question' },
+    ]);
+    expect(renderContext(ctx)).toContain('1. task (format gap, topic articles)\n2. writing (format essay)\n3. speaking (format question)');
+  });
+
+  test('violations accept a writing block without items and reject an empty prompt', async () => {
+    const { deps } = await setup('2026-10-20', {});
+    const ctx = await buildGenerationContext(deps, '2026-10-20', false, choice({ writing: true }));
+    expect(violations({ blocks: [essay()] }, ctx)).toEqual([]);
+    expect(violations({ blocks: [essay({ instruction: '  ' })] }, ctx)).toEqual(['b0 instruction: writing block has no prompt']);
+  });
+
+  test('an essay block is stored with its prompt as the instruction and no passage', async () => {
+    const gen: GeneratedSession = { blocks: [essay()] };
+    const { db, deps } = await setup('2026-10-20', { generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
+    expect((await generateSession(deps, { light: false, choice: choice({ writing: true }) })).ok).toBe(true);
+    expect(await db.select('SELECT kind, format, instruction, passage, minutes FROM block')).toEqual([
+      { kind: 'writing', format: 'essay', instruction: gen.blocks[0]!.instruction, passage: null, minutes: 40 },
+    ]);
+  });
+
+  test('rewrite writes a block before speaking with the source as its passage, in the session language', async () => {
+    const gen: GeneratedSession = { blocks: [gapBlock(), speaking] };
+    const { db, deps } = await setup('2026-10-20', { generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
+    const source = await addSource(db);
+    expect((await generateSession(deps, { light: false, choice: choice({ formats: ['gap'], speaking: true, rewrite: true }) })).ok).toBe(true);
+    const rows = await db.select<{ kind: string; format: string; title: string; instruction: string; passage: string | null; minutes: number }>(
+      "SELECT kind, format, title, instruction, passage, minutes FROM block WHERE session_id = (SELECT id FROM session WHERE status = 'generated') ORDER BY ord",
+    );
+    expect(rows.map((r) => `${r.kind}/${r.format}`)).toEqual(['task/gap', 'writing/rewrite', 'speaking/question']);
+    expect(rows[1]).toMatchObject({ title: 'Rewrite your text', instruction: 'Rewrite your last text without the errors.', minutes: 20 });
+    expect(JSON.parse(rows[1]!.passage!)).toEqual({ sourceBlockId: source, text });
+  });
+
+  test('rewrite is the last block when there is no speaking block, and is skipped without a source', async () => {
+    const gen: GeneratedSession = { blocks: [gapBlock()] };
+    const { db, deps } = await setup('2026-10-20', { generate_session: [ok(gen), ok(gen)], validate_session: [ok(allOk(gen)), ok(allOk(gen))] });
+    await generateSession(deps, { light: false, choice: choice({ formats: ['gap'], rewrite: true }) });
+    expect((await db.select<{ kind: string }>('SELECT kind FROM block ORDER BY ord')).map((b) => b.kind)).toEqual(['task']);
+    await db.execute('DELETE FROM session');
+    await addSource(db);
+    await generateSession(deps, { light: false, choice: choice({ formats: ['gap'], rewrite: true }) });
+    expect((await db.select<{ format: string }>("SELECT format FROM block WHERE session_id = (SELECT id FROM session WHERE status = 'generated') ORDER BY ord")).map((b) => b.format)).toEqual(['gap', 'rewrite']);
+  });
+
+  test('only rewrite and spelling: no LLM call', async () => {
+    const { db, llm, deps } = await setup('2026-10-20', {});
+    await addSource(db);
+    await db.execute("INSERT INTO spelling_word (word, hint, created_at) VALUES ('word', 'hint', 'x')");
+    const res = await generateSession(deps, { light: false, choice: choice({ spelling: true, rewrite: true }) });
+    expect(res.ok).toBe(true);
+    expect(llm.calls).toHaveLength(0);
+    expect((await db.select<{ kind: string }>("SELECT kind FROM block WHERE session_id = (SELECT id FROM session WHERE status = 'generated') ORDER BY ord")).map((b) => b.kind)).toEqual(['spelling', 'writing']);
+  });
+});

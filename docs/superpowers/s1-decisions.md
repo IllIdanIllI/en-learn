@@ -124,6 +124,12 @@ Spec `specs/2026-10-31-security-round-1.md`, plan `plans/2026-10-31-security-rou
 - A grade reply whose rule-gap proposal breaks the skeleton is retried, not partly accepted — cost if wrong: an extra retry.
 - A gap, fix or spot block without a format example gets a standard one (`She ___ tea. → drinks`, `He go to work by bus. → goes`, `go → goes`) instead of the whole lesson being generated again (2026-10-31) — cost if wrong: the example may show a different grammar point than the block.
 
+## Writing decisions (2026-11-02)
+
+Spec `specs/2026-11-02-writing-design.md`, plan `plans/2026-11-02-writing.md`.
+
+- D16 (S1 core-loop spec: speaking, writing and rewrite slots produce error spotting until S2/S3) is closed for writing and rewrite: those slots now give a writing or rewrite block, and spotting only on non-learn days — cost if wrong: the spot fallback comes back for writing and rewrite slots.
+
 ## Still open
 
 - **Mac-only checks** (`docs/macos-checklist.md`): `$HOME` in the shell permission, long multi-line arguments, plugin-sql migrations, the not-signed-in output, PATH/HOME when launched from Finder. Not verifiable in the Linux build container.

@@ -1,0 +1,128 @@
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { t } from '@/core/i18n';
+import {
+  buildPractice, cardFor, loadWordViews, recordAnswer, stageChanges, wordsOverview, type PracticeCard,
+} from '@/core/words/practice';
+import type { ReviewResult, Stage } from '@/core/words/types';
+import { useCore } from '@/ui/app/CoreProvider';
+import { Button, buttonVariants } from '@/ui/components/ui/button';
+import { Notice } from '@/ui/today/chips';
+import { CardView } from '@/ui/words/CardView';
+import { PracticeEnd } from '@/ui/words/PracticeEnd';
+
+type Ended = { correct: number; total: number; up: { word: string; stage: Stage }[]; down: { word: string; stage: Stage }[]; canContinue: boolean };
+
+function Practice({ onContinue }: { onContinue: () => void }) {
+  const { deps, lang } = useCore();
+  const [cards, setCards] = useState<PracticeCard[] | null>(null);
+  const [index, setIndex] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [nextDue, setNextDue] = useState<string | null>(null);
+  const [ended, setEnded] = useState<Ended | null>(null);
+  const started = useRef(false);
+  const before = useRef(new Map<number, Stage>());
+  // First answer of each word in this run (true = not wrong); repeats and later cards are not counted.
+  const first = useRef(new Map<number, boolean>());
+  const repeated = useRef(new Set<number>());
+
+  useEffect(() => {
+    // Guarded by a ref: StrictMode mounts twice and the queue must be built once.
+    if (started.current) return;
+    started.current = true;
+    (async () => {
+      const views = await loadWordViews(deps.db);
+      before.current = new Map(views.map((v) => [v.word.id, v.state.stage]));
+      const built = await buildPractice(deps);
+      if (built.length === 0) setNextDue((await wordsOverview(deps.db, deps.clock.today())).nextDue);
+      setCards(built);
+    })().catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const finish = async () => {
+    try {
+      const views = await loadWordViews(deps.db);
+      const after = new Map(views.map((v) => [v.word.id, v.state.stage]));
+      const names = new Map(views.map((v) => [v.word.id, v.word.word]));
+      const answers = [...first.current.values()];
+      const overview = await wordsOverview(deps.db, deps.clock.today());
+      setEnded({
+        correct: answers.filter(Boolean).length,
+        total: answers.length,
+        ...stageChanges(before.current, after, names),
+        canContinue: overview.available > 0,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const advance = (list: PracticeCard[], from: number) => {
+    if (from + 1 >= list.length) void finish();
+    else setIndex(from + 1);
+  };
+
+  const onResult = async (pc: PracticeCard, result: ReviewResult, text: string, recorded: boolean) => {
+    if (!recorded) await recordAnswer(deps, { wordId: pc.wordId, cardType: pc.card.type, exerciseId: pc.card.exercise?.id ?? null, result, text });
+    if (!pc.repeat && !first.current.has(pc.wordId)) first.current.set(pc.wordId, result !== 'wrong');
+    if (result === 'wrong' && !repeated.current.has(pc.wordId)) {
+      repeated.current.add(pc.wordId);
+      const views = await loadWordViews(deps.db);
+      const view = views.find((v) => v.word.id === pc.wordId);
+      const again = view ? cardFor(view, views.map((v) => v.word), deps.rand ?? Math.random) : null;
+      if (again) setCards((cur) => (cur ? [...cur, { ...again, repeat: true }] : cur));
+    }
+  };
+
+  const skip = async (pc: PracticeCard, at: number) => {
+    try {
+      const views = await loadWordViews(deps.db);
+      const view = views.find((v) => v.word.id === pc.wordId);
+      const swap = view ? cardFor(view, views.map((v) => v.word), deps.rand ?? Math.random, ['translation']) : null;
+      if (swap && cards) setCards(cards.map((c, i) => (i === at ? { ...swap, repeat: pc.repeat } : c)));
+      else if (cards) advance(cards, at);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  if (error !== null) return <Notice className="mt-6">{t(lang, 'words.loadError', { message: error })}</Notice>;
+  if (ended) return <PracticeEnd {...ended} onContinue={onContinue} />;
+  if (!cards) return null;
+  if (cards.length === 0) {
+    return (
+      <>
+        <h1 className="headline">{t(lang, 'nav.words')}</h1>
+        <p className="reading mt-6 text-muted-foreground">
+          {nextDue ? t(lang, 'words.allDone', { date: nextDue }) : t(lang, 'words.allDoneNoNext')}
+        </p>
+        <Link to="/words" className={buttonVariants({ variant: 'secondary', className: 'mt-6' })}>{t(lang, 'words.back')}</Link>
+      </>
+    );
+  }
+  const pc = cards[index];
+  if (!pc) return null;
+  return (
+    <>
+      <header className="flex items-center justify-between">
+        <span className="tabular text-muted-foreground">{index + 1} / {cards.length}</span>
+        <Button variant="ghost" onClick={() => void finish()}>{t(lang, 'words.practice.end')}</Button>
+      </header>
+      <div className="mt-6">
+        <CardView
+          key={`${index}:${pc.card.type}:${pc.card.exercise?.id ?? 0}`}
+          pc={pc}
+          onResult={(r, text, recorded) => onResult(pc, r, text, recorded)}
+          onNext={() => advance(cards, index)}
+          onSkip={() => void skip(pc, index)}
+        />
+      </div>
+    </>
+  );
+}
+
+export function WordsPractice() {
+  const [run, setRun] = useState(0);
+  return <Practice key={run} onContinue={() => setRun((n) => n + 1)} />;
+}

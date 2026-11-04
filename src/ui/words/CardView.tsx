@@ -1,0 +1,290 @@
+import { useEffect, useRef, useState } from 'react';
+import { Check, LoaderCircle, X } from 'lucide-react';
+import { t } from '@/core/i18n';
+import type { WordCheckReply } from '@/core/llm/types';
+import { checkTranslation, checkTyped, normalise, resultFor } from '@/core/words/check';
+import { wordLink } from '@/core/words/link';
+import { checkUseIt, type PracticeCard } from '@/core/words/practice';
+import type { ReviewResult } from '@/core/words/types';
+import { cn } from '@/lib/utils';
+import { useCore } from '@/ui/app/CoreProvider';
+import { Button } from '@/ui/components/ui/button';
+import { ExternalLink } from '@/ui/components/ExternalLink';
+import { Input } from '@/ui/components/ui/input';
+import { Textarea } from '@/ui/components/ui/textarea';
+import { Notice } from '@/ui/today/chips';
+
+export interface CardProps {
+  pc: PracticeCard;
+  /** Records the result; `recorded` is true when the service already saved it (use it). Resolves once saved. */
+  onResult: (result: ReviewResult, text: string, recorded: boolean) => Promise<void>;
+  onNext: () => void;
+  /** Skip of a use card: replaces it with a translation card, or moves on. */
+  onSkip: () => void;
+}
+
+type Feedback = { result: ReviewResult; text: string; use?: WordCheckReply };
+
+const TYPED = ['anagram', 'gap_hint', 'gap', 'collocation', 'form'] as const;
+const GAP_TYPES = ['gap_hint', 'gap', 'collocation', 'form'];
+
+function Sentence({ text }: { text: string }) {
+  return <p className="reading mt-3">{text}</p>;
+}
+
+function FeedbackView({ pc, fb }: { pc: PracticeCard; fb: Feedback }) {
+  const { lang } = useCore();
+  const ok = fb.result !== 'wrong';
+  const { word } = pc;
+  return (
+    <div className="mt-4 grid gap-1.5 rounded-md bg-card p-4" aria-live="polite">
+      <p className={cn('flex items-center gap-2 font-semibold', ok ? 'text-success' : 'text-destructive')}>
+        {ok ? <Check className="size-4" aria-hidden /> : <X className="size-4" aria-hidden />}
+        {t(lang, ok ? 'words.correct' : 'words.incorrect')}
+      </p>
+      {fb.text.trim() !== '' && <p className="text-muted-foreground">{t(lang, 'words.yourAnswer', { text: fb.text })}</p>}
+      <p><span className="answer font-semibold">{word.word}</span>{word.translation !== '' && <span className="text-muted-foreground"> · {word.translation}</span>}</p>
+      {word.definition !== '' && <p>{word.definition}</p>}
+      {word.example !== '' && <p className="text-muted-foreground">{word.example}</p>}
+      {fb.use && fb.use.wordNote !== '' && <p>{fb.use.wordNote}</p>}
+      {fb.use && fb.use.errors.length > 0 && (
+        <ul className="grid gap-1">
+          {fb.use.errors.map((e, i) => (
+            <li key={i}>
+              <span className="answer">{e.fragment}</span> → <span className="answer font-semibold text-success">{e.fix}</span>
+              {e.explanation !== '' && <span className="text-muted-foreground"> · {e.explanation}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p>
+        <ExternalLink href={wordLink(word.word, word.link)} className="text-primary underline underline-offset-2">
+          {t(lang, 'words.openLink')}
+        </ExternalLink>
+      </p>
+    </div>
+  );
+}
+
+export function CardView({ pc, onResult, onNext, onSkip }: CardProps) {
+  const { deps, lang } = useCore();
+  const { card, word } = pc;
+  const type = card.type;
+  const ex = card.exercise;
+  const [text, setText] = useState('');
+  const [hinted, setHinted] = useState(false);
+  const [retried, setRetried] = useState(false);
+  const [almost, setAlmost] = useState(false);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [mismatch, setMismatch] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [useError, setUseError] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
+  const nextRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (feedback && !saving) nextRef.current?.focus();
+  }, [feedback, saving]);
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const finish = async (fb: Feedback, recorded = false) => {
+    setFeedback(fb);
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await onResult(fb.result, fb.text, recorded);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const accepted = type === 'anagram' ? [word.word] : (ex?.answers ?? []);
+  const correctOption = type === 'choice' ? [word.word] : (ex?.answers ?? []);
+
+  const checkTypedAnswer = () => {
+    if (text.trim() === '') return;
+    const verdict = checkTyped(text, accepted);
+    if (verdict === 'almost' && !retried) {
+      setAlmost(true);
+      setRetried(true);
+      return;
+    }
+    setAlmost(false);
+    void finish({ result: resultFor({ correct: verdict === 'correct', hinted, retried }), text });
+  };
+
+  const checkTranslated = () => {
+    if (text.trim() === '') return;
+    if (checkTranslation(text, ex?.answers ?? [])) void finish({ result: 'correct', text });
+    else setMismatch(true);
+  };
+
+  const checkUse = async () => {
+    if (text.trim() === '') return;
+    setChecking(true);
+    setUseError(null);
+    try {
+      const res = await checkUseIt(deps, word.id, text.trim());
+      if (!res.ok) {
+        setUseError(res.message);
+        return;
+      }
+      await finish({ result: res.data.wordOk ? 'correct' : 'wrong', text: text.trim(), use: res.data }, true);
+    } catch (e) {
+      setUseError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const pick = (option: string) => {
+    if (feedback) return;
+    setPicked(option);
+    const correct = correctOption.some((a) => normalise(a) === normalise(option));
+    void finish({ result: correct ? 'correct' : 'wrong', text: option });
+  };
+
+  const hint = () => {
+    const first = Array.from(accepted[0] ?? '')[0] ?? '';
+    setText(first);
+    setHinted(true);
+    inputRef.current?.focus();
+  };
+
+  const onEnter = (submit: () => void) => (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      submit();
+    }
+  };
+
+  const instruction =
+    type === 'choice' ? t(lang, 'words.instr.choice')
+    : type === 'anagram' ? t(lang, 'words.instr.anagram')
+    : type === 'form' ? t(lang, 'words.instr.form', { cue: ex?.cue ?? '' })
+    : type === 'confusable' ? t(lang, 'words.instr.confusable')
+    : type === 'translation' ? t(lang, 'words.instr.translation')
+    : type === 'use' ? t(lang, 'words.instr.use', { word: word.word })
+    : t(lang, 'words.instr.gap');
+
+  const typed = (TYPED as readonly string[]).includes(type);
+  const options = type === 'choice' || type === 'confusable' ? (pc.options ?? []) : null;
+  const locked = feedback !== null;
+
+  return (
+    <div data-card-type={type}>
+      <p className="text-sm text-muted-foreground">{instruction}</p>
+      {(type === 'choice' || type === 'anagram') && <p className="reading mt-3">{word.definition}</p>}
+      {type === 'anagram' && pc.letters !== null && (
+        <p className="answer mt-3 text-2xl tracking-[0.4em]" aria-label={pc.letters}>{Array.from(pc.letters).join(' ')}</p>
+      )}
+      {GAP_TYPES.includes(type) && ex && <Sentence text={ex.prompt} />}
+      {type === 'gap_hint' && ex?.translation && <p className="mt-1 text-muted-foreground">{ex.translation}</p>}
+      {type === 'confusable' && ex && <Sentence text={ex.prompt} />}
+      {type === 'translation' && ex && <Sentence text={ex.prompt} />}
+
+      {options && (
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          {options.map((o) => {
+            const isRight = correctOption.some((a) => normalise(a) === normalise(o));
+            return (
+              <Button
+                key={o}
+                variant="secondary"
+                className={cn(
+                  'answer justify-start',
+                  locked && isRight && 'ring-2 ring-success',
+                  locked && picked === o && !isRight && 'ring-2 ring-destructive',
+                )}
+                disabled={locked}
+                onClick={() => pick(o)}
+              >
+                {o}
+              </Button>
+            );
+          })}
+        </div>
+      )}
+
+      {(typed || type === 'translation') && (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Input
+            ref={inputRef}
+            className="max-w-sm"
+            aria-label={instruction}
+            value={text}
+            readOnly={locked || mismatch}
+            onChange={(e) => {
+              setText(e.target.value);
+              setAlmost(false);
+            }}
+            onKeyDown={onEnter(typed ? checkTypedAnswer : checkTranslated)}
+          />
+          {!locked && !mismatch && (
+            <>
+              <Button disabled={text.trim() === ''} onClick={typed ? checkTypedAnswer : checkTranslated}>{t(lang, 'words.check')}</Button>
+              {typed && type !== 'anagram' && (
+                <Button variant="ghost" disabled={hinted} onClick={hint}>{t(lang, 'words.hint')}</Button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+      {almost && !locked && <p className="mt-2 text-muted-foreground" aria-live="polite">{t(lang, 'words.almost')}</p>}
+
+      {type === 'translation' && mismatch && !locked && (
+        <div className="mt-3 grid gap-3">
+          <p>{t(lang, 'words.accepted', { answers: (ex?.answers ?? []).join(' / ') })}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => void finish({ result: 'correct', text })}>{t(lang, 'words.right')}</Button>
+            <Button variant="secondary" onClick={() => void finish({ result: 'wrong', text })}>{t(lang, 'words.wrong')}</Button>
+          </div>
+        </div>
+      )}
+
+      {type === 'use' && (
+        <div className="mt-4 grid gap-3">
+          <Textarea
+            ref={inputRef}
+            aria-label={instruction}
+            rows={3}
+            value={text}
+            readOnly={locked || checking}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={onEnter(() => void checkUse())}
+          />
+          {useError !== null && (
+            <Notice>
+              <span>{t(lang, 'words.use.error', { message: useError })}</span>
+              <Button size="sm" variant="secondary" disabled={checking} onClick={() => void checkUse()}>{t(lang, 'words.retry')}</Button>
+            </Notice>
+          )}
+          {!locked && (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="ghost" disabled={checking} onClick={onSkip}>{t(lang, 'words.skip')}</Button>
+              <Button disabled={checking || text.trim() === ''} onClick={() => void checkUse()}>
+                {checking && <LoaderCircle className="animate-spin" aria-hidden />}
+                {t(lang, 'words.check')}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {feedback && <FeedbackView pc={pc} fb={feedback} />}
+      {saveError !== null && <Notice className="mt-3">{t(lang, 'words.saveError', { message: saveError })}</Notice>}
+      {feedback && (
+        <div className="mt-4">
+          <Button ref={nextRef} disabled={saving} onClick={onNext}>{t(lang, 'words.next')}</Button>
+        </div>
+      )}
+    </div>
+  );
+}

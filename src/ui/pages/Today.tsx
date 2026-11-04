@@ -13,6 +13,7 @@ import { useCore } from '@/ui/app/CoreProvider';
 import { errorOfDay, useGeneration } from '@/ui/app/GenerationProvider';
 import { Button } from '@/ui/components/ui/button';
 import { Notice } from '@/ui/today/chips';
+import { WordsLink } from '@/ui/today/WordsLink';
 import { LessonClosed } from '@/ui/today/LessonClosed';
 import { RuleDraft } from '@/ui/today/RuleDraft';
 import { SessionPage } from '@/ui/today/SessionPage';
@@ -222,6 +223,7 @@ export function Today() {
               setReload((n) => n + 1); // the skipped count changes with every grading
             }}
             onClose={shown.earlier || closed ? undefined : () => close(shown.id)}
+            afterHeader={<WordsLink />}
           />
         )}
       </>
@@ -238,6 +240,7 @@ export function Today() {
   return (
     <>
       <h1 className="headline">{t(lang, state.kind === 'rest' ? 'today.rest' : 'nav.today')}</h1>
+      <WordsLink />
       {solveButton && <div className="mt-6">{solveButton}</div>}
       {state.kind === 'no_programme' && (
         <p className="reading mt-6">

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { normaliseFix, scoreEval, type CaseResult, type GradeCase } from '../../evals/score';
+import { normaliseFix, scoreEval, suitesFor, type CaseResult, type GradeCase } from '../../evals/score';
 
 const base = { topic: 'articles', format: 'gap' as const, prompt: 'p', expected: 'e', ruleSection: 'Формула', answer: 'a', category: 'c', why: 'w' };
 const mk = (id: string, verdict: GradeCase['label']['verdict'], extra: Partial<GradeCase['label']> = {}): GradeCase => ({
@@ -108,5 +108,16 @@ describe('scoreEval', () => {
     const s = scoreEval([], []);
     expect(s.total).toBe(0);
     expect(s.accuracy).toBeNull();
+  });
+});
+
+describe('suitesFor', () => {
+  test.each([
+    ['generate', { generate: true, grade: false, words: false }],
+    ['grade', { generate: false, grade: true, words: false }],
+    ['words', { generate: false, grade: false, words: true }],
+    ['all', { generate: true, grade: true, words: true }],
+  ] as const)('%s', (suite, want) => {
+    expect(suitesFor(suite)).toEqual(want);
   });
 });

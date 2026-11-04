@@ -21,7 +21,7 @@ import { proseOf } from '@/core/grading/input';
 import { toneViolations } from '@/core/validate/tone';
 import { diskPrompts, NodeClaudeCli, RecordingLlm, ROOT, seededDb, tempCwd } from '../scripts/lib/nodeHarness';
 import { addBlock, addItem, seedHistory, type HistorySession } from './fixtures';
-import { EXPECTED_VERDICTS, scoreEval, type CaseResult, type EvalScore, type GradeCase } from './score';
+import { EXPECTED_VERDICTS, scoreEval, suitesFor, type CaseResult, type EvalScore, type GradeCase } from './score';
 
 const SEED_TODAY = '2026-10-26'; // Monday: programme week 1 starts here
 const GRADE_DATE = '2026-12-01';
@@ -313,9 +313,10 @@ function wordsSection(run: WordsRun): string[] {
 async function main(): Promise<void> {
   const { model, suite } = parseArgs(process.argv.slice(2));
   const date = new Date().toLocaleDateString('sv');
-  const gen = suite === 'grade' ? null : await runGenerate(model);
-  const grade = suite === 'generate' ? null : await runGrade(model);
-  const words = suite === 'generate' || suite === 'grade' ? null : await runWords(model);
+  const run = suitesFor(suite);
+  const gen = run.generate ? await runGenerate(model) : null;
+  const grade = run.grade ? await runGrade(model) : null;
+  const words = run.words ? await runWords(model) : null;
   const total = sum([...(gen ?? []).map((r) => r.costUsd), ...(grade?.batches ?? []).map((b) => b.costUsd), words?.costUsd ?? 0]);
   const md = [
     `# Model eval: ${model}`, '',

@@ -2273,7 +2273,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tauri-apps/api@npm:^2.12.0, @tauri-apps/api@npm:^2.12.4":
+"@tauri-apps/api@npm:^2.12.0, @tauri-apps/api@npm:^2.12.4, @tauri-apps/api@npm:^2.8.0":
   version: 2.12.4
   resolution: "@tauri-apps/api@npm:2.12.4"
   checksum: 10c0/4a5c492d17999dc393be617978aed52c133d999575e251f0166cd9f6838941a207b9302c153104dfe83b0f97a8bdc5fda8574dfee40eed457e551b1c6ca4f061
@@ -2416,6 +2416,15 @@ __metadata:
   dependencies:
     "@tauri-apps/api": "npm:^2.12.0"
   checksum: 10c0/c788cec6369552e4d23053bc20c7c06532dbec6253098c55755e55456fc35e5dc6bf74c628a87901dfb05857cf9f89bea05da32d50093ec09c17d1fc781322be
+  languageName: node
+  linkType: hard
+
+"@tauri-apps/plugin-opener@npm:2.5.2":
+  version: 2.5.2
+  resolution: "@tauri-apps/plugin-opener@npm:2.5.2"
+  dependencies:
+    "@tauri-apps/api": "npm:^2.8.0"
+  checksum: 10c0/b10c39063c59ca71e5a5c43bb93da34387a7e707d1baf65a53110141f1a973ce2b73f19be9f63d9312c030760ba2b876ad3069b9a123abb4883e025059a15c3f
   languageName: node
   linkType: hard
 
@@ -3098,6 +3107,7 @@ __metadata:
     "@tauri-apps/cli": "npm:^2.12.3"
     "@tauri-apps/plugin-dialog": "npm:^2"
     "@tauri-apps/plugin-fs": "npm:^2.7.1"
+    "@tauri-apps/plugin-opener": "npm:2.5.2"
     "@tauri-apps/plugin-shell": "npm:^2.5.0"
     "@tauri-apps/plugin-sql": "npm:^2.6.0"
     "@types/better-sqlite3": "npm:^9.6.0"

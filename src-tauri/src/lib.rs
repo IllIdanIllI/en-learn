@@ -29,6 +29,7 @@ pub fn run() {
     .plugin(tauri_plugin_shell::init())
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_dialog::init())
+    .plugin(tauri_plugin_opener::init())
     .setup(|app| {
       // A failed grant must not stop the app; the data folder is then simply unreadable until the next start.
       if let Err(e) = grant_current_data_folder(app.handle()) {

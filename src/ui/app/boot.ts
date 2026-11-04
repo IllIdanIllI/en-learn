@@ -7,7 +7,7 @@ import type { CoreInit } from './CoreProvider';
 
 /** Real app: Tauri adapters, SQLite file, the installed `claude` CLI. */
 export async function bootTauri(): Promise<CoreInit> {
-  const [{ appDataDir, appConfigDir, homeDir }, { openTauriDb }, { readDataDir, moveDataDir }, { ensureCliDir }, { TauriClock }, { TauriProcessRunner }, { TauriPromptStore }, { ClaudeCli }] =
+  const [{ appDataDir, appConfigDir, homeDir }, { openTauriDb }, { readDataDir, moveDataDir }, { ensureCliDir }, { TauriClock }, { TauriProcessRunner }, { TauriPromptStore }, { ClaudeCli }, { openUrl }] =
     await Promise.all([
       import('@tauri-apps/api/path'),
       import('@/adapters/tauri/db'),
@@ -17,6 +17,7 @@ export async function bootTauri(): Promise<CoreInit> {
       import('@/adapters/tauri/processRunner'),
       import('@/adapters/tauri/promptStore'),
       import('@/adapters/tauri/claudeCli'),
+      import('@tauri-apps/plugin-opener'),
     ]);
   const [appData, appConfig, home] = await Promise.all([appDataDir(), appConfigDir(), homeDir()]);
   let custom: string | null = null;
@@ -56,6 +57,7 @@ export async function bootTauri(): Promise<CoreInit> {
     moveDataDir: (target) => moveDataDir({ appDataDir: appData, appConfigDir: appConfig, home, custom }, target, () => db.close()),
     reopenDb: () => openTauriDb(custom),
     makeLlm: (location) => new ClaudeCli(runner, location, cliDir, home),
+    openUrl: (url) => openUrl(url),
   };
 }
 

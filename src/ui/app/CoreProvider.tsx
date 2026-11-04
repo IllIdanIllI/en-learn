@@ -28,6 +28,8 @@ export interface CoreInit {
   reopenDb?: () => Promise<Db>;
   /** Builds the real Llm once a `claude` location works; absent in preview, where a recheck changes nothing. */
   makeLlm?: (location: ClaudeLocation) => Llm;
+  /** Opens an https URL in the system browser; absent in preview, where the anchor works normally. */
+  openUrl?: (url: string) => Promise<void>;
 }
 
 export interface Core {
@@ -48,6 +50,7 @@ export interface Core {
   /** Re-reads settings and bumps `version`; pages that load data depend on `version`. */
   refresh(): void;
   version: number;
+  openUrl?: (url: string) => Promise<void>;
 }
 
 const CoreContext = createContext<Core | null>(null);
@@ -82,7 +85,7 @@ function useTheme(theme: Settings['theme']): boolean {
 }
 
 export function CoreProvider({ init, children }: { init: CoreInit; children: ReactNode }) {
-  const { runner, loadSeedInput, dataDir, dataDirError, makeLlm } = init;
+  const { runner, loadSeedInput, dataDir, dataDirError, makeLlm, openUrl } = init;
   const [deps, setDeps] = useState(init.deps);
   const [prereq, setPrereq] = useState(init.prereq);
   const [settings, setSettings] = useState(init.settings);
@@ -138,9 +141,9 @@ export function CoreProvider({ init, children }: { init: CoreInit; children: Rea
 
   const value = useMemo<Core>(
     () => ({
-      deps, runner, lang: settings.nativeLanguage, settings, isDark, prereq, loadSeedInput, dataDir, dataDirError, moveDataDir, recheckPrerequisites, refresh, version,
+      deps, runner, lang: settings.nativeLanguage, settings, isDark, prereq, loadSeedInput, dataDir, dataDirError, moveDataDir, recheckPrerequisites, refresh, version, openUrl,
     }),
-    [deps, runner, settings, isDark, prereq, loadSeedInput, dataDir, dataDirError, moveDataDir, recheckPrerequisites, refresh, version],
+    [deps, runner, settings, isDark, prereq, loadSeedInput, dataDir, dataDirError, moveDataDir, recheckPrerequisites, refresh, version, openUrl],
   );
   return <CoreContext.Provider value={value}>{children}</CoreContext.Provider>;
 }

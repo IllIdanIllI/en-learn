@@ -3,19 +3,9 @@ import {
   buildWordCheckPrompt, checkWordCheckReply, checkWordsReply, exercisesFrom, wordProblems,
 } from '@/core/words/generated';
 import type { GeneratedWord, WordCheckReply, WordsReply } from '@/core/llm/types';
+import { gen } from './helpers';
 import type { Word } from '@/core/words/types';
 
-export function gen(over: Partial<GeneratedWord> = {}): GeneratedWord {
-  return {
-    word: 'supersede', definition: 'd', translation: 't', example: 'e', synonyms: ['replace'],
-    gaps: [1, 2, 3].map((i) => ({ sentence: `Gap ${i} ___ here.`, answer: 'superseded', translation: `п${i}` })),
-    collocations: [{ phrase: 'a ___ b', answer: 'supersede' }, { phrase: 'c ___ d', answer: 'supersede' }],
-    forms: [],
-    confusables: [],
-    translations: [{ text: 'один', answers: ['one', 'uno'] }, { text: 'два', answers: ['two', 'dos'] }],
-    ...over,
-  };
-}
 const reply = (...words: string[]): WordsReply => ({ words: words.map((w) => gen({ word: w })) });
 
 describe('checkWordsReply', () => {
@@ -121,6 +111,7 @@ describe('word_check', () => {
   test('prompt carries the word, definition, sentence and topic lines', () => {
     const w: Word = { id: 1, word: 'supersede', definition: 'replace', translation: '', example: '', synonyms: [], link: '', added: '2026-11-04', generation: 'ready' };
     const p = buildWordCheckPrompt(w, 'My sentence.', [{ key: 'articles', title: 'Articles' }]);
+    expect(buildWordCheckPrompt({ ...w, definition: '  ' }, 's', [])).toContain('Definition: (missing)');
     expect(p).toContain('supersede');
     expect(p).toContain('replace');
     expect(p).toContain('My sentence.');

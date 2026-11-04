@@ -83,7 +83,7 @@ export function checkWordCheckReply(reply: WordCheckReply, sentence: string, top
 export function buildWordCheckPrompt(word: Word, sentence: string, topics: { key: string; title: string }[]): string {
   return [
     `Target word: ${word.word}`,
-    `Definition: ${word.definition === '' ? '(missing)' : word.definition}`,
+    `Definition: ${word.definition.trim() === '' ? '(missing)' : word.definition}`,
     '',
     'Learner sentence:',
     sentence,

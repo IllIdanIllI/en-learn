@@ -10,7 +10,7 @@ import type { Deps, LlmResult } from '@/core/ports';
 import type { GeneratedWord, WordsReply } from '@/core/llm/types';
 import type { WordFields } from '@/core/words/types';
 import { previewLlm } from '@/adapters/preview/previewLlm';
-import { gen } from './generated.test';
+import { gen } from './helpers';
 
 const good = (data: unknown): LlmResult<unknown> => ({ ok: true, data, costUsd: 0, durationMs: 1, raw: '{}' });
 const fail: LlmResult<unknown> = { ok: false, code: 'not_signed_in', message: 'sign in', costUsd: 0, durationMs: 1, raw: '' };
@@ -91,6 +91,16 @@ describe('generateWords', () => {
     const res = await generateWords(deps, ids);
     expect(res).toMatchObject({ ok: false, code: 'not_signed_in' });
     expect((await listWords(deps.db)).map((w) => w.generation)).toEqual(['failed', 'failed']);
+  });
+
+  test('a failed batch does not stop the run: later batches still run', async () => {
+    const llm = new FakeLlm({ words: [fail, echo()] });
+    const deps = await setup(llm);
+    const ids = await add(deps, ...Array.from({ length: 7 }, (_, i) => `w${i}`));
+    const res = await generateWords(deps, ids);
+    expect(res).toMatchObject({ ok: false, code: 'not_signed_in' });
+    expect(llm.calls).toHaveLength(2);
+    expect((await listWords(deps.db)).map((w) => w.generation)).toEqual([...Array(5).fill('failed'), 'ready', 'ready']);
   });
 
   test('busy leaves pending', async () => {

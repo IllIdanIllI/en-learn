@@ -61,18 +61,25 @@ async function runBatch(deps: Deps, ids: number[]): Promise<BatchOutcome> {
   return { failed };
 }
 
-/** Generates exercises in batches of BATCH_SIZE, each under its own job lock; a busy lock stops the run and leaves the rest pending. */
+/** Generates exercises in batches of BATCH_SIZE, each under its own job lock; a busy lock stops the run and leaves the rest pending; a failed batch call marks its words failed and the run goes on. */
 export async function generateWords(deps: Deps, wordIds: number[], onProgress?: (done: number, total: number) => void): Promise<GenerateResult> {
   const busy: BatchOutcome = { error: { ok: false, message: 'Another job is running', code: 'busy' } };
   let failed = 0;
   let done = 0;
+  let lastError: Extract<GenerateResult, { ok: false }> | null = null;
   for (let i = 0; i < wordIds.length; i += BATCH_SIZE) {
     const ids = wordIds.slice(i, i + BATCH_SIZE);
     const out = await withJobLock(deps.db, () => runBatch(deps, ids), busy);
-    if ('error' in out) return out.error;
+    if ('error' in out) {
+      if (out.error.code === 'busy') return out.error;
+      lastError = out.error;
+      done += ids.length;
+      onProgress?.(done, wordIds.length);
+      continue;
+    }
     failed += out.failed;
     done += ids.length;
     onProgress?.(done, wordIds.length);
   }
-  return { ok: true, failed };
+  return lastError ?? { ok: true, failed };
 }

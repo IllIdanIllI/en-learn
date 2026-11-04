@@ -146,4 +146,21 @@ describe('words repo', () => {
       },
     ]);
   });
+
+  test('insertWordErrors keeps a non-null topicId', async () => {
+    const db = await createTestDb();
+    const { lastInsertId: programmeId } = await db.execute("INSERT INTO programme (title, start_date, end_date) VALUES ('P', '2026-10-19', '2026-11-08')");
+    const { lastInsertId: topicId } = await db.execute(
+      "INSERT INTO topic (programme_id, key, title, kind, week_no, archived) VALUES (?, 'conditionals', 'Conditionals', 'learn', 2, 0)",
+      [programmeId],
+    );
+    const wordId = await insertWord(db, fields('coherence'), '2026-11-04T09:00:00Z');
+    const reviewId = await insertReview(db, {
+      wordId, cardType: 'use', exerciseId: null, answeredAt: '2026-11-04T10:00:00Z', date: '2026-11-04', result: 'wrong', counted: true, text: 'x',
+    });
+    await insertWordErrors(db, reviewId, [
+      { fragment: 'f', fix: 'g', topicId, suggestedTopic: null, ruleSection: null, explanation: 'e' },
+    ]);
+    expect(await listWordErrors(db)).toMatchObject([{ topicId }]);
+  });
 });

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { createTestDb } from '@/adapters/test/sqliteDb';
 import { getProgramme, getSlots, getTopics, topicHasRule } from '@/core/db/repos/programme';
+import { insertReview, insertWord, insertWordErrors } from '@/core/db/repos/words';
 import { insertSeedRules, parseSeed, replaceProgramme, saveProgramme } from '@/core/programme/setup';
 import type { ProgrammeInput } from '@/core/programme/setup';
 
@@ -84,6 +85,23 @@ describe('setup', () => {
     expect(topics.find((t) => t.key === 'present-perfect')?.weekNo).toBe(1);
     expect(topics.find((t) => t.key === 'articles')?.weekNo).toBe(2);
     expect((await getProgramme(db))?.title).toBe('New');
+  });
+
+  test('replaceProgramme keeps a topic referenced only by a word error, and archives it', async () => {
+    const db = await createTestDb();
+    await saveProgramme(db, input());
+    const x = (await getTopics(db)).find((t) => t.key === 'conditionals')!;
+    const wordId = await insertWord(db, { word: 'if', definition: '', translation: '', example: '', synonyms: [], link: '', added: '2026-10-19' }, 'NOW');
+    const reviewId = await insertReview(db, {
+      wordId, cardType: 'use', exerciseId: null, answeredAt: 'NOW', date: '2026-10-20', result: 'wrong', counted: true, text: 'If I would know.',
+    });
+    await insertWordErrors(db, reviewId, [
+      { fragment: 'would know', fix: 'knew', topicId: x.id, suggestedTopic: null, ruleSection: null, explanation: 'type 2' },
+    ]);
+    const next = input();
+    next.weeks = [next.weeks[2]!, next.weeks[0]!]; // drops conditionals
+    await expect(replaceProgramme(db, next)).resolves.toBeUndefined();
+    expect((await getTopics(db)).find((t) => t.key === 'conditionals')).toMatchObject({ id: x.id, weekNo: null, archived: true });
   });
 
   test('replaceProgramme un-archives a topic that returns to the input', async () => {

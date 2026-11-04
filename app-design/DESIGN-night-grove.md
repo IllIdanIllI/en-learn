@@ -169,6 +169,7 @@ Night grove only. Each detail is decorative unless noted.
 - Do check the garden in both themes with a screenshot after any change to sprites or tokens.
 - Do keep the fireflies honest: they count real correct answers, nothing else.
 - Do keep the meter and score bar paired with words ("Ответов: 3 из 7", "Верно 3 из 6").
+- Do give every interactive element the pointer cursor (buttons, links, cards, toggles, gear segments, checkboxes, radios, selects, menu items); disabled ones get `not-allowed`. Rule from the learner, repeated several times: never ship a clickable element without it.
 
 ### Don't
 - Don't animate anything but the firefly glow. No parallax, no sway, no falling leaves.

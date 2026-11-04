@@ -302,6 +302,7 @@ Use shadcn/ui primitives (Button, Input, Textarea, Tabs, Table, Tooltip, Dropdow
 - Do turn off spellcheck and autocorrect in every answer field.
 - Do write UI copy in short sentences; no em dashes in UI strings.
 - Do verify every UI change with a screenshot (Playwright against the Vite dev server) before calling it done.
+- Do give every interactive element the pointer cursor (buttons, links, cards, toggles, gear segments, checkboxes, radios, selects, menu items); disabled ones get `not-allowed`. Rule from the learner, repeated several times: never ship a clickable element without it.
 
 ### Don't
 - Don't use typical AI SaaS styling: gradients, gradient text, neon glows, glassmorphism, big hero metrics with small labels, identical card grids.

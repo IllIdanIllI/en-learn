@@ -91,6 +91,7 @@ describe('errorBank', () => {
       shouldBe: { before: 'Then He ', changed: 'goes', after: ' home.' },
       sentence: 'Then He go home.',
       kind: 'grammar',
+      source: 'lesson',
     });
   });
 });

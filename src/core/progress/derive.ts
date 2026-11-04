@@ -32,6 +32,8 @@ export type ErrorBankRow = {
   topicId: number | null;
   itemId: number;
   suggestedTopic: string | null;
+  /** Where the mistake was made: a lesson session, or a "use it" card on the Words practice. */
+  source: 'lesson' | 'words';
 };
 
 export type ErrorBankInput = {
@@ -59,7 +61,7 @@ export function errorBank(rows: ErrorBankInput[]): ErrorBankRow[] {
     if (r.effective !== 'wrong') continue;
     const kind = r.isInattention && r.verdict === 'wrong' ? 'inattention' : r.format === 'spelling' ? 'spelling' : 'grammar';
     const { was, shouldBe, sentence, hint } = errorContext(r);
-    out.push({ date: r.date, was, shouldBe, sentence, hint, kind, topicId: r.topicId, itemId: r.itemId, suggestedTopic: r.suggestedTopic });
+    out.push({ date: r.date, was, shouldBe, sentence, hint, kind, topicId: r.topicId, itemId: r.itemId, suggestedTopic: r.suggestedTopic, source: 'lesson' });
   }
   return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.itemId - b.itemId));
 }

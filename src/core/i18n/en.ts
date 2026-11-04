@@ -342,6 +342,7 @@ export const en = {
   'errors.filter.topic': 'Topic',
   'errors.filter.other': 'Other',
   'errors.possibleTopic': 'possible topic: {topic}',
+  'errors.source.words': 'Words',
   'errors.filter.all': 'All',
   'errors.empty': 'No mistakes yet. They are collected here after your first graded session.',
   'errors.loadError': 'The error bank could not be loaded: {message}',

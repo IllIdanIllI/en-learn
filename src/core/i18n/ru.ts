@@ -344,6 +344,7 @@ export const ru: Record<keyof typeof en, string> = {
   'errors.filter.topic': 'Тема',
   'errors.filter.other': 'Другое',
   'errors.possibleTopic': 'возможная тема: {topic}',
+  'errors.source.words': 'Слова',
   'errors.filter.all': 'Все',
   'errors.empty': 'Ошибок пока нет. Они появятся здесь после первой проверенной сессии.',
   'errors.loadError': 'Банк ошибок не загрузился: {message}',

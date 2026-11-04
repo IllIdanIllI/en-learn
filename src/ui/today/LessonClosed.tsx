@@ -43,6 +43,8 @@ export function LessonClosed({ lang, sessionId, loader, showingResults, onToggle
     };
   }, [deps, sessionId, open, reload]);
 
+  // Like Start: with the panel open and every card unpressed there is nothing to add. Untouched (closed) panel adds the defaults.
+  const noneTicked = open && options !== null && !chosen.review && chosen.formats.length === 0 && !chosen.spelling && !chosen.writing && !chosen.rewrite;
   const close = () => {
     setOpen(false);
     setOptions(null);
@@ -57,7 +59,7 @@ export function LessonClosed({ lang, sessionId, loader, showingResults, onToggle
           {t(lang, showingResults ? 'today.hideResults' : 'today.showResults')}
         </Button>
         <div className="inline-flex">
-          <Button className="rounded-r-none" disabled={adding} onClick={() => { onAdd(chosen); close(); }}>{t(lang, 'today.addMore')}</Button>
+          <Button className="rounded-r-none" disabled={adding || noneTicked} onClick={() => { onAdd(chosen); close(); }}>{t(lang, 'today.addMore')}</Button>
           <Button
             className="rounded-l-none border-l border-primary-foreground/30 px-2.5"
             aria-label={t(lang, 'today.setup')}

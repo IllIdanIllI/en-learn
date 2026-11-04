@@ -267,13 +267,14 @@ test.describe('lesson picker: added round', () => {
     await expect(page.getByText('Если предложение верно, нажмите ✓, иначе впишите исправленный фрагмент.')).toHaveCount(1);
   });
 
-  test('with every card unpressed the main part still adds a round with the defaults', async ({ page }) => {
+  test('with the panel open and every card unpressed the main part is disabled', async ({ page }) => {
     await page.goto('/?state=closed#/today');
     await gearOf(page).click();
+    await expect(addButton(page)).toBeEnabled();
     await untickAll(page);
-    await addButton(page).click();
-    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('My sister is an nurse')).toBeVisible();
+    await expect(addButton(page)).toBeDisabled();
+    await card(page, 'Правописание').click();
+    await expect(addButton(page)).toBeEnabled();
   });
 
   test('pressing the gear again closes the panel', async ({ page }) => {

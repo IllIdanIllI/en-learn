@@ -207,6 +207,7 @@ export function Today() {
             showingResults={showResults}
             onToggleResults={() => setShowResults((v) => !v)}
             onAdd={(round) => addMore(shown.id, round)}
+            afterHeader={<WordsLink />}
           >
             {solveButton}
           </LessonClosed>
@@ -223,7 +224,7 @@ export function Today() {
               setReload((n) => n + 1); // the skipped count changes with every grading
             }}
             onClose={shown.earlier || closed ? undefined : () => close(shown.id)}
-            afterHeader={<WordsLink />}
+            afterHeader={closed ? undefined : <WordsLink />}
           />
         )}
       </>

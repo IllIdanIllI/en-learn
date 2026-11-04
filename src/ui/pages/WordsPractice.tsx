@@ -19,6 +19,7 @@ function Practice({ onContinue }: { onContinue: () => void }) {
   const [index, setIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [nextDue, setNextDue] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
   const [ended, setEnded] = useState<Ended | null>(null);
   const started = useRef(false);
   const before = useRef(new Map<number, Stage>());
@@ -107,13 +108,20 @@ function Practice({ onContinue }: { onContinue: () => void }) {
     <>
       <header className="flex items-center justify-between">
         <span className="tabular text-muted-foreground">{index + 1} / {cards.length}</span>
-        <Button variant="ghost" onClick={() => void finish()}>{t(lang, 'words.practice.end')}</Button>
+        <Button variant="ghost" disabled={pending} onClick={() => void finish()}>{t(lang, 'words.practice.end')}</Button>
       </header>
       <div className="mt-6">
         <CardView
           key={`${index}:${pc.card.type}:${pc.card.exercise?.id ?? 0}`}
           pc={pc}
-          onResult={(r, text, recorded) => onResult(pc, r, text, recorded)}
+          onResult={async (r, text, recorded) => {
+            setPending(true);
+            try {
+              await onResult(pc, r, text, recorded);
+            } finally {
+              setPending(false);
+            }
+          }}
           onNext={() => advance(cards, index)}
           onSkip={() => void skip(pc, index)}
         />

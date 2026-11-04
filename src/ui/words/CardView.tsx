@@ -28,6 +28,13 @@ type Feedback = { result: ReviewResult; text: string; use?: WordCheckReply };
 const TYPED = ['anagram', 'gap_hint', 'gap', 'collocation', 'form'] as const;
 const GAP_TYPES = ['gap_hint', 'gap', 'collocation', 'form'];
 
+function enterKey(e: React.KeyboardEvent, submit: () => void) {
+  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+    e.preventDefault();
+    submit();
+  }
+}
+
 function Sentence({ text }: { text: string }) {
   return <p className="reading mt-3">{text}</p>;
 }
@@ -82,6 +89,9 @@ export function CardView({ pc, onResult, onNext, onSkip }: CardProps) {
   const [checking, setChecking] = useState(false);
   const [useError, setUseError] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
+  // One result per card, however many times Enter or a button fires before the state catches up.
+  const finished = useRef(false);
+  const checkingRef = useRef(false);
   const nextRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
 
@@ -93,6 +103,8 @@ export function CardView({ pc, onResult, onNext, onSkip }: CardProps) {
   }, []);
 
   const finish = async (fb: Feedback, recorded = false) => {
+    if (finished.current) return;
+    finished.current = true;
     setFeedback(fb);
     setSaving(true);
     setSaveError(null);
@@ -109,6 +121,7 @@ export function CardView({ pc, onResult, onNext, onSkip }: CardProps) {
   const correctOption = type === 'choice' ? [word.word] : (ex?.answers ?? []);
 
   const checkTypedAnswer = () => {
+    if (finished.current) return;
     if (text.trim() === '') return;
     const verdict = checkTyped(text, accepted);
     if (verdict === 'almost' && !retried) {
@@ -121,13 +134,15 @@ export function CardView({ pc, onResult, onNext, onSkip }: CardProps) {
   };
 
   const checkTranslated = () => {
+    if (finished.current) return;
     if (text.trim() === '') return;
     if (checkTranslation(text, ex?.answers ?? [])) void finish({ result: 'correct', text });
     else setMismatch(true);
   };
 
   const checkUse = async () => {
-    if (text.trim() === '') return;
+    if (finished.current || checkingRef.current || text.trim() === '') return;
+    checkingRef.current = true;
     setChecking(true);
     setUseError(null);
     try {
@@ -140,12 +155,13 @@ export function CardView({ pc, onResult, onNext, onSkip }: CardProps) {
     } catch (e) {
       setUseError(e instanceof Error ? e.message : String(e));
     } finally {
+      checkingRef.current = false;
       setChecking(false);
     }
   };
 
   const pick = (option: string) => {
-    if (feedback) return;
+    if (feedback || finished.current) return;
     setPicked(option);
     const correct = correctOption.some((a) => normalise(a) === normalise(option));
     void finish({ result: correct ? 'correct' : 'wrong', text: option });
@@ -155,14 +171,8 @@ export function CardView({ pc, onResult, onNext, onSkip }: CardProps) {
     const first = Array.from(accepted[0] ?? '')[0] ?? '';
     setText(first);
     setHinted(true);
+    setAlmost(false);
     inputRef.current?.focus();
-  };
-
-  const onEnter = (submit: () => void) => (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-      e.preventDefault();
-      submit();
-    }
   };
 
   const instruction =
@@ -225,11 +235,11 @@ export function CardView({ pc, onResult, onNext, onSkip }: CardProps) {
               setText(e.target.value);
               setAlmost(false);
             }}
-            onKeyDown={onEnter(typed ? checkTypedAnswer : checkTranslated)}
+            onKeyDown={(e) => enterKey(e, () => (typed ? checkTypedAnswer() : checkTranslated()))}
           />
           {!locked && !mismatch && (
             <>
-              <Button disabled={text.trim() === ''} onClick={typed ? checkTypedAnswer : checkTranslated}>{t(lang, 'words.check')}</Button>
+              <Button disabled={text.trim() === ''} onClick={() => (typed ? checkTypedAnswer() : checkTranslated())}>{t(lang, 'words.check')}</Button>
               {typed && type !== 'anagram' && (
                 <Button variant="ghost" disabled={hinted} onClick={hint}>{t(lang, 'words.hint')}</Button>
               )}
@@ -258,7 +268,7 @@ export function CardView({ pc, onResult, onNext, onSkip }: CardProps) {
             value={text}
             readOnly={locked || checking}
             onChange={(e) => setText(e.target.value)}
-            onKeyDown={onEnter(() => void checkUse())}
+            onKeyDown={(e) => enterKey(e, () => void checkUse())}
           />
           {useError !== null && (
             <Notice>

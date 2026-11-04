@@ -5,10 +5,14 @@ import { checkRuleBody } from '@/core/rules/rules';
 import { toneViolations } from '@/core/validate/tone';
 import { callStructured } from '@/core/llm/call';
 import { getSettings, setSetting } from '@/core/db/repos/settings';
+import { getCurrentRules, getTopics } from '@/core/db/repos/programme';
+import { listOpenWritingBlocks } from '@/core/db/repos/writing';
+import { MIN_WORDS, countWords } from '@/core/writing/text';
+import { ruleSections } from '@/core/rules/rules';
 import { getSession, hasOpenItems, listGradingItems, type GradingItem } from '@/core/db/repos/sessions';
 import { applyGraded, type Graded } from './apply';
-import { buildRefs, missingRefs, proseOf, renderGradeInput, spotParagraphs, type GradeBatch } from './input';
-import { autoCorrect, autoSpot } from './autocheck';
+import { buildRefs, missingRefs, proseOf, renderGradeInput, spotParagraphs, textProblems, type GradeBatch } from './input';
+import { autoCorrect, autoSpot, dropIgnoredLines } from './autocheck';
 import { BUILTIN_SHORTHANDS, precheckAnswers, type Question, type Submission } from './precheck';
 
 export type { Question, Submission } from './precheck';
@@ -32,9 +36,9 @@ export const hasAwaiting = (sessionId: number): boolean => awaiting.has(sessionI
 
 const byKey = ([a]: [string, string], [b]: [string, string]) => (a < b ? -1 : a > b ? 1 : 0);
 const snapshotOf = (sub: Submission): string =>
-  JSON.stringify([Object.entries(sub.items).sort(byKey), Object.entries(sub.spot).sort(byKey)]);
+  JSON.stringify([Object.entries(sub.items).sort(byKey), Object.entries(sub.spot).sort(byKey), Object.entries(sub.texts).sort(byKey)]);
 
-const emptyResult = (): GradeResult => ({ items: [], spot: [], patterns: [], tomorrow: [], spellingErrors: [], ruleGaps: [] });
+const emptyResult = (): GradeResult => ({ items: [], spot: [], patterns: [], tomorrow: [], spellingErrors: [], ruleGaps: [], texts: [] });
 const union = (a: string[], b: string[]) => [...new Set([...a, ...b])];
 
 function merge(a: GradeResult, b: GradeResult): GradeResult {
@@ -45,6 +49,7 @@ function merge(a: GradeResult, b: GradeResult): GradeResult {
     tomorrow: union(a.tomorrow, b.tomorrow),
     spellingErrors: [...a.spellingErrors, ...b.spellingErrors.filter((w) => !a.spellingErrors.some((x) => x.word === w.word))],
     ruleGaps: [...a.ruleGaps, ...b.ruleGaps],
+    texts: [...a.texts, ...b.texts],
   };
 }
 
@@ -84,7 +89,8 @@ async function run(
 
   // Answered items are left alone only in an open round; a generated session is graded in full again (a crash mid-apply is repaired that way).
   const all = (await listGradingItems(deps.db, sessionId)).map((i) => (session.status === 'graded' ? i : { ...i, answered: false }));
-  const items = all.filter((i) => i.status === 'active' && !i.answered);
+  // The error items of a writing block are results, not questions: they are never graded.
+  const items = all.filter((i) => i.status === 'active' && !i.answered && i.format !== 'essay' && i.format !== 'rewrite');
   const settings = await getSettings(deps.db);
   const snapshot = snapshotOf(sub);
   let prior = awaiting.get(sessionId);
@@ -113,7 +119,7 @@ async function run(
       } else questions.push({ itemId: id, kind: 'llm', text });
     }
     if (questions.length > 0) return { kind: 'questions', questions };
-    batch = { items: regrade, spots: [] };
+    batch = { items: regrade, spots: [], texts: [], topics: [] };
   } else {
     const shorthands = [...settings.acceptedShorthands];
     const texts = new Map<number, string>();
@@ -135,10 +141,11 @@ async function run(
         if (i.format !== 'spot' && i.format !== 'question' && (answers[i.id] ?? '').trim() === '') skipped.add(i.id);
       }
     }
-    // A spot paragraph without learner lines is not graded: its hidden errors are stored as skipped.
-    for (const s of spotParagraphs(items, sub.spot)) if (s.learnerText.trim() === '') for (const e of s.errors) skipped.add(e.id);
+    // Lines that change nothing are ignored. A spot paragraph without learner lines is not graded: its hidden errors are stored as skipped.
+    const spotTexts = Object.fromEntries(Object.entries(sub.spot).map(([k, v]) => [k, dropIgnoredLines(v)]));
+    for (const s of spotParagraphs(items, spotTexts)) if (s.learnerText.trim() === '') for (const e of s.errors) skipped.add(e.id);
     const open = items.filter((i) => !skipped.has(i.id));
-    const questions = precheckAnswers({ items: answers, spot: sub.spot }, open, shorthands);
+    const questions = precheckAnswers({ items: answers, spot: sub.spot, texts: sub.texts }, open, shorthands);
     if (questions.length > 0) return { kind: 'questions', questions };
 
     for (const it of open) {
@@ -146,7 +153,7 @@ async function run(
       const a = (answers[it.id] ?? '').trim();
       texts.set(it.id, shorthands.includes(a) || BUILTIN_SHORTHANDS.includes(a) ? '✓' : a);
     }
-    const allSpots = spotParagraphs(items, sub.spot);
+    const allSpots = spotParagraphs(items, spotTexts);
     const spots = allSpots.filter((s) => s.learnerText.trim() !== '');
     const result = emptyResult();
     const gradable = open.filter((i): i is typeof i & { format: 'gap' | 'fix' } => i.format === 'gap' || i.format === 'fix');
@@ -156,25 +163,35 @@ async function run(
         result.items.push({ ref: refs.refOf.get(it.id)!, verdict: 'correct', fix: '', ruleSection: it.ruleSection ?? '', explanation: '', vocabularyNote: '', question: '' });
       }
     }
-    const llmSpots = spots.filter((s) => {
-      const code = autoSpot(s.passageText, s.errors, s.learnerText);
-      if (!code) return true;
-      result.spot.push({ blockRef: `b${s.blockOrd}`, paragraph: s.paragraph, found: code.found.map((id) => refs.refOf.get(id)!), extra: [] });
-      return false;
+    // Only the lines the code cannot decide, and the hidden errors they could still name, go to the LLM.
+    const llmSpots = spots.flatMap((s) => {
+      const { found, leftover } = autoSpot(s.passageText, s.errors, s.learnerText);
+      if (found.length > 0) result.spot.push({ blockRef: `b${s.blockOrd}`, paragraph: s.paragraph, found: found.map((id) => refs.refOf.get(id)!), extra: [] });
+      return leftover.length > 0 ? [{ ...s, learnerText: leftover.join('\n'), errors: s.errors.filter((e) => !found.includes(e.id)) }] : [];
     });
+    // A text under MIN_WORDS is stored without a check. An empty one is not stored (its block stays open) until the lesson is finished: then it is stored as skipped.
+    const written = (await listOpenWritingBlocks(deps.db, sessionId)).flatMap((b) => {
+      const text = sub.texts[b.blockId] ?? '';
+      if (text.trim() === '') return finish ? [{ ...b, text: '', words: 0 }] : [];
+      return [{ ...b, text, words: countWords(text) }];
+    });
+    const toCheck = written.filter((w) => w.words >= MIN_WORDS);
+    const topics = toCheck.length === 0 ? [] : await programmeTopics(deps);
     graded = {
-      sessionId, texts, skipped,
+      sessionId, texts, skipped, writing: written,
       spot: new Map(allSpots.map((s) => [`${s.blockId}:${s.paragraph}`, s.learnerText])),
       result,
     };
     batch = {
       items: gradable.filter((i) => !auto.has(i.id)).map((item) => ({ item, answer: texts.get(item.id) ?? '' })),
       spots: llmSpots,
+      texts: toCheck.map((w) => ({ blockId: w.blockId, blockOrd: w.blockOrd, format: w.format, prompt: w.prompt, text: w.text })),
+      topics,
     };
   }
 
   let fresh = emptyResult();
-  if (batch.items.length > 0 || batch.spots.length > 0) {
+  if (batch.items.length > 0 || batch.spots.length > 0 || batch.texts.length > 0) {
     const res = await callStructured<GradeResult>(deps, 'grade', renderGradeInput(batch, refs, settings), {
       sessionId,
       check: (r) => {
@@ -186,6 +203,8 @@ async function run(
           const bad = checkRuleBody(g.proposal, settings.nativeLanguage);
           if (bad) return `rule gap ${g.ref}: ${bad}`;
         }
+        const bad = textProblems(batch, r);
+        if (bad) return bad;
         return toneViolations(proseOf(r)).join('; ') || null;
       },
     });
@@ -216,4 +235,13 @@ async function applyKept(deps: Deps, items: GradingItem[], graded: Graded): Prom
   } catch (e) {
     return errorOutcome(e instanceof Error ? e.message : String(e), () => applyKept(deps, items, graded));
   }
+}
+
+/** Every programme topic that has a rule, with the headings of that rule's sections. */
+async function programmeTopics(deps: Deps) {
+  const [topics, rules] = await Promise.all([getTopics(deps.db), getCurrentRules(deps.db)]);
+  return topics.flatMap((t) => {
+    const rule = rules.get(t.id);
+    return rule ? [{ key: t.key, title: t.title, sections: ruleSections(rule.body) }] : [];
+  });
 }

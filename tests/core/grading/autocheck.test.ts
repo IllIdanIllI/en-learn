@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { autoCorrect, autoSpot, normalizeAnswer } from '@/core/grading/autocheck';
+import { autoCorrect, autoSpot, dropIgnoredLines, normalizeAnswer } from '@/core/grading/autocheck';
 
 const fix = { format: 'fix' as const, prompt: 'She lives in the Spain.', expected: 'Spain', wrong: 'the Spain' };
 const gap = { format: 'gap' as const, prompt: 'She ___ to school.', expected: 'goes', wrong: null };
@@ -48,23 +48,21 @@ describe('autoSpot', () => {
     { id: 1, prompt: 'has went', expected: 'has gone' },
     { id: 2, prompt: 'informations', expected: 'information' },
   ];
-  test('one paired line', () => {
-    expect(autoSpot(text, errors, 'has went → has gone')).toEqual({ found: [1] });
-  });
-  test('two paired lines', () => {
-    expect(autoSpot(text, errors, 'has went → has gone\ninformations -> information')).toEqual({ found: [1, 2] });
-  });
-  test('unpaired line goes to the LLM', () => {
-    expect(autoSpot(text, errors, 'has went → has gone\nthe cat → a cat')).toBeNull();
-  });
-  test('wrong correction goes to the LLM', () => {
-    expect(autoSpot(text, errors, 'has went → had went')).toBeNull();
-  });
-  test('line without an arrow, or two lines for one error, go to the LLM', () => {
-    expect(autoSpot(text, errors, 'has went')).toBeNull();
-    expect(autoSpot(text, errors, 'has went → has gone\nhas went → has gone')).toBeNull();
-  });
+  test('one paired line', () => expect(autoSpot(text, errors, 'has went → has gone')).toEqual({ found: [1], leftover: [] }));
+  test('two paired lines', () => expect(autoSpot(text, errors, 'has went → has gone\ninformations -> information')).toEqual({ found: [1, 2], leftover: [] }));
+  test('unpaired line is leftover, paired line still found', () =>
+    expect(autoSpot(text, errors, 'has went → has gone\nthe cat → a cat')).toEqual({ found: [1], leftover: ['the cat → a cat'] }));
+  test('wrong correction is leftover', () => expect(autoSpot(text, errors, 'has went → had went')).toEqual({ found: [], leftover: ['has went → had went'] }));
+  test('wider selection with a right fix is found', () => expect(autoSpot(text, errors, 'He has went → He has gone')).toEqual({ found: [1], leftover: [] }));
+  test('a second line for an error already found is dropped', () =>
+    expect(autoSpot(text, errors, 'has went → has gone\nwent → gone')).toEqual({ found: [1], leftover: [] }));
   test('empty text finds nothing', () => {
-    expect(autoSpot(text, errors, '')).toEqual({ found: [] });
+    expect(autoSpot(text, errors, '')).toEqual({ found: [], leftover: [] });
+  });
+
+  describe('dropIgnoredLines', () => {
+    test('drops empty and unchanged fixes, keeps real ones', () =>
+      expect(dropIgnoredLines('a hour → an hour\na old → \nA Idea → a idea\nno arrow\n')).toBe('a hour → an hour'));
+    test('only ignored lines give an empty string', () => expect(dropIgnoredLines('went → went')).toBe(''));
   });
 });

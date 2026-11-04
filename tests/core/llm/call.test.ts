@@ -3,6 +3,7 @@ import { createTestDb } from '@/adapters/test/sqliteDb';
 import { FixedClock } from '@/adapters/test/fixedClock';
 import { FakeLlm } from '@/adapters/test/fakeLlm';
 import { callStructured } from '@/core/llm/call';
+import { COMMON_RULES } from '@/core/llm/bundledPrompts';
 import { setSetting } from '@/core/db/repos/settings';
 import type { Deps, LlmResult } from '@/core/ports';
 
@@ -92,9 +93,9 @@ describe('callStructured', () => {
     const llm = new FakeLlm({ grade: [good({ word: 'a' })], generate_session: [good({ word: 'a' })] });
     const deps = await setup(llm);
     await setSetting(deps.db, 'models', {
-      rule_draft: 'm-r', rule_chat: 'm-c', generate_session: 'm-g', validate_session: 'm-v', grade: 'm-grade', dispute: 'm-d',
+      rule_draft: 'm-r', rule_chat: 'm-c', generate_session: 'm-g', validate_session: 'm-v', grade: 'm-grade', dispute: 'm-d', explain: 'm-e',
     });
-    await setSetting(deps.db, 'efforts', { rule_draft: 'low', rule_chat: 'low', generate_session: 'low', validate_session: 'low', grade: 'medium', dispute: 'low' });
+    await setSetting(deps.db, 'efforts', { rule_draft: 'low', rule_chat: 'low', generate_session: 'low', validate_session: 'low', grade: 'medium', dispute: 'low', explain: 'low' });
     await setSetting(deps.db, 'budgetUsd', 0.5);
     await callStructured(deps, 'grade', 'p', { sessionId: undefined });
     await callStructured(deps, 'generate_session', 'p');
@@ -103,7 +104,7 @@ describe('callStructured', () => {
     expect(llm.calls[1]!.effort).toBe('low');
     expect(llm.calls[0]!.budgetUsd).toBe(0.5);
     expect(llm.calls[0]!.timeoutMs).toBe(120000);
-    expect(llm.calls[0]!.systemPrompt).toBe('Explain in Russian. Again Russian.');
+    expect(llm.calls[0]!.systemPrompt).toBe(`${COMMON_RULES}\n\nExplain in Russian. Again Russian.`);
     expect(llm.calls[1]!.model).toBe('m-g');
     expect(llm.calls[1]!.timeoutMs).toBe(300000);
     expect((await rows(deps))[0]!.model).toBe('m-grade');
@@ -114,6 +115,15 @@ describe('callStructured', () => {
     const deps = await setup(llm);
     await setSetting(deps.db, 'nativeLanguage', 'en');
     await callStructured(deps, 'dispute', 'p');
-    expect(llm.calls[0]!.systemPrompt).toBe('Explain in English. Again English.');
+    expect(llm.calls[0]!.systemPrompt).toBe(`${COMMON_RULES}\n\nExplain in English. Again English.`);
   });
+});
+
+test('every kind starts its system prompt with the common rules', async () => {
+  const kinds = ['rule_draft', 'rule_chat', 'generate_session', 'validate_session', 'grade', 'dispute', 'explain'] as const;
+  const llm = new FakeLlm(Object.fromEntries(kinds.map((k) => [k, [good({ word: 'a' })]])));
+  const deps = await setup(llm);
+  for (const k of kinds) await callStructured(deps, k, 'p');
+  expect(llm.calls.map((c) => c.systemPrompt.startsWith(`${COMMON_RULES}\n\n`))).toEqual(kinds.map(() => true));
+  expect(COMMON_RULES).toContain('Do exactly what the task asks');
 });

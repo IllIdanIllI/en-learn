@@ -179,3 +179,62 @@ describe('loadSessionView after grading', () => {
     await expect(loadSessionView(await createTestDb(), 99)).rejects.toThrow('Session 99 not found');
   });
 });
+
+describe('loadSessionView writing blocks', () => {
+  const answer = (db: Db, blockId: number, ord: number, text: string, fix: string) =>
+    db.execute(
+      "INSERT INTO answer (item_id, text, verdict, fix, explanation) SELECT id, ?, 'wrong', ?, 'Because.' FROM item WHERE block_id = ? AND ord = ?",
+      [text, fix, blockId, ord],
+    );
+
+  test('a checked essay carries its text, word count and error items, and no score', async () => {
+    const db = await createTestDb();
+    const sid = await insertDraftSession(db, { date: '2026-10-24', title: 'Sat', isLight: false, createdAt: 'x' });
+    const b = await insertBlock(db, sid, 0, { kind: 'writing', format: 'essay', title: 'Essay', instruction: 'Discuss.', formatExample: null, passage: null, minutes: 40 });
+    await insertItem(db, b, 0, { ...base, prompt: 'He goes home.', expected: 'go' });
+    await answer(db, b, 0, 'goes', 'go');
+    await db.execute("INSERT INTO writing_text (block_id, text, words, source_block_id, created_at) VALUES (?, 'He goes home.', 3, NULL, 'x')", [b]);
+    await setSessionStatus(db, sid, 'graded');
+    const block = (await loadSessionView(db, sid)).blocks[0]!;
+    expect(block.graded).toBe(true);
+    expect(block.writing).toEqual({ text: 'He goes home.', words: 3, source: null });
+    expect(block.items.map((x) => [x.prompt, x.answer?.text, x.effective])).toEqual([['He goes home.', 'goes', 'wrong']]);
+    expect(block.score).toBeUndefined();
+  });
+
+  test('an unchecked essay has no text and is not graded, even in a graded session', async () => {
+    const db = await createTestDb();
+    const sid = await insertDraftSession(db, { date: '2026-10-24', title: 'Sat', isLight: false, createdAt: 'x' });
+    await insertBlock(db, sid, 0, { kind: 'writing', format: 'essay', title: 'Essay', instruction: 'Discuss.', formatExample: null, passage: null, minutes: 40 });
+    await setSessionStatus(db, sid, 'generated');
+    expect((await loadSessionView(db, sid)).blocks[0]).toMatchObject({ graded: false, items: [], writing: { text: null, words: null, source: null } });
+    await setSessionStatus(db, sid, 'graded');
+    const view = await loadSessionView(db, sid);
+    expect(view.blocks[0]!.graded).toBe(false);
+    expect(view.open).toBe(true);
+  });
+
+  test('a rewrite block carries the source text, its errors and its rate', async () => {
+    const db = await createTestDb();
+    const s1 = await insertDraftSession(db, { date: '2026-10-24', title: 'Sat', isLight: false, createdAt: 'x' });
+    const essay = await insertBlock(db, s1, 0, { kind: 'writing', format: 'essay', title: 'Essay', instruction: 'Discuss.', formatExample: null, passage: null, minutes: 40 });
+    await insertItem(db, essay, 0, { ...base, prompt: 'He goes home.', expected: 'go' });
+    await insertItem(db, essay, 1, { ...base, prompt: 'They are here.', expected: 'is' });
+    await answer(db, essay, 0, 'goes', 'go');
+    await answer(db, essay, 1, 'are', 'is');
+    await db.execute("INSERT INTO writing_text (block_id, text, words, source_block_id, created_at) VALUES (?, 'He goes home. They are here.', 60, NULL, 'x')", [essay]);
+    await setSessionStatus(db, s1, 'graded');
+    const s2 = await insertDraftSession(db, { date: '2026-10-25', title: 'Sun', isLight: false, createdAt: 'x' });
+    await insertBlock(db, s2, 0, {
+      kind: 'writing', format: 'rewrite', title: 'Rewrite', instruction: 'Rewrite.', formatExample: null,
+      passage: JSON.stringify({ sourceBlockId: essay, text: 'He goes home. They are here.' }), minutes: 20,
+    });
+    await setSessionStatus(db, s2, 'generated');
+    const block = (await loadSessionView(db, s2)).blocks[0]!;
+    expect(block.paragraphs).toEqual([]);
+    expect(block.writing).toEqual({
+      text: null, words: null,
+      source: { text: 'He goes home. They are here.', errors: [{ was: 'goes', fix: 'go' }, { was: 'are', fix: 'is' }], rate: 3.3 },
+    });
+  });
+});

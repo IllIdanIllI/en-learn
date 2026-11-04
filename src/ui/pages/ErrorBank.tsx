@@ -6,14 +6,19 @@ import { loadGradedFacts } from '@/core/progress/history';
 import { useCore } from '@/ui/app/CoreProvider';
 import { useLoaded } from '@/ui/app/useLoaded';
 import { SHOULD_TONE, SnippetText, WAS_TONE } from '@/ui/components/SnippetText';
+import { Pixel } from '@/ui/grove/Pixel';
+import { DRY_LEAF } from '@/ui/grove/sprites';
 import { Select } from '@/ui/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/ui/components/ui/table';
 import { Notice } from '@/ui/today/chips';
 
 const KINDS: ErrorBankRow['kind'][] = ['grammar', 'spelling', 'inattention'];
+/** The topic filter's "Other": grammar errors with no programme topic. */
+const OTHER = '__other__';
+const isOther = (r: ErrorBankRow) => r.topicId === null && r.kind === 'grammar';
 
 export function ErrorBank() {
-  const { deps, lang } = useCore();
+  const { deps, lang, settings } = useCore();
   const [kind, setKind] = useState('');
   const [topic, setTopic] = useState('');
   const loaded = useLoaded(async () => {
@@ -29,7 +34,10 @@ export function ErrorBank() {
         const { rows, topics } = loaded.data;
         if (rows.length === 0) return <p className="reading mt-6 text-muted-foreground">{t(lang, 'errors.empty')}</p>;
         const titles = new Map(topics.map((tp) => [tp.id, tp.title]));
-        const shown = rows.filter((r) => (kind === '' || r.kind === kind) && (topic === '' || String(r.topicId) === topic));
+        const shown = rows.filter((r) => (kind === '' || r.kind === kind) && (topic === '' || (topic === OTHER ? isOther(r) : String(r.topicId) === topic)));
+        if (topic === OTHER) {
+          shown.sort((a, b) => (a.suggestedTopic ?? '').localeCompare(b.suggestedTopic ?? '') || (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+        }
         return (
           <>
             <div className="mt-6 flex flex-wrap gap-4">
@@ -53,6 +61,7 @@ export function ErrorBank() {
                   options={[
                     { value: '', label: t(lang, 'errors.filter.all') },
                     ...topics.filter((tp) => rows.some((r) => r.topicId === tp.id)).map((tp) => ({ value: String(tp.id), label: tp.title })),
+                    ...(rows.some(isOther) ? [{ value: OTHER, label: t(lang, 'errors.filter.other') }] : []),
                   ]}
                 />
               </div>
@@ -71,8 +80,10 @@ export function ErrorBank() {
                 {shown.map((r) => (
                   <TableRow key={r.itemId}>
                     <TableCell className="answer" title={r.sentence === '' ? undefined : r.sentence}>
+                      {settings.design === 'grove' && <Pixel rows={DRY_LEAF} className="mr-2 inline-block" />}
                       <SnippetText s={r.was} tone={WAS_TONE} />
                       {r.hint !== null && <div className="mt-1 text-sm text-muted-foreground">{r.hint}</div>}
+                      {r.suggestedTopic !== null && <div className="mt-1 text-sm text-muted-foreground">{t(lang, 'errors.possibleTopic', { topic: r.suggestedTopic })}</div>}
                     </TableCell>
                     <TableCell className="answer" title={r.sentence === '' ? undefined : r.sentence}>
                       <SnippetText s={r.shouldBe} tone={SHOULD_TONE} />

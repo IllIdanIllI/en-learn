@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { decideRuleGap, RuleGapStaleError, saveMnemonic, setInattention } from '@/core/grading/actions';
+import { decideRuleGap, explainItem, RuleGapStaleError, saveMnemonic, setInattention } from '@/core/grading/actions';
 import { getRule } from '@/core/db/repos/rules';
 import { t, type Lang } from '@/core/i18n';
 import type { ViewItem } from '@/core/session/view';
@@ -101,10 +101,27 @@ export function ItemActions({ item, lang }: { item: ViewItem; lang: Lang }) {
   const a = item.answer;
   const [disputeOpen, setDisputeOpen] = useState(a?.disputeText != null);
   const [error, setError] = useState<string | null>(null);
+  const [explaining, setExplaining] = useState(false);
+  const [explainError, setExplainError] = useState<string | null>(null);
   if (!a) return null;
 
   const canDispute = item.status === 'active' && (a.verdict === 'wrong' || a.verdict === 'rule_gap');
   const canTag = item.status === 'active' && a.verdict === 'wrong';
+  const canExplain = item.format === 'spot' && item.status === 'active' && item.effective === 'wrong' && a.verdict === 'wrong' && a.explanation === '';
+  const explain = async () => {
+    if (explaining) return;
+    setExplaining(true);
+    setExplainError(null);
+    try {
+      const res = await explainItem(deps, item.id);
+      if (res.ok) reload();
+      else setExplainError(res.message);
+    } catch (e) {
+      setExplainError(message(e));
+    } finally {
+      setExplaining(false);
+    }
+  };
   const tag = async (value: boolean) => {
     setError(null);
     try {
@@ -119,11 +136,16 @@ export function ItemActions({ item, lang }: { item: ViewItem; lang: Lang }) {
     <>
       {item.gap && <GapProposal item={item} lang={lang} />}
       {item.format === 'spelling' && item.spellingWordId != null && <Mnemonic item={item} lang={lang} />}
-      {(canDispute || canTag) && (
+      {(canDispute || canTag || canExplain) && (
         <div className="mt-2 -ml-2.5 flex flex-wrap items-center gap-1">
           {canDispute && (
             <Button variant="ghost" size="sm" aria-expanded={disputeOpen} onClick={() => setDisputeOpen((open) => !open)}>
               {t(lang, 'item.dispute')}
+            </Button>
+          )}
+          {canExplain && (
+            <Button variant="ghost" size="sm" disabled={explaining} onClick={() => void explain()}>
+              {t(lang, explaining ? 'item.explaining' : 'item.explain')}
             </Button>
           )}
           {canTag && (
@@ -134,6 +156,14 @@ export function ItemActions({ item, lang }: { item: ViewItem; lang: Lang }) {
         </div>
       )}
       {error !== null && <Notice className="mt-2">{t(lang, 'action.error', { message: error })}</Notice>}
+      {explainError !== null && (
+        <Notice className="mt-2">
+          <span>{t(lang, 'explain.error', { message: explainError })}</span>
+          <Button variant="secondary" size="sm" disabled={explaining} onClick={() => void explain()}>
+            {t(lang, 'today.retry')}
+          </Button>
+        </Notice>
+      )}
       {canDispute && disputeOpen && <DisputeField item={item} lang={lang} />}
     </>
   );

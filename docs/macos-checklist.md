@@ -137,3 +137,10 @@ N. **Budget set.**
    - Action: Settings → set a budget per call (for example 0.50), then repeat K and L in a new chat.
    - Expected: same as K and L (scopes `claude-local-chat-budget` and `claude-local-chat-next-budget`).
    - If it fails: record the error and the `llm_call` rows.
+
+## Writing (2026-11-02)
+
+Q. **Update keeps earlier lessons (migration 0005 rebuilds the block table).**
+   - Action: first copy `enlearn.db` aside before updating. Then start the updated app on a database from an earlier build (do not delete `enlearn.db` this time). Open Today and the session log.
+   - Expected: the app starts with no error toast, earlier lessons still show with their blocks and answers, and `sqlite3 enlearn.db "select schema_version from meta"` prints 5.
+   - If it fails: record the message and the console error, and restore the copy of `enlearn.db` before trying again.

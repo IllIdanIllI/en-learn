@@ -1,7 +1,7 @@
 import type { Llm, LlmRequest, LlmResult } from '@/core/ports';
 import { MINI_RULES } from './miniSeed';
 import type {
-  DisputeBatchReply, GeneratedBlock, GeneratedItem, GeneratedParagraph, GeneratedSession, GradeResult, RuleChatReply, RuleDraft, ValidationResult,
+  DisputeBatchReply, ExplainReply, GeneratedBlock, GeneratedItem, GeneratedParagraph, GeneratedSession, GradeResult, RuleChatReply, RuleDraft, ValidationResult,
 } from '@/core/llm/types';
 
 /** Canned, valid model outputs for preview mode. They are derived from the request text so they pass the code checks. */
@@ -219,10 +219,17 @@ function generate(prompt: string): GeneratedSession {
   const due = (/in the review block: ([^.\n]+)\./.exec(prompt)?.[1] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   const extra = prompt.includes('## Extra set');
   const blocks: GeneratedBlock[] = [];
-  for (const m of prompt.matchAll(/^\d+\. (review|task|speaking) \(format ([^,)]+)(?:, topic ([^)]+))?\)$/gm)) {
+  for (const m of prompt.matchAll(/^\d+\. (review|task|writing|speaking) \(format ([^,)]+)(?:, topic ([^)]+))?\)$/gm)) {
     const [, kind, format, topic] = m;
     if (kind === 'review') blocks.push(reviewBlock(allowed, due));
     else if (kind === 'task') blocks.push(taskBlock(format as string, topic ?? allowed[0] ?? FALLBACK, extra));
+    else if (kind === 'writing') {
+      blocks.push({
+        kind: 'writing', format: 'essay', title: 'Эссе',
+        instruction: 'Some people think that working from home is better than working in an office. Discuss both views and give your opinion.',
+        formatExample: '', minutes: 40, items: [], paragraphs: [], question: '',
+      });
+    }
     else {
       blocks.push({
         kind: 'speaking', format: 'question', title: 'Говорение',
@@ -243,8 +250,33 @@ function field(block: string, name: string): string {
   return new RegExp(`^${name}: ?(.*)$`, 'm').exec(block)?.[1]?.trim() ?? '';
 }
 
+/** Writing errors: "goes" (fix "go", the first programme topic) and "are" (fix "is", no topic) when they occur in a text. */
+function gradeTexts(prompt: string): GradeResult['texts'] {
+  const [textPart = '', topicPart = ''] = (prompt.split('## Texts')[1] ?? '').split('## Programme topics');
+  const first = /^- ([^:\n]+): .*? \| sections: (?:"([^"]*)")?/m.exec(topicPart);
+  return textPart.split(/^### /m).slice(1).flatMap((block) => {
+    const blockRef = /^(b\d+) /.exec(block)?.[1];
+    const text = block.split('\nText:\n')[1] ?? '';
+    if (!blockRef) return [];
+    const errors: GradeResult['texts'][number]['errors'] = [];
+    if (first && text.includes('goes')) {
+      errors.push({
+        fragment: 'goes', fix: 'go', topicKey: first[1] as string, suggestedTopic: '', ruleSection: first[2] ?? '',
+        explanation: feedbackFor(first[1] as string).explanation,
+      });
+    }
+    if (text.includes('are')) {
+      errors.push({
+        fragment: 'are', fix: 'is', topicKey: '', suggestedTopic: 'subject-verb agreement', ruleSection: '',
+        explanation: 'Глагол согласуется с подлежащим в числе.',
+      });
+    }
+    return [{ blockRef, errors }];
+  });
+}
+
 function grade(prompt: string): GradeResult {
-  const result: GradeResult = { items: [], spot: [], patterns: [], tomorrow: [], spellingErrors: [], ruleGaps: [] };
+  const result: GradeResult = { items: [], spot: [], patterns: [], tomorrow: [], spellingErrors: [], ruleGaps: [], texts: [] };
   const wrongKeys: string[] = [];
   const [itemPart = '', spotPart = ''] = prompt.split('## Error-spotting paragraphs');
   for (const block of itemPart.split(/^### /m).slice(1)) {
@@ -285,6 +317,7 @@ function grade(prompt: string): GradeResult {
       extra: [],
     });
   }
+  result.texts = gradeTexts(prompt);
   if (wrongKeys.length > 0) {
     const fb = feedbackFor(wrongKeys[0] as string);
     result.patterns = [fb.pattern];
@@ -362,6 +395,7 @@ export const previewLlm: Llm = {
       case 'rule_draft': data = ruleDraft(req.userPrompt); break;
       case 'rule_chat': ({ reply: data, sessionId } = ruleChat(req.userPrompt, req.resume ?? null)); break;
       case 'dispute': data = dispute(req.userPrompt); break;
+      case 'explain': data = { explanation: 'Перед гласным звуком нужен артикль an: an old friend.' } satisfies ExplainReply; break;
     }
     return { ok: true, data, costUsd: 0, durationMs: 5, raw: JSON.stringify(envelope(data, sessionId)), ...(sessionId ? { sessionId } : {}) };
   },

@@ -9,6 +9,7 @@ export interface Settings {
   acceptedShorthands: string[];
   spellingVariant: 'british' | 'american';
   theme: 'dark' | 'light' | 'system';
+  design: 'grove' | 'lamp';
   /** Ids of sessions the learner closed; the last 30 are kept. */
   closedSessions: number[];
 }
@@ -24,6 +25,7 @@ export const DEFAULT_SETTINGS: Settings = {
     validate_session: DEFAULT_MODEL,
     grade: DEFAULT_MODEL,
     dispute: DEFAULT_MODEL,
+    explain: DEFAULT_MODEL,
   },
   efforts: {
     rule_draft: 'medium',
@@ -32,11 +34,13 @@ export const DEFAULT_SETTINGS: Settings = {
     validate_session: 'medium',
     grade: 'high',
     dispute: 'medium',
+    explain: 'medium',
   },
   budgetUsd: null,
   acceptedShorthands: ['✓'],
   spellingVariant: 'british',
   theme: 'dark',
+  design: 'grove',
   closedSessions: [],
 };
 

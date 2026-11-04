@@ -16,11 +16,11 @@ export function violations(s: GeneratedSession, ctx: GenerationContext): string[
   const wanted = ctx.blocks.map((b) => b.kind).join(', ');
   if (kinds !== wanted) out.push(`blocks: got [${kinds}], the context asks for [${wanted}]`);
   s.blocks.forEach((b, i) => {
-    const taskFormat = ctx.extra ? ctx.blocks.find((x) => x.kind === 'task')?.format : ctx.plan.task?.format;
-    if (b.kind === 'task' && taskFormat && b.format !== taskFormat) {
-      out.push(`b${i} format: task block must be ${taskFormat}, got ${b.format}`);
+    const wantedBlock = ctx.blocks[i];
+    if (b.kind === 'task' && wantedBlock?.kind === 'task' && b.format !== wantedBlock.format) {
+      out.push(`b${i} format: task block must be ${wantedBlock.format}, got ${b.format}`);
     }
-    if (b.kind === 'task' && ctx.extra && (b.items.length < 6 || b.items.length > 8)) {
+    if (b.kind === 'task' && b.format !== 'spot' && ctx.extra && (b.items.length < 6 || b.items.length > 8)) {
       out.push(`b${i} items: ${b.items.length} items in an extra set, need 6 to 8`);
     }
     if (b.kind === 'review') {
@@ -29,7 +29,9 @@ export function violations(s: GeneratedSession, ctx: GenerationContext): string[
       if (b.items.length > cap) out.push(`b${i} items: ${b.items.length} review items, at most ${cap}`);
     }
     if (b.kind === 'speaking' && b.question.trim() === '') out.push(`b${i} question: speaking block has no question`);
-    if (b.kind !== 'speaking' && b.items.length === 0 && b.paragraphs.every((p) => p.errors.length === 0)) {
+    if (b.kind === 'writing' && b.format !== 'essay') out.push(`b${i} format: writing block must be essay, got ${b.format}`);
+    if (b.kind === 'writing' && b.instruction.trim() === '') out.push(`b${i} instruction: writing block has no prompt`);
+    if (b.kind !== 'speaking' && b.kind !== 'writing' && b.items.length === 0 && b.paragraphs.every((p) => p.errors.length === 0)) {
       out.push(`b${i} items: block has no active items`);
     }
   });

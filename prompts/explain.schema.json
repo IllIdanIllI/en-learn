@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "explanation"
+  ],
+  "properties": {
+    "explanation": {
+      "type": "string",
+      "description": "2 to 4 sentences in the learner native language"
+    }
+  }
+}

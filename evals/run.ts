@@ -134,7 +134,7 @@ async function runGrade(model: string): Promise<GradeRun> {
     const answers: Record<number, string> = {};
     for (const c of group) answers[itemOf.get(c.id)!.itemId] = c.answer;
     llm.calls = [];
-    const outcome = await gradeSession(deps, sessionId, { items: answers, spot: {} }, []);
+    const outcome = await gradeSession(deps, sessionId, { items: answers, spot: {}, texts: {} }, []);
     const calls = llm.calls.filter((x) => x.kind === 'grade');
     const final = [...calls].reverse().find((x) => x.res.ok)?.res;
     const finalData = final?.ok ? (final.data as GradeResult) : null;

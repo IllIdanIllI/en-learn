@@ -15,7 +15,8 @@ export function parseSpotLines(text: string): { wrong: string; right: string }[]
   return out;
 }
 
-export type Submission = { items: Record<number, string>; spot: Record<string, string> };
+/** Answers by item id, spot paragraphs by `${blockId}:${paragraph}`, writing texts by block id. */
+export type Submission = { items: Record<number, string>; spot: Record<string, string>; texts: Record<number, string> };
 export type Question = { itemId: number; kind: 'blank' | 'shorthand' | 'llm'; symbol?: string; text?: string };
 
 /** Always accepted for "correct as it is" and never asked about. */

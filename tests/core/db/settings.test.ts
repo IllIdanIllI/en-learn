@@ -14,14 +14,22 @@ describe('settings repo', () => {
         validate_session: 'claude-sonnet-5-5',
         grade: 'claude-sonnet-5-5',
         dispute: 'claude-sonnet-5-5',
+        explain: 'claude-sonnet-5-5',
       },
-      efforts: { rule_draft: 'medium', rule_chat: 'medium', generate_session: 'medium', validate_session: 'medium', grade: 'high', dispute: 'medium' },
+      efforts: { rule_draft: 'medium', rule_chat: 'medium', generate_session: 'medium', validate_session: 'medium', grade: 'high', dispute: 'medium', explain: 'medium' },
       budgetUsd: null,
       acceptedShorthands: ['✓'],
       spellingVariant: 'british',
       theme: 'dark',
+      design: 'grove',
       closedSessions: [],
     });
+  });
+
+  test('design round-trips', async () => {
+    const db = await createTestDb();
+    await setSetting(db, 'design', 'lamp');
+    expect((await getSettings(db)).design).toBe('lamp');
   });
 
   test('budgetUsd round-trips and overwrites', async () => {

@@ -16,7 +16,7 @@ import { Notice } from '@/ui/today/chips';
 
 const MODELS = ['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-opus-5-5'];
 const EFFORTS: Effort[] = ['low', 'medium', 'high'];
-const KINDS: LlmKind[] = ['rule_draft', 'rule_chat', 'generate_session', 'validate_session', 'grade', 'dispute'];
+const KINDS: LlmKind[] = ['rule_draft', 'rule_chat', 'generate_session', 'validate_session', 'grade', 'dispute', 'explain'];
 
 function Row({ label, htmlFor, hint, children }: { label: string; htmlFor?: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -141,6 +141,14 @@ export function Settings() {
             value={settings.theme}
             options={(['dark', 'light', 'system'] as const).map((v) => ({ value: v, label: t(lang, `settings.theme.${v}` as MessageKey) }))}
             onChange={(v) => void save('theme', v)}
+          />
+        </Row>
+        <Row label={t(lang, 'settings.design')}>
+          <Segmented
+            label={t(lang, 'settings.design')}
+            value={settings.design}
+            options={(['grove', 'lamp'] as const).map((v) => ({ value: v, label: t(lang, `settings.design.${v}` as MessageKey) }))}
+            onChange={(v) => void save('design', v)}
           />
         </Row>
         <Row label={t(lang, 'settings.budget')} htmlFor="settings-budget" hint={t(lang, 'settings.budgetHint')}>

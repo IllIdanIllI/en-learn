@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { disputeItems, recordSupport } from '@/core/grading/actions';
-import { draftsToAnswers, itemDraftKey, loadDraftAnswers, saveDraftAnswer, spotDraftKey } from '@/core/db/repos/drafts';
+import { draftsToAnswers, itemDraftKey, loadDraftAnswers, saveDraftAnswer, spotDraftKey, writingDraftKey } from '@/core/db/repos/drafts';
 import { gradeSession, type ClarificationAnswer, type GradeOutcome, type Question } from '@/core/grading/grade';
 import { t } from '@/core/i18n';
 import { loadSessionView, type SessionView } from '@/core/session/view';
@@ -18,6 +18,9 @@ import { Questions, type Reply } from './Questions';
 import { SessionHeader } from './SessionHeader';
 import { SpellingRow } from './SpellingRow';
 import { SpotBlock } from './SpotBlock';
+import { WritingBlock } from './WritingBlock';
+import { AnswerMeter } from '@/ui/grove/AnswerMeter';
+import { answerSegments } from '@/ui/grove/segments';
 import { Notice } from './chips';
 import { RulePanel, type RuleTarget } from './RulePanel';
 import { SessionActionsProvider, type SessionActions } from './sessionActions';
@@ -38,13 +41,14 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
   /** Today's session only: a button in the action bar once everything is graded. */
   onClose?: () => void;
 }) {
-  const { deps, lang } = useCore();
+  const { deps, lang, settings } = useCore();
   const [view, setView] = useState<SessionView | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [draftsReady, setDraftsReady] = useState(false);
   const [items, setItems] = useState<Record<number, string>>({});
   const [spot, setSpot] = useState<Record<string, string>>({});
+  const [texts, setTexts] = useState<Record<number, string>>({});
   const [questions, setQuestions] = useState<Question[]>([]);
   const [replies, setReplies] = useState<Record<number, Reply>>({});
   const [finish, setFinish] = useState(false);
@@ -89,6 +93,7 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
         const restored = draftsToAnswers(drafts);
         setItems(restored.items);
         setSpot(restored.spot);
+        setTexts(restored.texts);
         setDraftsReady(true);
       },
       (e: unknown) => {
@@ -171,7 +176,9 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
       setFinish(finishing);
       void run(async () => {
         await flushAll(); // a late draft write must not land after the drafts are deleted by grading
-        return gradeSession(deps, sessionId, { items, spot }, clarifications(), { finish: finishing });
+        // A rewrite field still holding its prefilled source text submits that text.
+        const prefilled = Object.fromEntries((view?.blocks ?? []).flatMap((b) => (b.writing?.text === null && b.writing.source ? [[b.id, b.writing.source.text] as const] : [])));
+        return gradeSession(deps, sessionId, { items, spot, texts: { ...prefilled, ...texts } }, clarifications(), { finish: finishing });
       });
     }
   };
@@ -274,13 +281,24 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
     return q && <Questions question={q} reply={replies[id]} lang={lang} onChange={(r) => setReplies((prev) => ({ ...prev, [id]: r }))} />;
   };
 
-  const renderBlock = (block: SessionView['blocks'][number], i: number, hideTitle: boolean) => {
+  const renderBlock = (block: SessionView['blocks'][number], i: number, hideTitle: boolean, divider: boolean) => {
     // An added round continues the numbering of the task blocks before it.
     const offset = view.blocks.filter((b) => b.kind === 'task' && b.round < block.round).reduce((n, b) => n + b.itemCount, 0);
     return (
-      <Block key={block.id} block={block} number={i + 1} lang={lang} hideTitle={hideTitle}>
+      <Block key={block.id} block={block} number={i + 1} lang={lang} hideTitle={hideTitle} divider={divider}>
         {block.format === 'question' ? (
           <QuestionBlock block={block} />
+        ) : block.kind === 'writing' ? (
+          <WritingBlock
+            block={block}
+            lang={lang}
+            value={texts[block.id] ?? block.writing?.source?.text ?? ''}
+            onChange={(value) => {
+              setFinish(false);
+              setTexts((prev) => ({ ...prev, [block.id]: value }));
+              persist(writingDraftKey(block.id), value);
+            }}
+          />
         ) : block.format === 'spot' ? (
           <SpotBlock
             block={block}
@@ -314,6 +332,11 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
       </Block>
     );
   };
+  // A divider goes between rendered blocks, never above the first one shown.
+  const renderBlocks = (show: (block: SessionView['blocks'][number]) => boolean, hideTitle: boolean) => {
+    let shown = 0;
+    return view.blocks.map((block, i) => show(block) && renderBlock(block, i, hideTitle, shown++ > 0));
+  };
   const latestRound = Math.max(...view.blocks.map((b) => b.round));
   const summary = graded && <FeedbackSummary view={view} lang={lang} />;
   const showClose = done && onClose !== undefined;
@@ -322,13 +345,14 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
     <SessionActionsProvider value={actions}>
       <div ref={root}>
         <SessionHeader view={view} lang={lang} rebuilding={rebuilding} solving={solving} onRebuild={rebuild} />
+        {settings.design === 'grove' && answerable && !solving && <AnswerMeter filled={answerSegments(view, items, spot)} lang={lang} />}
         {loader && <Loader lang={lang} {...loader} />}
         {solving ? (
-          view.blocks.map((block, i) => !block.graded && block.items.length > 0 && renderBlock(block, i, false))
+          renderBlocks((block) => !block.graded && block.items.length > 0, false)
         ) : latestRound > 1 ? (
           <>
             <div id="latest-round" tabIndex={-1} className="rounded-sm">
-              {view.blocks.map((block, i) => block.round === latestRound && renderBlock(block, i, true))}
+              {renderBlocks((block) => block.round === latestRound, true)}
             </div>
             <Button variant="secondary" className="mt-8" aria-expanded={showPrevious} onClick={() => setShowPrevious((v) => !v)}>
               {t(lang, showPrevious ? 'today.hidePrevious' : 'today.showPrevious')}
@@ -336,14 +360,14 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
             {showPrevious && (
               <>
                 {summary}
-                {view.blocks.map((block, i) => block.round < latestRound && renderBlock(block, i, false))}
+                {renderBlocks((block) => block.round < latestRound, false)}
               </>
             )}
           </>
         ) : (
           <>
             {summary}
-            {view.blocks.map((block, i) => renderBlock(block, i, false))}
+            {renderBlocks(() => true, false)}
           </>
         )}
         {(answerable || unsent.length > 0 || showClose) && (

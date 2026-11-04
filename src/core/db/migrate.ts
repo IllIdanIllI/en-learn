@@ -32,7 +32,9 @@ export async function runMigrations(db: Db, list: Migration[]): Promise<number> 
   if (rows.length === 0) await db.execute('INSERT INTO meta (schema_version) VALUES (0)');
   for (const m of [...list].sort((a, b) => a.version - b.version)) {
     if (m.version <= current) continue;
-    for (const stmt of splitStatements(m.sql)) await db.execute(stmt);
+    // A `-- batch` file runs as one call: PRAGMA foreign_keys only works outside a transaction, per connection.
+    if (m.sql.trimStart().startsWith('-- batch')) await db.execute(m.sql);
+    else for (const stmt of splitStatements(m.sql)) await db.execute(stmt);
     await db.execute('UPDATE meta SET schema_version = ?', [m.version]);
     current = m.version;
   }

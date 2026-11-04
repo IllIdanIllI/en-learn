@@ -1,6 +1,7 @@
 import type { Db } from '@/core/ports';
 import type { BlockFormat, BlockKind, ISODate, ItemStatus, SessionStatus } from '@/core/domain';
 import type { CallStat } from '@/core/progress/usage';
+import type { LessonChoice } from '@/core/session/choice';
 import { getSettings, setSetting } from './settings';
 
 export interface GradedSession {
@@ -107,13 +108,23 @@ export async function getLatestGeneratedBefore(db: Db, date: ISODate): Promise<{
 
 export async function insertDraftSession(
   db: Db,
-  s: { date: ISODate; title: string; isLight: boolean; createdAt: string },
+  s: { date: ISODate; title: string; isLight: boolean; createdAt: string; choice?: LessonChoice },
 ): Promise<number> {
   const res = await db.execute(
-    "INSERT INTO session (date, title, is_light, status, created_at) VALUES (?, ?, ?, 'draft', ?)",
-    [s.date, s.title, s.isLight ? 1 : 0, s.createdAt],
+    "INSERT INTO session (date, title, is_light, status, created_at, choice) VALUES (?, ?, ?, 'draft', ?, ?)",
+    [s.date, s.title, s.isLight ? 1 : 0, s.createdAt, s.choice ? JSON.stringify(s.choice) : null],
   );
   return res.lastInsertId;
+}
+
+/** The lesson choice a session was generated from; null for a session made before the picker. */
+export async function getSessionChoice(db: Db, sessionId: number): Promise<LessonChoice | null> {
+  const rows = await db.select<{ choice: string | null }>('SELECT choice FROM session WHERE id = ?', [sessionId]);
+  const raw = rows[0]?.choice;
+  if (!raw) return null;
+  // Choices stored before writing existed have no writing or rewrite keys.
+  const stored = JSON.parse(raw) as Omit<LessonChoice, 'writing' | 'rewrite'> & Partial<Pick<LessonChoice, 'writing' | 'rewrite'>>;
+  return { writing: false, rewrite: false, ...stored };
 }
 
 export async function insertBlock(db: Db, sessionId: number, ord: number, b: NewBlock, round = 1): Promise<number> {
@@ -150,9 +161,10 @@ export async function markSessionGraded(db: Db, id: number, gradedAt: string): P
   await db.execute("UPDATE session SET status = 'graded', graded_at = ? WHERE id = ?", [gradedAt, id]);
 }
 
-export async function getSession(db: Db, id: number): Promise<{ id: number; date: ISODate; status: SessionStatus } | null> {
-  const rows = await db.select<{ id: number; date: string; status: SessionStatus }>('SELECT id, date, status FROM session WHERE id = ?', [id]);
-  return rows[0] ?? null;
+export async function getSession(db: Db, id: number): Promise<{ id: number; date: ISODate; status: SessionStatus; isLight: boolean } | null> {
+  const rows = await db.select<{ id: number; date: string; status: SessionStatus; is_light: number }>('SELECT id, date, status, is_light FROM session WHERE id = ?', [id]);
+  const r = rows[0];
+  return r ? { id: r.id, date: r.date, status: r.status, isLight: r.is_light === 1 } : null;
 }
 
 export interface GradingItem {
@@ -218,13 +230,15 @@ export async function reopenSession(db: Db, id: number): Promise<void> {
   if (closedSessions.includes(id)) await setSetting(db, 'closedSessions', closedSessions.filter((x) => x !== id));
 }
 
-/** True when an active item of the session (a speaking question aside) has no answer row yet. */
+/** True when an active item of the session (a speaking question aside) has no answer row yet, or a writing block has no stored text. */
 export async function hasOpenItems(db: Db, sessionId: number): Promise<boolean> {
   const rows = await db.select<{ n: number }>(
-    `SELECT COUNT(*) AS n FROM item i JOIN block b ON b.id = i.block_id
-     WHERE b.session_id = ? AND i.status = 'active' AND b.format != 'question'
-       AND NOT EXISTS (SELECT 1 FROM answer a WHERE a.item_id = i.id)`,
-    [sessionId],
+    `SELECT (SELECT COUNT(*) FROM item i JOIN block b ON b.id = i.block_id
+             WHERE b.session_id = ? AND i.status = 'active' AND b.format != 'question'
+               AND NOT EXISTS (SELECT 1 FROM answer a WHERE a.item_id = i.id))
+          + (SELECT COUNT(*) FROM block b WHERE b.session_id = ? AND b.kind = 'writing'
+               AND NOT EXISTS (SELECT 1 FROM writing_text w WHERE w.block_id = b.id)) AS n`,
+    [sessionId, sessionId],
   );
   return (rows[0]?.n ?? 0) > 0;
 }

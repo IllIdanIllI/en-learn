@@ -8,7 +8,7 @@ test('shell renders sidebar', async ({ page }) => {
   for (const label of ['Сегодня', 'Прогресс', 'Правила', 'Банк ошибок', 'Настройки']) {
     await expect(nav.getByText(label)).toBeVisible();
   }
-  await expect(nav.getByRole('link')).toHaveCount(5);
+  await expect(nav.getByRole('link')).toHaveCount(6);
   await page.screenshot({ path: `${SHOTS}/shell-no_session.png` });
 });
 
@@ -16,7 +16,7 @@ test('shell collapses to icons below 1100px', async ({ page }) => {
   await page.setViewportSize({ width: 1000, height: 700 });
   await page.goto('/#/today');
   const nav = page.getByRole('navigation');
-  await expect(nav.getByRole('link')).toHaveCount(5);
+  await expect(nav.getByRole('link')).toHaveCount(6);
   await expect(nav.getByText('Сегодня')).toBeHidden();
   expect((await nav.boundingBox())?.width).toBe(56);
   await page.screenshot({ path: `${SHOTS}/shell-collapsed.png` });
@@ -63,7 +63,7 @@ test('settings page', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 1100 });
   await page.goto('/?state=no_session#/settings');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  await expect(page.locator('button[data-model-kind]')).toHaveCount(6);
+  await expect(page.locator('button[data-model-kind]')).toHaveCount(7);
   await expect(page.locator('#settings-budget')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Настройка программы' })).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/settings.png` });
@@ -103,7 +103,7 @@ test('settings changes save immediately', async ({ page }) => {
 
 test('an effort select saves', async ({ page }) => {
   await page.goto('/?state=no_session#/settings');
-  await expect(page.locator('button[data-effort-kind]')).toHaveCount(6);
+  await expect(page.locator('button[data-effort-kind]')).toHaveCount(7);
   const trigger = page.locator('#effort-grade');
   await expect(trigger).toHaveText('Высокое');
   await trigger.click();
@@ -225,7 +225,7 @@ test.describe('today session', () => {
     await expect(marked).toHaveValue('');
     await expect(mark).toHaveAttribute('aria-pressed', 'true');
     await expect(mark).toBeEnabled();
-    expect(await bgOf()).not.toBe(bgBefore);
+    await expect.poll(bgOf).not.toBe(bgBefore);
     await page.addStyleTag({ content: '*{transition:none!important}' });
     for (const theme of ['light', 'dark'] as const) {
       await page.evaluate((th) => document.documentElement.classList.toggle('dark', th === 'dark'), theme);
@@ -254,6 +254,26 @@ test.describe('today session', () => {
     await expect(tickItem.getByText('→ a teacher')).toBeVisible();
     await expect(tickItem.getByText('✓')).toHaveCount(0);
     await page.screenshot({ path: `${SHOTS}/today-graded.png`, fullPage: true });
+  });
+
+  test('a wrong item has a full border and no strike-through', async ({ page }) => {
+    for (const design of [
+      { radio: 'По умолчанию', attr: 'lamp' },
+      { radio: 'Ночная роща', attr: 'grove' },
+    ]) {
+      await page.goto('/?state=graded#/settings');
+      await page.getByRole('radio', { name: design.radio }).click();
+      await expect(page.locator('html')).toHaveAttribute('data-design', design.attr);
+      await page.goto('/?state=graded#/today');
+      const wrongItem = page.locator('main li > div.min-w-0').filter({ has: page.locator('.label', { hasText: /^(Неверно|Не найдено)$/ }) }).first();
+      await expect(wrongItem).toBeVisible();
+      const borders = await wrongItem.evaluate((el) => {
+        const style = getComputedStyle(el);
+        return { left: style.borderLeftWidth, top: style.borderTopWidth };
+      });
+      expect(borders, design.attr).toEqual({ left: '1px', top: '1px' });
+      await expect(page.locator('main .line-through'), design.attr).toHaveCount(0);
+    }
   });
 
   test('Close lesson on the graded page leads to the closed card, which can show the results again', async ({ page }) => {
@@ -588,7 +608,8 @@ test.describe('today actions', () => {
     await page.goto('/?state=rest#/today');
     await expect(page.getByRole('heading', { level: 1, name: 'День отдыха' })).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/today-rest.png` });
-    await page.getByRole('button', { name: 'Начать лёгкий день' }).click();
+    await page.getByRole('button', { name: 'Лёгкий день', exact: true }).click();
+    await page.getByRole('button', { name: 'Начать сессию' }).click();
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
   });
 

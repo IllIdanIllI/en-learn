@@ -10,18 +10,19 @@ Every task item, text, expected answer, correction, format example and speaking 
 
 # Blocks
 
-Produce only the blocks the context asks for, in this order: review block (kind "review"), task block (kind "task"), speaking block (kind "speaking"). Spelling is built by the application, never by you. Omit the review block if the context has no review input and no due topic. Every block has: kind, format, title, instruction, formatExample, minutes (a realistic time estimate), items, paragraphs, question. All fields are always present: use an empty array or an empty string when a field does not apply.
+Produce exactly the blocks listed under "Blocks to produce", in that order; there may be several task blocks. Spelling and the rewrite of the learner's own earlier text are built by the application, never by you. Omit the review block if the context has no review input and no due topic. Every block has: kind, format, title, instruction, formatExample, minutes (a realistic time estimate), items, paragraphs, question. All fields are always present: use an empty array or an empty string when a field does not apply.
 
 - format "gap" or "fix": fill "items"; "paragraphs" is [] and "question" is "".
 - format "spot" (error spotting): fill "paragraphs"; "items" is [] and "question" is "".
+- format "essay" (writing block, kind "writing"): the "instruction" is the essay prompt, in English: an IELTS Task 2 prompt (opinion or discussion) for an essay of about 250 words. Where it fits naturally, the prompt invites the use of the week's grammar topic, without naming the topic. formatExample is "", "items" and "paragraphs" are [], "question" is "", minutes 40.
 - format "question" (speaking block, kind "speaking"): fill "question"; "items" and "paragraphs" are [] and formatExample is "". Always exactly one question, and it always starts with "Describe a time when".
 
 Counts:
 - Review block: format is always gap or fix, never spot. At most 12 items; on a light day at most 5. Every gap or fix block, review included, has at least 3 items: if the review input gives fewer than 3, pad the block with fresh sentences on the same topics (only constructions the rules cover). Every topic whose re-check is due today or overdue gets at least one item in the review block with isCheck = true, and these check items always win over the caps: on a light day the review block has at most 5 items unless more topics are due, in which case it has one check item per due topic. All other items have isCheck = false. Outside the review block isCheck is always false.
 - Task block with format gap or fix: 6 to 10 items.
-- Extra set: when the context has an "Extra set" section, produce only the one task block it asks for (format as given), with 6 to 8 items on the given task topic, none repeating a prompt listed there; no review, speaking or spot block, and isCheck is always false.
+- Extra set: when the context has an "Extra set" section, produce only the task blocks it asks for (formats as given), each gap or fix block with 6 to 8 items on its topic, each spot block as usual (2 to 3 paragraphs over the error-spotting topics); none repeating a prompt listed there; no review or speaking block (a writing block only if it is listed); isCheck is always false.
 - Task block with format spot: 2 to 3 paragraphs, each with 5 to 7 hidden errors.
-- Light day: only the review block (see above) and the speaking block.
+- Light day: only lowers the review cap (see above). The blocks are exactly those listed under "Blocks to produce", whatever the day.
 
 # Task design rules (all are mandatory)
 
@@ -38,7 +39,7 @@ TD-8. Error-spotting texts are plain paragraphs: no lists, no headings, no line 
 
 - Rule links: every item and every hidden error has topicKey (copied from the context) and ruleSection (the heading text of the rule section that decides it, copied exactly from the heading text in the rule you were given, without the leading ## and without surrounding spaces, in whatever language the rule is written; the context lists the allowed headings for every topic under "Allowed rule sections"). Never invent a topic key or a section heading.
 - Review block: build the items from the review input (the learner's counted wrong answers) and from the due re-check topics. Re-test the same mechanism with fresh sentences; do not copy the old sentence unchanged. Rules describe general mechanisms: test the mechanism, not the learner's individual slip.
-- Task block: follow the task topic and slot given in the context. For a "learn" topic use gap or fix on its rule. For a "notice" topic and for error-spotting days use "spot" over the listed error-spotting topics, and put in some of the learner's recent inattention errors (careless slips) as hidden errors when they fit the topics.
+- Task block: each task block follows its listed format: gap or fix on the listed topic's rule; spot over the listed error-spotting topics (or the listed notice topic), and put in some of the learner's recent inattention errors (careless slips) as hidden errors when they fit the topics.
 - Second set: if the context says it is a second set, use fresh sentences on the same topic.
 - Naturalness: write natural, exam-level sentences (IELTS / TOEFL register, varied everyday and academic subjects). No sentence may depend on a vocabulary choice; the only thing being tested is the rule.
 - Vocabulary is never the target. Do not make an item whose answer is a word choice unless a rule covers it.

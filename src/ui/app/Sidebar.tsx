@@ -1,7 +1,8 @@
 import { NavLink } from 'react-router-dom';
-import { BookOpen, CalendarDays, ChartLine, CircleAlert, Settings as SettingsIcon, type LucideIcon } from 'lucide-react';
+import { BookOpen, CalendarDays, ChartLine, CircleAlert, PenLine, Settings as SettingsIcon, type LucideIcon } from 'lucide-react';
 import { t, type MessageKey } from '@/core/i18n';
 import { cn } from '@/lib/utils';
+import { Garden } from '@/ui/grove/Garden';
 import { useCore } from './CoreProvider';
 
 const ITEMS: { to: string; key: MessageKey; icon: LucideIcon }[] = [
@@ -9,16 +10,17 @@ const ITEMS: { to: string; key: MessageKey; icon: LucideIcon }[] = [
   { to: '/progress', key: 'nav.progress', icon: ChartLine },
   { to: '/rules', key: 'nav.rules', icon: BookOpen },
   { to: '/errors', key: 'nav.errors', icon: CircleAlert },
+  { to: '/writing', key: 'nav.writing', icon: PenLine },
   { to: '/settings', key: 'nav.settings', icon: SettingsIcon },
 ];
 
 /** 220px with labels; icons only (56px) below 1100px. */
 export function Sidebar() {
-  const { lang } = useCore();
+  const { lang, settings } = useCore();
   return (
     <nav
       aria-label={t(lang, 'nav.label')}
-      className="flex w-14 shrink-0 flex-col gap-1 border-r border-border bg-sidebar px-2 py-4 text-sidebar-foreground min-[1100px]:w-[220px]"
+      className="relative flex w-14 shrink-0 flex-col gap-1 border-r border-border bg-sidebar px-2 py-4 text-sidebar-foreground min-[1100px]:w-[220px]"
     >
       {ITEMS.map(({ to, key, icon: Icon }) => {
         const label = t(lang, key);
@@ -45,6 +47,7 @@ export function Sidebar() {
           </NavLink>
         );
       })}
+      {settings.design === 'grove' && <Garden />}
     </nav>
   );
 }

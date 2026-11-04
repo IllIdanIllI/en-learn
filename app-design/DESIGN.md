@@ -128,6 +128,8 @@ components:
 
 # Design System: English Exam Coach
 
+> Two designs exist. This file describes **Default** (formerly "Lamp"), the design Settings switches back to. The default, **Night grove**, is in `app-design/DESIGN-night-grove.md`; it changes the colour tokens, fonts and adds a sidebar garden and pixel details, and keeps the rules here unless it says otherwise.
+
 Stack: React + shadcn/ui + Tailwind inside Tauri. This file is normative: when generating or changing UI, follow the tokens in the frontmatter and the rules below. Product context and principles live in `PRODUCT.md`.
 
 ## 1. Overview
@@ -300,6 +302,7 @@ Use shadcn/ui primitives (Button, Input, Textarea, Tabs, Table, Tooltip, Dropdow
 - Do turn off spellcheck and autocorrect in every answer field.
 - Do write UI copy in short sentences; no em dashes in UI strings.
 - Do verify every UI change with a screenshot (Playwright against the Vite dev server) before calling it done.
+- Do give every interactive element the pointer cursor (buttons, links, cards, toggles, gear segments, checkboxes, radios, selects, menu items); disabled ones get `not-allowed`. Rule from the learner, repeated several times: never ship a clickable element without it.
 
 ### Don't
 - Don't use typical AI SaaS styling: gradients, gradient text, neon glows, glassmorphism, big hero metrics with small labels, identical card grids.

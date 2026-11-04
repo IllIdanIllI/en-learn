@@ -35,6 +35,8 @@ export interface Core {
   runner: ProcessRunner;
   lang: Lang;
   settings: Settings;
+  /** True when the `dark` class is on <html>, including "system" resolved against the OS. */
+  isDark: boolean;
   prereq: PrereqResult | null;
   loadSeedInput(): SeedBundle | null;
   dataDir: string;
@@ -56,17 +58,27 @@ export function useCore(): Core {
   return core;
 }
 
-/** `dark` class on <html> follows the theme setting; "system" follows the OS. */
-function useTheme(theme: Settings['theme']): void {
+function resolveDark(theme: Settings['theme']): boolean {
+  return theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
+
+/** `dark` class on <html> follows the theme setting; "system" follows the OS. Returns whether the class is on. */
+function useTheme(theme: Settings['theme']): boolean {
+  const [isDark, setIsDark] = useState(() => resolveDark(theme));
   useEffect(() => {
     const root = document.documentElement;
     const query = window.matchMedia('(prefers-color-scheme: dark)');
-    const apply = () => root.classList.toggle('dark', theme === 'dark' || (theme === 'system' && query.matches));
+    const apply = () => {
+      const dark = resolveDark(theme);
+      root.classList.toggle('dark', dark);
+      setIsDark(dark);
+    };
     apply();
     if (theme !== 'system') return;
     query.addEventListener('change', apply);
     return () => query.removeEventListener('change', apply);
   }, [theme]);
+  return isDark;
 }
 
 export function CoreProvider({ init, children }: { init: CoreInit; children: ReactNode }) {
@@ -116,16 +128,19 @@ export function CoreProvider({ init, children }: { init: CoreInit; children: Rea
     };
   }, [init]);
 
-  useTheme(settings.theme);
+  const isDark = useTheme(settings.theme);
   useEffect(() => {
     document.documentElement.lang = settings.nativeLanguage;
   }, [settings.nativeLanguage]);
+  useEffect(() => {
+    document.documentElement.dataset.design = settings.design;
+  }, [settings.design]);
 
   const value = useMemo<Core>(
     () => ({
-      deps, runner, lang: settings.nativeLanguage, settings, prereq, loadSeedInput, dataDir, dataDirError, moveDataDir, recheckPrerequisites, refresh, version,
+      deps, runner, lang: settings.nativeLanguage, settings, isDark, prereq, loadSeedInput, dataDir, dataDirError, moveDataDir, recheckPrerequisites, refresh, version,
     }),
-    [deps, runner, settings, prereq, loadSeedInput, dataDir, dataDirError, moveDataDir, recheckPrerequisites, refresh, version],
+    [deps, runner, settings, isDark, prereq, loadSeedInput, dataDir, dataDirError, moveDataDir, recheckPrerequisites, refresh, version],
   );
   return <CoreContext.Provider value={value}>{children}</CoreContext.Provider>;
 }

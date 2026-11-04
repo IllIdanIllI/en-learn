@@ -4,9 +4,11 @@ import { listRules } from '@/core/db/repos/rules';
 import { listBlockTitles, listGradedSessions } from '@/core/db/repos/sessions';
 import { consistency } from '@/core/progress/derive';
 import { getTopicStates, loadProgressLog } from '@/core/progress/history';
+import { loadWritingTexts } from '@/core/progress/writing';
 import { useCore } from '@/ui/app/CoreProvider';
 import { useLoaded } from '@/ui/app/useLoaded';
 import { ConsistencyGrid } from '@/ui/progress/ConsistencyGrid';
+import { RateChart } from '@/ui/progress/RateChart';
 import { OpenTopics } from '@/ui/progress/OpenTopics';
 import { ProgressLog } from '@/ui/progress/ProgressLog';
 import { Notice } from '@/ui/today/chips';
@@ -15,12 +17,13 @@ export function Progress() {
   const { deps, lang } = useCore();
   const loaded = useLoaded(async () => {
     const sessions = await listGradedSessions(deps.db);
-    const [topics, states, rules, log, blockTitles] = await Promise.all([
+    const [topics, states, rules, log, blockTitles, texts] = await Promise.all([
       getTopics(deps.db),
       getTopicStates(deps.db),
       listRules(deps.db),
       loadProgressLog(deps.db),
       listBlockTitles(deps.db, sessions.map((s) => s.id)),
+      loadWritingTexts(deps.db),
     ]);
     return {
       grid: consistency(sessions.map((s) => ({ date: s.date, isLight: s.isLight, status: 'graded' as const })), deps.clock.today()),
@@ -29,6 +32,8 @@ export function Progress() {
       ruleIds: new Map(rules.map((r) => [r.topic.id, r.ruleId])),
       log,
       blockTitles,
+      /** Errors per 100 words, oldest first; texts with no rate are left out. */
+      rates: texts.flatMap((x) => (x.rate === null ? [] : [{ date: x.date, rate: x.rate }])).reverse(),
     };
   });
 
@@ -42,6 +47,16 @@ export function Progress() {
             <h2 className="title">{t(lang, 'progress.consistency')}</h2>
             <div className="mt-4">
               <ConsistencyGrid data={loaded.data.grid} lang={lang} />
+            </div>
+          </section>
+          <section className="mt-12">
+            <h2 className="title">{t(lang, 'progress.rate')}</h2>
+            <div className="mt-4">
+              {loaded.data.rates.length === 0 ? (
+                <p className="text-muted-foreground">{t(lang, 'progress.rate.empty')}</p>
+              ) : (
+                <RateChart points={loaded.data.rates} lang={lang} />
+              )}
             </div>
           </section>
           <section className="mt-12">

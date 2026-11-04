@@ -5,6 +5,7 @@ import type {
 import type { Db } from '@/core/ports';
 import { effectiveVerdict } from '@/core/verdict';
 import { blockScores } from '@/core/progress/derive';
+import { errorRate } from '@/core/writing/text';
 
 export interface ViewAnswer {
   text: string;
@@ -71,6 +72,12 @@ export interface ViewBlock {
   itemCount: number;
   paragraphs: ViewParagraph[];
   score?: { correct: number; counted: number };
+  /** Writing and rewrite blocks. `text` and `words` are null until the text is checked; `source` is the checked text a rewrite block starts from. */
+  writing?: {
+    text: string | null;
+    words: number | null;
+    source: { text: string; errors: { was: string; fix: string }[]; rate: number | null } | null;
+  };
 }
 
 export interface SessionView {
@@ -149,6 +156,29 @@ export async function loadSessionView(db: Db, sessionId: number): Promise<Sessio
     feedback = { patterns: fb[0] ? (JSON.parse(fb[0].patterns) as string[]) : [], tomorrow: fb[0] ? (JSON.parse(fb[0].tomorrow) as string[]) : [] };
   }
 
+  const writingTexts = new Map<number, { text: string; words: number }>();
+  for (const r of await db.select<{ block_id: number; text: string; words: number }>(
+    'SELECT wt.block_id AS block_id, wt.text AS text, wt.words AS words FROM writing_text wt JOIN block b ON b.id = wt.block_id WHERE b.session_id = ?',
+    [sessionId],
+  )) writingTexts.set(r.block_id, { text: r.text, words: r.words });
+
+  // The checked text a rewrite block starts from: its words and the errors that still count after disputes.
+  const sourceIds = blockRows.flatMap((b) => (b.format === 'rewrite' && b.passage !== null ? [(JSON.parse(b.passage) as { sourceBlockId: number }).sourceBlockId] : []));
+  const sources = new Map<number, { text: string; errors: { was: string; fix: string }[]; rate: number | null }>();
+  for (const id of sourceIds) {
+    const [src] = await db.select<{ text: string; words: number }>('SELECT text, words FROM writing_text WHERE block_id = ?', [id]);
+    if (!src) continue;
+    const rows = await db.select<{ status: ItemStatus; text: string | null; fix: string | null; verdict: Verdict; dispute_decision: DisputeDecision | null; gap_status: GapStatus | null }>(
+      `SELECT i.status AS status, a.text AS text, a.fix AS fix, a.verdict AS verdict, a.dispute_decision AS dispute_decision, g.status AS gap_status
+       FROM item i JOIN answer a ON a.item_id = i.id LEFT JOIN rule_gap g ON g.item_id = i.id WHERE i.block_id = ? ORDER BY i.ord`,
+      [id],
+    );
+    const errors = rows
+      .filter((r) => effectiveVerdict({ itemStatus: r.status, verdict: r.verdict, disputeDecision: r.dispute_decision, gapStatus: r.gap_status }) === 'wrong')
+      .map((r) => ({ was: r.text ?? '', fix: r.fix ?? '' }));
+    sources.set(id, { text: src.text, errors, rate: errorRate(errors.length, src.words) });
+  }
+
   const toItem = (r: ItemRow, number: number, format: BlockFormat, blockGraded: boolean): ViewItem => {
     const item: ViewItem = {
       id: r.id, ord: r.ord, number, prompt: r.prompt, format, topicId: r.topic_id, ruleId: r.rule_id, ruleSection: r.rule_section, status: r.status,
@@ -177,18 +207,27 @@ export async function loadSessionView(db: Db, sessionId: number): Promise<Sessio
     const rows = itemRows.filter((r) => r.block_id === b.id);
     const isSpot = b.format === 'spot';
     const isQuestion = b.format === 'question';
-    const blockGraded = graded && (isQuestion || rows.every((r) => r.status !== 'active' || r.has_answer !== null));
+    const isWriting = b.kind === 'writing';
+    const written = writingTexts.get(b.id);
+    // A writing block is graded once its text is stored; its error items are results, never questions.
+    const blockGraded = graded && (isQuestion || (isWriting ? written !== undefined : rows.every((r) => r.status !== 'active' || r.has_answer !== null)));
     const visible = rows.filter((r) => r.status !== 'defect');
     const numberOf = new Map(visible.map((r, k) => [r.id, k + 1]));
     const num = (r: ItemRow) => numberOf.get(r.id) ?? 0;
     const listed = graded && !blockGraded ? visible.filter((r) => r.has_answer === null) : visible;
-    const passage = b.passage === null || isQuestion ? [] : (JSON.parse(b.passage) as string[]);
+    const passage = b.passage === null || isQuestion || isWriting ? [] : (JSON.parse(b.passage) as string[]);
     return {
       id: b.id, ord: b.ord, kind: b.kind, format: b.format, title: b.title, instruction: b.instruction,
       formatExample: b.format_example, minutes: b.minutes, round: b.round, graded: blockGraded,
       ...(isQuestion ? { question: b.passage ?? '' } : {}),
+      ...(isWriting ? {
+        writing: {
+          text: written?.text ?? null, words: written?.words ?? null,
+          source: b.format === 'rewrite' && b.passage !== null ? (sources.get((JSON.parse(b.passage) as { sourceBlockId: number }).sourceBlockId) ?? null) : null,
+        },
+      } : {}),
       itemCount: visible.length,
-      items: isSpot ? [] : listed.map((r) => toItem(r, num(r), b.format, blockGraded)),
+      items: isSpot || (isWriting && !blockGraded) ? [] : listed.map((r) => toItem(r, num(r), b.format, blockGraded)),
       paragraphs: passage.map((text, index): ViewParagraph => {
         if (!blockGraded) return { index, text };
         const key = `${b.id}:${index}`;

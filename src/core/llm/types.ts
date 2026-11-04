@@ -15,8 +15,8 @@ export interface GeneratedParagraph {
 }
 
 export interface GeneratedBlock {
-  kind: 'review' | 'task' | 'speaking';
-  format: 'gap' | 'fix' | 'spot' | 'question';
+  kind: 'review' | 'task' | 'writing' | 'speaking';
+  format: 'gap' | 'fix' | 'spot' | 'essay' | 'question';
   title: string;
   instruction: string;
   formatExample: string;
@@ -48,6 +48,10 @@ export interface GradeResult {
   tomorrow: string[];
   spellingErrors: { word: string; hint: string }[];
   ruleGaps: { ref: string; ruleTopicKey: string; proposal: string; explanation: string; sources: Source[] }[];
+  texts: {
+    blockRef: string;
+    errors: { fragment: string; fix: string; topicKey: string; suggestedTopic: string; ruleSection: string; explanation: string }[];
+  }[];
 }
 
 export interface RuleDraft { body: string; sources: Source[] }
@@ -62,3 +66,5 @@ export interface DisputeReply {
 }
 
 export interface DisputeBatchReply { replies: (DisputeReply & { ref: string })[] }
+
+export interface ExplainReply { explanation: string }

@@ -1,0 +1,151 @@
+/* Night grove: colours, sprite colours and fonts. Every rule hangs off [data-design='grove'], so Lamp is unchanged. */
+
+/* Bundled Latin and Cyrillic subsets only. */
+@import "@fontsource/murecho/latin-400.css";
+@import "@fontsource/murecho/cyrillic-400.css";
+@import "@fontsource/murecho/latin-500.css";
+@import "@fontsource/murecho/cyrillic-500.css";
+@import "@fontsource/murecho/latin-700.css";
+@import "@fontsource/murecho/cyrillic-700.css";
+@import "@fontsource/alegreya/latin-400.css";
+@import "@fontsource/alegreya/cyrillic-400.css";
+@import "@fontsource/alegreya/latin-400-italic.css";
+@import "@fontsource/alegreya/cyrillic-400-italic.css";
+@import "@fontsource/alegreya/latin-700.css";
+@import "@fontsource/alegreya/cyrillic-700.css";
+
+/* Night grove, light. */
+[data-design='grove'] {
+  --background: oklch(0.955 0.016 115);
+  --foreground: oklch(0.26 0.03 160);
+  --card: oklch(0.975 0.01 115);
+  --popover: oklch(0.975 0.01 115);
+  --secondary: oklch(0.975 0.01 115);
+  --accent: oklch(0.975 0.01 115);
+  --input: oklch(0.975 0.01 115);
+  --muted: oklch(0.925 0.022 125);
+  --sidebar: oklch(0.925 0.022 125);
+  --muted-foreground: oklch(0.44 0.03 155);
+  --sidebar-foreground: oklch(0.44 0.03 155);
+  --faint: oklch(0.52 0.025 150);
+  --primary: oklch(0.36 0.05 165);
+  --ring: oklch(0.36 0.05 165);
+  --primary-foreground: oklch(0.95 0.04 100);
+  --border: oklch(0.86 0.022 130);
+  --success: oklch(0.48 0.1 150);
+  --destructive: oklch(0.52 0.12 42);
+  --note: oklch(0.47 0.08 245);
+  --px-far: oklch(0.87 0.035 135);
+  --px-far-node: oklch(0.81 0.04 135);
+  --px-leaf-far: oklch(0.85 0.045 135);
+  --px-bamboo-hi: oklch(0.72 0.11 140);
+  --px-bamboo: oklch(0.6 0.11 148);
+  --px-bamboo-lo: oklch(0.5 0.1 152);
+  --px-bamboo-node: oklch(0.42 0.08 155);
+  --px-leaf: oklch(0.62 0.12 142);
+  --px-dry: oklch(0.76 0.1 85);
+  --px-dry-node: oklch(0.62 0.09 75);
+  --px-empty: oklch(0.87 0.02 125);
+  --px-empty-node: oklch(0.81 0.02 125);
+  --px-wood-hi: oklch(0.7 0.08 70);
+  --px-wood: oklch(0.58 0.08 60);
+  --px-wood-lo: oklch(0.45 0.06 55);
+  --px-strap: oklch(0.55 0.12 30);
+  --px-moon: oklch(0.82 0.1 95);
+  --px-moon-lo: oklch(0.7 0.1 90);
+  --px-glow: oklch(0.8 0.13 85);
+  --px-stone: oklch(0.72 0.01 150);
+  --px-stone-lo: oklch(0.6 0.01 150);
+  --px-light-day: oklch(0.8 0.06 145);
+  --firefly: oklch(0.7 0.15 110);
+}
+
+/* Night grove, dark. Two classes so it beats the light block above and Lamp's .dark block. */
+.dark[data-design='grove'] {
+  --background: oklch(0.2 0.022 165);
+  --foreground: oklch(0.91 0.03 105);
+  --card: oklch(0.25 0.025 165);
+  --popover: oklch(0.25 0.025 165);
+  --secondary: oklch(0.25 0.025 165);
+  --accent: oklch(0.25 0.025 165);
+  --input: oklch(0.25 0.025 165);
+  --muted: oklch(0.225 0.024 165);
+  --sidebar: oklch(0.225 0.024 165);
+  --muted-foreground: oklch(0.76 0.03 120);
+  --sidebar-foreground: oklch(0.76 0.03 120);
+  --faint: oklch(0.65 0.03 135);
+  --primary: oklch(0.88 0.11 98);
+  --ring: oklch(0.88 0.11 98);
+  --primary-foreground: oklch(0.22 0.03 165);
+  --border: oklch(0.33 0.025 165);
+  --success: oklch(0.78 0.11 148);
+  --destructive: oklch(0.74 0.1 45);
+  --note: oklch(0.76 0.07 240);
+  --px-far: oklch(0.29 0.035 160);
+  --px-far-node: oklch(0.26 0.035 160);
+  --px-leaf-far: oklch(0.31 0.045 155);
+  --px-bamboo-hi: oklch(0.74 0.12 140);
+  --px-bamboo: oklch(0.6 0.11 148);
+  --px-bamboo-lo: oklch(0.48 0.09 152);
+  --px-bamboo-node: oklch(0.8 0.1 140);
+  --px-leaf: oklch(0.58 0.11 145);
+  --px-dry: oklch(0.72 0.1 85);
+  --px-dry-node: oklch(0.56 0.08 75);
+  --px-empty: oklch(0.31 0.025 165);
+  --px-empty-node: oklch(0.37 0.025 165);
+  --px-wood-hi: oklch(0.66 0.08 70);
+  --px-wood: oklch(0.54 0.08 60);
+  --px-wood-lo: oklch(0.42 0.06 55);
+  --px-strap: oklch(0.65 0.13 30);
+  --px-moon: oklch(0.9 0.1 98);
+  --px-moon-lo: oklch(0.78 0.09 95);
+  --px-glow: oklch(0.86 0.13 88);
+  --px-stone: oklch(0.45 0.015 160);
+  --px-stone-lo: oklch(0.36 0.015 160);
+  --px-light-day: oklch(0.42 0.06 150);
+  --firefly: oklch(0.92 0.15 110);
+}
+
+/* Fonts (spec N3). Headings Murecho 700, reading text Alegreya, interface Murecho. Monospace stays. */
+[data-design='grove'] body {
+  font-family: Murecho, system-ui, sans-serif;
+}
+[data-design='grove'] .headline,
+[data-design='grove'] .title {
+  font-family: Murecho, system-ui, sans-serif;
+  font-weight: 700;
+}
+/* Score bar "N / M": a dedicated class, because the unlayered .title size would beat a utility. */
+[data-design='grove'] .grove-score {
+  font-size: 2.25rem;
+  line-height: 1.1;
+}
+[data-design='grove'] .reading {
+  font-family: Alegreya, Georgia, serif;
+  font-size: 1.125rem;
+  line-height: 1.55;
+}
+
+/* Sidebar garden fireflies: a slow glow; still drawn, but not animated, under reduced motion. */
+[data-design='grove'] .grove-firefly {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: var(--firefly);
+  box-shadow: 0 0 6px 2px color-mix(in oklch, var(--firefly) 60%, transparent);
+  animation: grove-blink 3.2s ease-in-out infinite;
+}
+@keyframes grove-blink {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-design='grove'] .grove-firefly {
+    animation: none;
+  }
+}

@@ -1,8 +1,11 @@
 import { t, type Lang } from '@/core/i18n';
 import type { SessionView } from '@/core/session/view';
+import { useCore } from '@/ui/app/CoreProvider';
+import { ScoreBar } from '@/ui/grove/ScoreBar';
 
 /** Plain text at the top of a graded page: score per block, then Correct, To fix, Tomorrow's review. */
 export function FeedbackSummary({ view, lang }: { view: SessionView; lang: Lang }) {
+  const grove = useCore().settings.design === 'grove';
   const scored = view.blocks.filter((b) => b.score && b.score.counted > 0);
   const right = scored.reduce((n, b) => n + (b.score?.correct ?? 0), 0);
   const wrong = scored.reduce((n, b) => n + ((b.score?.counted ?? 0) - (b.score?.correct ?? 0)), 0);
@@ -11,6 +14,7 @@ export function FeedbackSummary({ view, lang }: { view: SessionView; lang: Lang 
   return (
     <section aria-labelledby="feedback-title" className="mt-8">
       <h2 id="feedback-title" tabIndex={-1} className="title rounded-sm">{t(lang, 'feedback.title')}</h2>
+      {grove && <ScoreBar view={view} lang={lang} />}
       <ul className="mt-4 max-w-sm">
         {scored.map((b) => (
           <li key={b.id} className="label tabular flex justify-between gap-6 border-b border-border py-1.5">

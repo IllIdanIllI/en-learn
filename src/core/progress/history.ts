@@ -52,6 +52,7 @@ export async function loadGradedFacts(db: Db): Promise<GradedFacts> {
       effective: verdict,
       isInattention: r.isInattention,
       verdict: r.verdict,
+      suggestedTopic: r.suggestedTopic,
     });
     if (r.topicId !== null) {
       topicFacts.push({

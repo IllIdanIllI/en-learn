@@ -27,6 +27,7 @@
             "enum": [
               "review",
               "task",
+              "writing",
               "speaking"
             ]
           },
@@ -36,6 +37,7 @@
               "gap",
               "fix",
               "spot",
+              "essay",
               "question"
             ]
           },

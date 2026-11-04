@@ -1,7 +1,8 @@
 import type { Db, Deps, LlmResult } from '@/core/ports';
 import type { DisputeDecision, ISODate } from '@/core/domain';
-import type { DisputeBatchReply, DisputeReply, Source } from '@/core/llm/types';
+import type { DisputeBatchReply, DisputeReply, ExplainReply, Source } from '@/core/llm/types';
 import { callStructured } from '@/core/llm/call';
+import { toneViolations } from '@/core/validate/tone';
 import { listGradingItems } from '@/core/db/repos/sessions';
 import { getRule, saveRuleVersion } from '@/core/db/repos/rules';
 
@@ -89,6 +90,39 @@ export async function disputeItem(deps: Deps, itemId: number, text: string): Pro
   if (!res.ok) return res;
   const r = res.data.replies.find((x) => x.ref === 'd1')!;
   return { ...res, data: { position: r.position, ruleSection: r.ruleSection, sources: r.sources, recommendation: r.recommendation } };
+}
+
+/** Explanation of one missed spot error, on demand. Saved to the answer on success; refused unless the error is wrong and has none yet. */
+export async function explainItem(deps: Deps, itemId: number): Promise<LlmResult<ExplainReply>> {
+  const rows = await deps.db.select<{
+    session_id: number; format: string; verdict: string; rule_section: string | null; explanation: string | null;
+  }>(
+    `SELECT b.session_id AS session_id, b.format AS format, a.verdict AS verdict, a.rule_section AS rule_section,
+            a.explanation AS explanation
+     FROM answer a JOIN item i ON i.id = a.item_id JOIN block b ON b.id = i.block_id
+     WHERE a.item_id = ?`,
+    [itemId],
+  );
+  const answer = rows[0];
+  if (!answer || answer.format !== 'spot' || answer.verdict !== 'wrong' || answer.explanation) throw new Error('explain not allowed');
+  const item = (await listGradingItems(deps.db, answer.session_id)).find((i) => i.id === itemId);
+  const paragraph = item?.passage?.[item.paragraph ?? -1];
+  if (!item || paragraph === undefined) throw new Error('Item not found');
+
+  const res = await callStructured<ExplainReply>(deps, 'explain', [
+    `Topic key: ${item.topicKey ?? '(none)'}`,
+    `Paragraph text: ${paragraph}`,
+    `Wrong fragment: "${item.prompt}"`,
+    `Expected correction: "${item.expected}"`,
+    `Rule section: ${answer.rule_section || item.ruleSection || '(none)'}`,
+    `Rule body (version ${item.ruleVersion ?? '-'}):`,
+    item.ruleBody ?? '(none)',
+  ].join('\n'), {
+    sessionId: answer.session_id,
+    check: (data) => (data.explanation.trim() === '' ? 'empty explanation' : toneViolations([data.explanation]).join('; ') || null),
+  });
+  if (res.ok) await deps.db.execute('UPDATE answer SET explanation = ? WHERE item_id = ?', [res.data.explanation, itemId]);
+  return res;
 }
 
 /** The learner's choice after a dispute (keep / correct / drop). Everything derived recomputes from it. */

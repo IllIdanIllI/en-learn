@@ -59,6 +59,8 @@
   --faint: oklch(0.65 0.018 70);
 }
 
+@import "./grove.css";
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -117,10 +119,12 @@
   a,
   summary,
   label[for],
-  select {
+  select,
+  input[type='checkbox'],
+  input[type='radio'] {
     cursor: pointer;
   }
-  :is(button, [role='button'], select):disabled {
+  :is(button, [role='button'], select, input[type='checkbox'], input[type='radio']):disabled {
     cursor: not-allowed;
   }
 }

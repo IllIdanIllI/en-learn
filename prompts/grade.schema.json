@@ -7,7 +7,8 @@
     "patterns",
     "tomorrow",
     "spellingErrors",
-    "ruleGaps"
+    "ruleGaps",
+    "texts"
   ],
   "properties": {
     "items": {
@@ -195,6 +196,64 @@
                 "url": {
                   "type": "string",
                   "description": "Real URL of the page that supports the claim"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "texts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "blockRef",
+          "errors"
+        ],
+        "properties": {
+          "blockRef": {
+            "type": "string",
+            "description": "Text reference exactly as given, for example b3"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "fragment",
+                "fix",
+                "topicKey",
+                "suggestedTopic",
+                "ruleSection",
+                "explanation"
+              ],
+              "properties": {
+                "fragment": {
+                  "type": "string",
+                  "description": "The exact wrong text as written in the learner text"
+                },
+                "fix": {
+                  "type": "string",
+                  "description": "The minimal corrected fragment"
+                },
+                "topicKey": {
+                  "type": "string",
+                  "description": "A programme topic key if one fits, else empty string"
+                },
+                "suggestedTopic": {
+                  "type": "string",
+                  "description": "Short English name of the grammar or usage area when topicKey is empty, else empty string"
+                },
+                "ruleSection": {
+                  "type": "string",
+                  "description": "Exact heading of a listed section of the topic when topicKey is set, else empty string"
+                },
+                "explanation": {
+                  "type": "string",
+                  "description": "Short neutral explanation in the learner native language"
                 }
               }
             }

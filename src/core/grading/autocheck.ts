@@ -37,24 +37,50 @@ export function autoCorrect(
   return containsRun(wordsOf(corrected), words) && !containsRun(wordsOf(item.prompt), words);
 }
 
-/** Spec F2: found ids when every learner line pairs with one hidden error and is right; null sends the paragraph to the LLM. */
+/** Keeps only the "wrong → right" lines that change something; the rest are ignored. */
+export function dropIgnoredLines(text: string): string {
+  const kept: string[] = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (line === '') continue;
+    const { wrong, right } = parseSpotLines(line)[0]!;
+    if (right !== '' && normalizeAnswer(right) !== normalizeAnswer(wrong)) kept.push(line);
+  }
+  return kept.join('\n');
+}
+
+/**
+ * Spec F2, per line: a line that pairs with one hidden error and is right finds it; a second line for an
+ * error already found is dropped; any other line is returned as `leftover` for the LLM.
+ */
 export function autoSpot(
   paragraphText: string,
   errors: { id: number; prompt: string; expected: string }[],
   learnerText: string,
-): { found: number[] } | null {
+): { found: number[]; leftover: string[] } {
   const found = new Set<number>();
-  for (const line of parseSpotLines(learnerText)) {
-    const lw = line.wrong.toLowerCase();
-    if (lw === '' || line.right === '') return null;
+  const leftover: string[] = [];
+  for (const raw of learnerText.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (line === '') continue;
+    const { wrong, right } = parseSpotLines(line)[0]!;
+    const lw = wrong.toLowerCase();
+    if (lw === '' || right === '') {
+      leftover.push(line);
+      continue;
+    }
     const paired = errors.filter((e) => {
       const w = e.prompt.trim().toLowerCase();
       return lw.includes(w) || w.includes(lw);
     });
-    if (paired.length !== 1 || found.has(paired[0]!.id)) return null;
+    if (paired.length !== 1) {
+      leftover.push(line);
+      continue;
+    }
     const e = paired[0]!;
-    if (!autoCorrect({ format: 'fix', prompt: paragraphText, expected: e.expected, wrong: e.prompt }, line.right)) return null;
-    found.add(e.id);
+    if (found.has(e.id)) continue;
+    if (autoCorrect({ format: 'fix', prompt: paragraphText, expected: e.expected, wrong: e.prompt }, right)) found.add(e.id);
+    else leftover.push(line);
   }
-  return { found: [...found] };
+  return { found: [...found], leftover };
 }

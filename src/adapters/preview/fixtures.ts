@@ -5,6 +5,7 @@ import { CLAUDE_LOCATIONS } from '@/core/llm/claude';
 import { bundledPrompts } from '@/core/llm/bundledPrompts';
 import { startApp } from '@/core/startup';
 import { insertSeedRules, saveProgramme, type SeedRule } from '@/core/programme/setup';
+import { extendOptions, lessonOptions } from '@/core/session/choice';
 import { extendSession } from '@/core/session/extend';
 import { generateSession } from '@/core/session/generate';
 import { gradeSession } from '@/core/grading/grade';
@@ -16,7 +17,8 @@ import { MINI_PROGRAMME, MINI_RULES } from './miniSeed';
 
 export const PREVIEW_STATES = [
   'empty', 'no_session', 'generated', 'questions', 'graded', 'progress', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing',
-  'earlier_session', 'progress_archived', 'closed', 'open-round', 'round-graded', 'skipped', 'skipped-round',
+  'earlier_session', 'progress_archived', 'closed', 'open-round', 'round-graded', 'skipped', 'skipped-round', 'fireflies',
+  'spot', 'spot-graded', 'writing', 'writing-graded', 'rewrite',
 ] as const;
 export type PreviewState = (typeof PREVIEW_STATES)[number];
 
@@ -26,6 +28,12 @@ const SPELLING_WORDS: [word: string, hint: string][] = [
   ['definitely', 'Without any doubt'],
   ['accommodation', 'A place to stay'],
   ['separate', 'Apart from the others'],
+];
+
+/** Words created after today's lesson in the `closed` fixture. */
+const EXTRA_SPELLING_WORDS: [word: string, hint: string][] = [
+  ['receive', 'To get something'],
+  ['believe', 'To think something is true'],
 ];
 
 /**
@@ -41,6 +49,14 @@ const ANSWERS: Record<string, string> = {
 const TUESDAY = '2026-10-20';
 const WEDNESDAY = '2026-10-21';
 const THURSDAY = '2026-10-22';
+const MONDAY = '2026-10-19';
+const SATURDAY = '2026-10-24';
+const SUNDAY = '2026-10-25';
+
+/** The essay of the writing states: 60 words with the two errors the preview grader finds, "goes" and "are". */
+const ESSAY_TEXT = 'Working from home gives people more freedom because nobody wastes time on a long commute every morning. '
+  + 'My brother goes to the office by bus and he says the trip makes him tired before the day even starts. '
+  + 'Many companies are happy to let staff choose where they work, and the results are usually quite good for everyone involved here.';
 
 /**
  * Earlier days of the `progress` fixture, played through the core on that day's date: five more graded sessions, the
@@ -140,7 +156,10 @@ async function answerToday(deps: Deps, state: 'questions' | 'graded' | 'skipped'
       }
     });
   }
-  const outcome = await gradeSession(deps, session.id, { items: answers, spot }, [], { finish: state === 'skipped' });
+  // Every essay block of the session is written with the same text.
+  const essays = await deps.db.select<{ id: number }>("SELECT id FROM block WHERE session_id = ? AND format = 'essay'", [session.id]);
+  const texts = Object.fromEntries(essays.map((b) => [b.id, ESSAY_TEXT]));
+  const outcome = await gradeSession(deps, session.id, { items: answers, spot, texts }, [], { finish: state === 'skipped' });
   if (state !== 'questions' && outcome.kind !== 'graded') throw new Error(`Preview fixture: grading gave ${outcome.kind}`);
   if (state === 'questions' && outcome.kind !== 'questions') throw new Error(`Preview fixture: expected questions, got ${outcome.kind}`);
 }
@@ -152,7 +171,7 @@ async function playDay(deps: Deps, light: boolean): Promise<void> {
 }
 
 export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
-  const clock = new SteppedClock(state === 'rest' ? WEDNESDAY : TUESDAY);
+  const clock = new SteppedClock(state === 'rest' ? WEDNESDAY : state.startsWith('spot') ? MONDAY : state.startsWith('writing') ? SATURDAY : state === 'rewrite' ? SUNDAY : TUESDAY);
   const deps: Deps = {
     db: await createSqlJsDb(),
     llm: previewLlm,
@@ -175,6 +194,12 @@ export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
   for (const [word, hint] of SPELLING_WORDS) await findOrCreateSpellingWord(deps.db, word, hint, clock.now());
 
   const today = clock.today();
+  if (state === 'fireflies') {
+    // Yesterday's lesson was played, so the sidebar garden has fireflies; today has no session yet.
+    clock.set('2026-10-19');
+    await playDay(deps, false);
+    clock.set(today);
+  }
   const progressLike = state === 'progress' || state === 'progress_archived';
   if (progressLike) {
     for (const day of EARLIER_DAYS) {
@@ -188,18 +213,36 @@ export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
     requireOk(await generateSession(deps, { light: false }), 'generateSession');
     clock.set(THURSDAY);
   }
+  if (state === 'rewrite') {
+    // Saturday's essay was written and checked; today's lesson rewrites it.
+    clock.set(SATURDAY);
+    requireOk(await generateSession(deps, { light: false, choice: (await lessonOptions(deps, SATURDAY, false)).defaults }), 'generateSession');
+    await answerToday(deps, 'graded');
+    clock.set(today);
+  }
+  const written = state === 'writing' || state === 'writing-graded' || state === 'rewrite';
   const answered = state === 'graded' || state === 'closed' || state === 'open-round' || state === 'round-graded' || state === 'skipped' || state === 'skipped-round';
-  if (state === 'generated' || state === 'questions' || answered || progressLike) {
+  if (written) {
+    requireOk(await generateSession(deps, { light: false, choice: (await lessonOptions(deps, today, false)).defaults }), 'generateSession');
+  }
+  if (state === 'generated' || state === 'spot' || state === 'spot-graded' || state === 'questions' || answered || progressLike) {
     requireOk(await generateSession(deps, { light: false }), 'generateSession');
   }
   if (state === 'questions' || answered || progressLike) {
     await answerToday(deps, state === 'questions' || state === 'skipped' ? state : 'graded');
   }
+  if (state === 'spot-graded' || state === 'writing-graded') await answerToday(deps, 'graded');
   if (state === 'closed' || state === 'open-round' || state === 'round-graded' || state === 'skipped-round') {
     const session = await getSessionByDate(deps.db, today);
     if (!session) throw new Error('Preview fixture: no session');
-    if (state === 'closed') await closeSession(deps.db, session.id);
-    else requireOk(await extendSession(deps, session.id), 'extendSession');
+    if (state === 'closed') {
+      await closeSession(deps.db, session.id);
+      // Words today's lesson did not use, so the added round can offer spelling.
+      for (const [word, hint] of EXTRA_SPELLING_WORDS) await findOrCreateSpellingWord(deps.db, word, hint, clock.now());
+    } else {
+      const { defaults } = await extendOptions(deps, session.id);
+      requireOk(await extendSession(deps, session.id, { review: false, formats: defaults, spelling: false, writing: false, rewrite: false }), 'extendSession');
+    }
     if (state === 'round-graded') await answerToday(deps, 'graded');
     // Round 2 answered with blanks and the lesson finished: the skipped items belong to the added round.
     if (state === 'skipped-round') await answerToday(deps, 'skipped');

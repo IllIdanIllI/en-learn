@@ -8,7 +8,7 @@ test('https link kept', () => {
 });
 
 test('http, javascript:, file: and empty → Oxford search link', () => {
-  for (const link of ['http://example.com', 'javascript:alert(1)', 'file:///etc/passwd', '', '   ']) {
+  for (const link of ['http://example.com', 'javascript:alert(1)', 'file:///etc/passwd', '', '   ', 'https://', ' https:// ']) {
     expect(wordLink('cat', link), link).toBe(`${OXFORD}cat`);
   }
 });

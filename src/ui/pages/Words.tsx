@@ -100,6 +100,7 @@ export function Words() {
         <div className="mt-4 rounded-md bg-card p-4">
           <ImportPanel
             existing={existing}
+            onChanged={changed}
             onImported={() => {
               changed();
               setPanel(null);

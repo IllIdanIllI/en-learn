@@ -3,7 +3,7 @@ import { createTestDb } from '@/adapters/test/sqliteDb';
 import { FixedClock } from '@/adapters/test/fixedClock';
 import { FakeLlm } from '@/adapters/test/fakeLlm';
 import { bundledPrompts } from '@/core/llm/bundledPrompts';
-import { insertWord, listExercises, listWords } from '@/core/db/repos/words';
+import { deleteWord, insertWord, listExercises, listWords } from '@/core/db/repos/words';
 import { withJobLock } from '@/core/session/jobLock';
 import { generateWords } from '@/core/words/generate';
 import type { Deps, LlmResult } from '@/core/ports';
@@ -111,6 +111,18 @@ describe('generateWords', () => {
     expect(res).toEqual({ ok: false, message: expect.any(String), code: 'busy' });
     expect((await listWords(deps.db))[0]!.generation).toBe('pending');
     expect(llm.calls).toHaveLength(0);
+  });
+
+  test('a word deleted while its batch call runs is skipped, the others ready', async () => {
+    const inner = new FakeLlm({ words: [echo()] });
+    const deps = await setup(inner);
+    let victim = 0;
+    deps.llm = { call: async (req) => { await deleteWord(deps.db, victim); return inner.call(req); } };
+    const ids = await add(deps, 'a', 'b', 'c');
+    victim = ids[1]!;
+    expect(await generateWords(deps, ids)).toEqual({ ok: true, failed: 0 });
+    const gens = Object.fromEntries((await listWords(deps.db)).map((w) => [w.word, w.generation]));
+    expect(gens).toEqual({ a: 'ready', c: 'ready' });
   });
 
   test('a deleted word id is skipped', async () => {

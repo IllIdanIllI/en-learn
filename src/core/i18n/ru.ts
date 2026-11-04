@@ -256,7 +256,7 @@ export const ru: Record<keyof typeof en, string> = {
   'error.budget': 'Достигнут лимит бюджета на один вызов.',
   'error.budgetLink': 'Изменить в настройках',
   'error.sessionExists': 'Сессия на сегодня уже есть.',
-  'error.busy': 'Урок уже создаётся',
+  'error.busy': 'Сейчас выполняется другая задача. Попробуйте через минуту.',
   'error.sessionNotFound': 'Сессия не найдена.',
   'error.sessionNotReady': 'Сессия пока не готова.',
   'error.boundary.title': 'Что-то пошло не так.',

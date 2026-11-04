@@ -39,7 +39,9 @@ async function runBatch(deps: Deps, ids: number[]): Promise<BatchOutcome> {
     return { error: { ok: false, message: res.message, code: res.code } };
   }
   let failed = 0;
+  const present = new Set((await listWords(deps.db)).map((x) => x.id));
   for (const w of words) {
+    if (!present.has(w.id)) continue;
     const g = res.data.words.find((x) => x.word.trim().toLowerCase() === w.word.trim().toLowerCase())!;
     if (wordProblems(g, w.word).length > 0) {
       await setGeneration(deps.db, w.id, 'failed');

@@ -9,7 +9,7 @@ import { Notice } from '@/ui/today/chips';
 import { useWordsJob } from './WordsJobProvider';
 
 /** Pasted Obsidian cards with a live preview; importing stores the new words and starts their generation. */
-export function ImportPanel({ existing, onImported, onCancel }: { existing: string[]; onImported: () => void; onCancel: () => void }) {
+export function ImportPanel({ existing, onImported, onChanged, onCancel }: { existing: string[]; onImported: () => void; onChanged: () => void; onCancel: () => void }) {
   const { deps, lang } = useCore();
   const job = useWordsJob();
   const [text, setText] = useState('');
@@ -24,6 +24,7 @@ export function ImportPanel({ existing, onImported, onCancel }: { existing: stri
     setError(null);
     const today = deps.clock.today();
     const ids: number[] = [];
+    let failed = false;
     try {
       for (const { fields } of preview.toImport) {
         try {
@@ -47,11 +48,13 @@ export function ImportPanel({ existing, onImported, onCancel }: { existing: stri
       }
       setText('');
     } catch (e) {
+      failed = true;
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       if (ids.length > 0) {
         job.run(ids);
-        onImported();
+        if (failed) onChanged();
+        else onImported();
       }
       setSaving(false);
     }

@@ -135,11 +135,25 @@ test.describe('lesson picker: before a lesson', () => {
     await expect(writing).toBeEnabled();
   });
 
-  test('on a rest day the Writing card is unavailable with its reason', async ({ page }) => {
+  test('a rest day has the same controls as a normal day: Start session, the gear and an unpressed light toggle', async ({ page }) => {
     await page.goto('/?state=rest#/today');
+    await expect(page.getByRole('button', { name: 'Начать сессию' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Лёгкий день', exact: true })).toHaveAttribute('aria-pressed', 'false');
     await openSetup(page);
+    await expect(card(page, 'Письмо')).toBeEnabled();
+    await expect(card(page, 'Письмо')).not.toContainText('не в лёгкий день');
+    await page.getByRole('button', { name: 'Лёгкий день', exact: true }).click();
     await expect(card(page, 'Письмо')).toBeDisabled();
     await expect(card(page, 'Письмо')).toContainText('не в лёгкий день');
+  });
+
+  test('pressing Start session closes the set-up panel', async ({ page }) => {
+    await page.goto('/?state=no_session&delay=1500#/today');
+    await openSetup(page);
+    await expect(card(page, 'Правописание')).toBeVisible();
+    await page.getByRole('button', { name: 'Начать сессию' }).click();
+    await expect(page.getByRole('button', { name: 'Настроить урок' })).toHaveAttribute('aria-expanded', 'false');
+    await expect(card(page, 'Правописание')).toHaveCount(0);
   });
 
   test('pressing every card off disables Start session', async ({ page }) => {
@@ -157,7 +171,7 @@ test.describe('lesson picker: before a lesson', () => {
     await expect(card(page, 'Правописание')).toHaveAttribute('aria-pressed', 'true');
     await expect(card(page, 'Говорение')).toHaveAttribute('aria-pressed', 'false');
     for (const name of ['Вставить пропуск', 'Исправить предложение', 'Найти ошибки', 'Письмо']) await expect(card(page, name)).toHaveAttribute('aria-pressed', 'false');
-    await expect(page.getByRole('button', { name: 'Начать лёгкий день' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Начать сессию' })).toBeEnabled();
   });
 
   test('the pointer cursor shows on the cards and the gear, not-allowed on a disabled card', async ({ page }) => {

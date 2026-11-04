@@ -610,7 +610,8 @@ test.describe('today actions', () => {
     await page.goto('/?state=rest#/today');
     await expect(page.getByRole('heading', { level: 1, name: 'День отдыха' })).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/today-rest.png` });
-    await page.getByRole('button', { name: 'Начать лёгкий день' }).click();
+    await page.getByRole('button', { name: 'Лёгкий день', exact: true }).click();
+    await page.getByRole('button', { name: 'Начать сессию' }).click();
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
   });
 

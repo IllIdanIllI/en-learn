@@ -57,7 +57,7 @@ S2's writing part: a writing task, a rewrite task, the errors-per-100-words metr
 - Within "Other", errors with the same suggested topic sit together, so recurring areas are visible as material for new rules. Creating a rule from them is not part of this spec.
 
 ## W8. Set-up panel (replaces the picker UI)
-- **Start button:** a split button: "Начать сессию" and a gear segment (lucide `settings`, 1.5 stroke), both in the primary colour, separated by a thin divider. The main part starts the lesson with the current choice (the day's defaults until changed). The gear toggles the set-up panel under the button; while open, the gear segment shows a pressed state (`aria-expanded`). Rest day: the same, with "Начать лёгкий день".
+- **Start button:** a split button: "Начать сессию" and a gear segment (lucide `settings`, 1.5 stroke), both in the primary colour, separated by a thin divider. The main part starts the lesson with the current choice (the day's defaults until changed). The gear toggles the set-up panel under the button; while open, the gear segment shows a pressed state (`aria-expanded`). Pressing the main part closes the panel. Rest day (learner, 2026-11-04): the same controls as a normal day ("Начать сессию", gear, "Лёгкий день" toggle off); the rest-day defaults (review, spelling) stay.
 - "Лёгкий день" stays a separate toggle button next to it, behaviour unchanged.
 - **Panel:** cards instead of checkboxes, in three groups:
   - Повторение / Review: Повторение (only when review is available);

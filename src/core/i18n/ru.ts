@@ -206,7 +206,6 @@ export const ru: Record<keyof typeof en, string> = {
   'feedback.tomorrow': 'Что повторить завтра',
   'feedback.rightCount': 'Верных ответов: {n}.',
   'feedback.fixCount': 'Нужно исправить: {n}. Подробности под каждым заданием.',
-  'today.startLight': 'Начать лёгкий день',
   'today.setup': 'Настроить урок',
   'picker.group.review': 'Повторение',
   'picker.group.tasks': 'Задания',

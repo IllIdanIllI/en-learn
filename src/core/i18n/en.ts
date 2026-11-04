@@ -204,7 +204,6 @@ export const en = {
   'feedback.tomorrow': "Tomorrow's review",
   'feedback.rightCount': '{n} answers are right.',
   'feedback.fixCount': '{n} to fix. Details are under each item.',
-  'today.startLight': 'Start light day',
   'today.setup': 'Set up the lesson',
   'picker.group.review': 'Review',
   'picker.group.tasks': 'Tasks',

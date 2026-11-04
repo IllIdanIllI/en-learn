@@ -42,8 +42,7 @@ export function StartSession({ lang, today, loader, error, rest = false, onStart
   }, [deps, today, rest, reload]);
 
   const generating = loader !== null;
-  // A rest day has no toggle: the only way to practise is a light day.
-  const light = rest || lightChoice;
+  const light = lightChoice;
   const ready = choice !== null && (choice.review || choice.formats.length > 0 || choice.spelling || choice.speaking || (!light && (choice.writing || choice.rewrite)));
   // The light toggle drops the task, writing and rewrite ticks; switching it off brings the day's default ticks back. The learner can still tick a card afterwards.
   const toggleLight = (on: boolean) => {
@@ -56,7 +55,9 @@ export function StartSession({ lang, today, loader, error, rest = false, onStart
     }));
   };
   const start = () => {
-    if (choice !== null) onStart(light, choice);
+    if (choice === null) return;
+    setSetupOpen(false);
+    onStart(light, choice);
   };
   return (
     <>
@@ -79,7 +80,7 @@ export function StartSession({ lang, today, loader, error, rest = false, onStart
       <div className="mt-6 flex items-center gap-3">
         <div className="inline-flex">
           <Button className="rounded-r-none" disabled={generating || !ready} onClick={start}>
-            {t(lang, rest ? 'today.startLight' : 'today.start')}
+            {t(lang, 'today.start')}
           </Button>
           <Button
             className="rounded-l-none border-l border-primary-foreground/30 px-2.5"
@@ -91,11 +92,9 @@ export function StartSession({ lang, today, loader, error, rest = false, onStart
             <Settings strokeWidth={1.5} aria-hidden />
           </Button>
         </div>
-        {!rest && (
-          <Toggle pressed={light} disabled={generating} onPressedChange={toggleLight}>
-            {t(lang, 'today.light')}
-          </Toggle>
-        )}
+        <Toggle pressed={light} disabled={generating} onPressedChange={toggleLight}>
+          {t(lang, 'today.light')}
+        </Toggle>
       </div>
       {setupOpen && options !== null && choice !== null && (
         <div className="mt-4">

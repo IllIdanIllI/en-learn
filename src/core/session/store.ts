@@ -34,7 +34,7 @@ export async function writeBlocks(
       formatExample: null,
       passage: null,
       minutes: Math.ceil(spelling.length / SPELLING_WORDS_PER_MINUTE),
-    });
+    }, at.round);
     let i = 0;
     for (const w of spelling) {
       await insertItem(db, blockId, i++, {

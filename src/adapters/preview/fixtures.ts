@@ -30,6 +30,12 @@ const SPELLING_WORDS: [word: string, hint: string][] = [
   ['separate', 'Apart from the others'],
 ];
 
+/** Words created after today's lesson in the `closed` fixture. */
+const EXTRA_SPELLING_WORDS: [word: string, hint: string][] = [
+  ['receive', 'To get something'],
+  ['believe', 'To think something is true'],
+];
+
 /**
  * Canned answers of the graded fixture: one wrong (answered with a bare tick), one right, and one the rulebook does not cover (a rule gap),
  * matched by prompt. Other items alternate right and wrong.
@@ -229,8 +235,14 @@ export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
   if (state === 'closed' || state === 'open-round' || state === 'round-graded' || state === 'skipped-round') {
     const session = await getSessionByDate(deps.db, today);
     if (!session) throw new Error('Preview fixture: no session');
-    if (state === 'closed') await closeSession(deps.db, session.id);
-    else requireOk(await extendSession(deps, session.id, (await extendOptions(deps, session.id)).defaults, false), 'extendSession');
+    if (state === 'closed') {
+      await closeSession(deps.db, session.id);
+      // Words today's lesson did not use, so the added round can offer spelling.
+      for (const [word, hint] of EXTRA_SPELLING_WORDS) await findOrCreateSpellingWord(deps.db, word, hint, clock.now());
+    } else {
+      const { defaults } = await extendOptions(deps, session.id);
+      requireOk(await extendSession(deps, session.id, { review: false, formats: defaults, spelling: false, writing: false, rewrite: false }), 'extendSession');
+    }
     if (state === 'round-graded') await answerToday(deps, 'graded');
     // Round 2 answered with blanks and the lesson finished: the skipped items belong to the added round.
     if (state === 'skipped-round') await answerToday(deps, 'skipped');

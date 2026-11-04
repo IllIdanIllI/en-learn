@@ -143,7 +143,6 @@ test.describe('sidebar garden', () => {
     await expect(page.getByRole('heading', { name: 'Урок завершён' })).toBeVisible();
     await expect(page.locator('[data-garden] [data-geta]')).toHaveCount(1);
     await page.getByRole('button', { name: 'Добавить вопросы' }).click();
-    await page.getByRole('button', { name: 'Добавить', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Урок завершён' })).toHaveCount(0);
     await expect(page.locator('[data-garden] [data-geta]')).toHaveCount(0);
   });

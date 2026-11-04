@@ -43,6 +43,23 @@ function ref(info: DayInfo, topic: Topic): RuleRef | null {
   return r ? { topic, ruleId: r.ruleId, version: r.version, body: r.body } : null;
 }
 
+function reviewEntry(topics: Topic[], r: DayInfo['facts']['errorRows'][number]): ReviewEntry {
+  return {
+    prompt: r.prompt,
+    answer: r.text,
+    fix: r.fix,
+    topicKey: r.topicId === null ? null : (topics.find((t) => t.id === r.topicId)?.key ?? null),
+    skipped: false,
+  };
+}
+
+/** The counted wrong answers (not spelling, not inattention) of today's graded session. */
+export function todayMistakes(info: DayInfo, d: ISODate): ReviewEntry[] {
+  return info.facts.errorRows
+    .filter((r) => r.format !== 'spelling' && r.date === d && r.effective === 'wrong' && !r.isInattention)
+    .map((r) => reviewEntry(info.topics, r));
+}
+
 export interface ReviewSources {
   reviewDate: ISODate | null;
   reviewInputs: ReviewEntry[];
@@ -62,13 +79,7 @@ export async function reviewSources(deps: Deps, info: DayInfo, d: ISODate): Prom
   });
 
   const last = (await listGradedSessions(deps.db)).find((s) => s.date < d) ?? null;
-  const entry = (r: (typeof facts.errorRows)[number]): ReviewEntry => ({
-    prompt: r.prompt,
-    answer: r.text,
-    fix: r.fix,
-    topicKey: r.topicId === null ? null : (byId.get(r.topicId)?.key ?? null),
-    skipped: false,
-  });
+  const entry = (r: (typeof facts.errorRows)[number]): ReviewEntry => reviewEntry(info.topics, r);
   const skipped: ReviewEntry[] = last
     ? (await listSkippedItems(deps.db, last.id)).map((r) => ({
         prompt: r.prompt,

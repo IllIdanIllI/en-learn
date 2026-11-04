@@ -39,6 +39,14 @@ describe('latestWritingSource', () => {
     expect(await latestWritingSource(db, '2026-10-10')).toBeNull();
   });
 
+  test('with `inclusive` a text of that very day counts', async () => {
+    const db = await createTestDb();
+    const before = await addText(db, '2026-10-19', 'graded', 60);
+    const same = await addText(db, '2026-10-20', 'graded', 55);
+    expect(await latestWritingSource(db, '2026-10-20')).toEqual({ blockId: before, text: 'text of 60 words' });
+    expect(await latestWritingSource(db, '2026-10-20', true)).toEqual({ blockId: same, text: 'text of 55 words' });
+  });
+
   test('a text of exactly 50 words is usable', async () => {
     const db = await createTestDb();
     const bid = await addText(db, '2026-10-20', 'graded', 50);

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Check } from 'lucide-react';
 import { t, type Lang, type MessageKey } from '@/core/i18n';
-import type { ExtendOptions, LessonChoice, LessonOptions, RowReason, TaskFormat } from '@/core/session/choice';
+import type { AddRound, ExtendOptions, LessonChoice, LessonOptions, RowReason, TaskFormat } from '@/core/session/choice';
 
 type CardKey = 'review' | 'gap' | 'fix' | 'spot' | 'spelling' | 'speaking' | 'writing' | 'rewrite';
 const FORMATS: TaskFormat[] = ['gap', 'fix', 'spot'];
@@ -11,11 +11,10 @@ const REASON_KEY: Record<CardReason, MessageKey> = {
   no_rule: 'picker.reason.no_rule',
   no_topics: 'picker.reason.no_topics',
   no_text: 'picker.reason.no_text',
+  no_mistakes: 'picker.reason.no_mistakes',
+  no_words: 'picker.reason.no_words',
   light: 'picker.reason.light',
 };
-
-/** The round the learner adds: the ticked task formats and whether it ends with an essay. */
-export interface AddRound { formats: TaskFormat[]; writing: boolean }
 
 /** One card: a toggle button with the title, a one-line example and a description. An unavailable card (one with a reason) is dimmed and shows its reason instead of the example. */
 function Card({ lang, id, reason, selected, disabled, onToggle }: {
@@ -84,17 +83,27 @@ export function LessonCards({ lang, options, value, light, disabled, onChange }:
   );
 }
 
-/** The cards of the added round: the three task formats and writing (unavailable on a light session). */
+/** The cards of the added round, grouped like the lesson's (no speaking): review, the task formats, and spelling, writing and rewrite. Writing and rewrite are unavailable on a light session. */
 export function AddRoundCards({ lang, options, value, disabled, onChange }: {
   lang: Lang; options: ExtendOptions; value: AddRound; disabled: boolean; onChange: (value: AddRound) => void;
 }) {
   const flip = (f: TaskFormat) => onChange({ ...value, formats: FORMATS.filter((x) => (x === f ? !value.formats.includes(f) : value.formats.includes(x))) });
+  const light = !options.writing;
   return (
-    <div className="grid max-w-sm gap-2.5">
-      {FORMATS.map((f) => (
-        <Card key={f} lang={lang} id={f} reason={options.formats[f]} selected={value.formats.includes(f)} disabled={disabled} onToggle={() => flip(f)} />
-      ))}
-      <Card lang={lang} id="writing" reason={options.writing ? null : 'light'} selected={value.writing} disabled={disabled} onToggle={() => onChange({ ...value, writing: !value.writing })} />
+    <div className="rounded-xl border border-border bg-card p-3.5">
+      <Group title={t(lang, 'picker.group.review')}>
+        <Card lang={lang} id="review" reason={options.reviewReason} selected={value.review} disabled={disabled} onToggle={() => onChange({ ...value, review: !value.review })} />
+      </Group>
+      <Group title={t(lang, 'picker.group.tasks')}>
+        {FORMATS.map((f) => (
+          <Card key={f} lang={lang} id={f} reason={options.formats[f]} selected={value.formats.includes(f)} disabled={disabled} onToggle={() => flip(f)} />
+        ))}
+      </Group>
+      <Group title={t(lang, 'picker.group.more')}>
+        <Card lang={lang} id="spelling" reason={options.spellingReason} selected={value.spelling} disabled={disabled} onToggle={() => onChange({ ...value, spelling: !value.spelling })} />
+        <Card lang={lang} id="writing" reason={light ? 'light' : null} selected={value.writing} disabled={disabled} onToggle={() => onChange({ ...value, writing: !value.writing })} />
+        <Card lang={lang} id="rewrite" reason={light ? 'light' : options.rewriteReason} selected={value.rewrite} disabled={disabled} onToggle={() => onChange({ ...value, rewrite: !value.rewrite })} />
+      </Group>
     </div>
   );
 }

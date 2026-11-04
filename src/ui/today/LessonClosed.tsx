@@ -1,11 +1,14 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { Settings } from 'lucide-react';
 import { t, type Lang } from '@/core/i18n';
-import { extendOptions, type ExtendOptions } from '@/core/session/choice';
+import { extendOptions, type AddRound, type ExtendOptions } from '@/core/session/choice';
 import { useCore } from '@/ui/app/CoreProvider';
 import { Button } from '@/ui/components/ui/button';
 import { ErrorNotice } from './ErrorNotice';
-import { AddRoundCards, type AddRound } from './LessonCards';
+import { AddRoundCards } from './LessonCards';
 import { Loader, type LoaderView } from './Loader';
+
+const NONE: AddRound = { review: false, formats: [], spelling: false, writing: false, rewrite: false };
 
 /** Today after the lesson is closed: what the learner can do next. */
 export function LessonClosed({ lang, sessionId, loader, showingResults, onToggleResults, onAdd, children }: {
@@ -15,10 +18,11 @@ export function LessonClosed({ lang, sessionId, loader, showingResults, onToggle
 }) {
   const { deps } = useCore();
   const adding = loader !== null;
-  // The panel of the added round: its cards and default ticks are read when it opens; "Добавить" starts the round with the ticked cards.
+  // The panel of the added round sits behind the gear: its cards and default ticks are read when it opens; the main button starts the round with the ticked cards.
+  // Without the panel the choice is empty, and Today adds the round with the defaults.
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState<ExtendOptions | null>(null);
-  const [chosen, setChosen] = useState<AddRound>({ formats: [], writing: false });
+  const [chosen, setChosen] = useState<AddRound>(NONE);
   const [optionsError, setOptionsError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   useEffect(() => {
@@ -28,7 +32,7 @@ export function LessonClosed({ lang, sessionId, loader, showingResults, onToggle
       (o) => {
         if (!live) return;
         setOptions(o);
-        setChosen({ formats: o.defaults, writing: false });
+        setChosen({ ...NONE, formats: o.defaults });
       },
       (e: unknown) => {
         if (live) setOptionsError(e instanceof Error ? e.message : String(e));
@@ -42,6 +46,7 @@ export function LessonClosed({ lang, sessionId, loader, showingResults, onToggle
   const close = () => {
     setOpen(false);
     setOptions(null);
+    setChosen(NONE);
     setOptionsError(null);
   };
   return (
@@ -51,7 +56,18 @@ export function LessonClosed({ lang, sessionId, loader, showingResults, onToggle
         <Button variant="secondary" aria-expanded={showingResults} disabled={adding} onClick={onToggleResults}>
           {t(lang, showingResults ? 'today.hideResults' : 'today.showResults')}
         </Button>
-        <Button aria-expanded={open} disabled={adding} onClick={() => (open ? close() : setOpen(true))}>{t(lang, 'today.addMore')}</Button>
+        <div className="inline-flex">
+          <Button className="rounded-r-none" disabled={adding} onClick={() => { onAdd(chosen); close(); }}>{t(lang, 'today.addMore')}</Button>
+          <Button
+            className="rounded-l-none border-l border-primary-foreground/30 px-2.5"
+            aria-label={t(lang, 'today.setup')}
+            aria-expanded={open}
+            disabled={adding}
+            onClick={() => (open ? close() : setOpen(true))}
+          >
+            <Settings strokeWidth={1.5} aria-hidden />
+          </Button>
+        </div>
         {children}
       </div>
       {open && (
@@ -68,11 +84,6 @@ export function LessonClosed({ lang, sessionId, loader, showingResults, onToggle
             />
           )}
           {options !== null && <AddRoundCards lang={lang} options={options} value={chosen} disabled={adding} onChange={setChosen} />}
-          <div className="mt-4">
-            <Button disabled={options === null || (chosen.formats.length === 0 && !chosen.writing) || adding} onClick={() => { onAdd(chosen); close(); }}>
-              {t(lang, 'picker.add')}
-            </Button>
-          </div>
         </div>
       )}
       {loader !== null && <Loader lang={lang} {...loader} />}

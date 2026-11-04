@@ -5,7 +5,6 @@ test.describe('lesson picker: generation outlives the page', () => {
     await page.goto('/?state=closed&delay=1500#/today');
     const add = page.getByRole('button', { name: 'Добавить вопросы' });
     await add.click();
-    await page.getByRole('button', { name: 'Добавить', exact: true }).click();
     await expect(add).toBeDisabled();
     await page.getByRole('link', { name: 'Настройки' }).click();
     await expect(page).toHaveURL(/#\/settings/);
@@ -33,7 +32,6 @@ test.describe('lesson picker: generation outlives the page', () => {
     }, { intervals: [300] }).toBe(true);
     await page.goto('/?state=closed&delay=1500#/today');
     await page.getByRole('button', { name: 'Добавить вопросы' }).click();
-    await page.getByRole('button', { name: 'Добавить', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 30_000 });
     await expect(fields).toHaveCount(expected);
   });
@@ -185,58 +183,106 @@ test.describe('lesson picker: before a lesson', () => {
 });
 
 test.describe('lesson picker: added round', () => {
-  test('pressing Добавить вопросы shows four cards with the defaults pressed and an Add button', async ({ page }) => {
+  const gearOf = (page: Page) => page.getByRole('button', { name: 'Настроить урок' });
+  const addButton = (page: Page) => page.getByRole('button', { name: 'Добавить вопросы' });
+  const untickAll = async (page: Page) => {
+    while ((await page.getByRole('button', { pressed: true }).count()) > 0) await page.getByRole('button', { pressed: true }).first().click();
+  };
+
+  test('Добавить вопросы is a split button: the gear starts closed and the cards are hidden', async ({ page }) => {
     await page.goto('/?state=closed#/today');
-    await page.getByRole('button', { name: 'Добавить вопросы' }).click();
-    const gap = card(page, 'Вставить пропуск');
-    const fix = card(page, 'Исправить предложение');
-    const spot = card(page, 'Найти ошибки');
-    await expect(gap).toBeVisible();
-    await expect(fix).toBeVisible();
-    await expect(spot).toBeVisible();
-    await expect(card(page, 'Письмо')).toBeVisible();
-    await expect(spot).toHaveAttribute('aria-pressed', 'false');
+    await expect(addButton(page)).toBeVisible();
+    await expect(gearOf(page)).toHaveAttribute('aria-expanded', 'false');
+    await expect(card(page, 'Вставить пропуск')).toHaveCount(0);
+  });
+
+  test('the gear shows the seven cards with the programme format pressed and nothing else', async ({ page }) => {
+    await page.goto('/?state=closed#/today');
+    await gearOf(page).click();
+    await expect(gearOf(page)).toHaveAttribute('aria-expanded', 'true');
+    for (const name of ['Повторение', 'Вставить пропуск', 'Исправить предложение', 'Найти ошибки', 'Правописание', 'Письмо', 'Переписать']) {
+      await expect(card(page, name)).toBeVisible();
+    }
+    await expect(card(page, 'Говорение')).toHaveCount(0);
+    await expect(card(page, 'Повторение')).toHaveAttribute('aria-pressed', 'false');
+    await expect(card(page, 'Правописание')).toHaveAttribute('aria-pressed', 'false');
+    await expect(card(page, 'Найти ошибки')).toHaveAttribute('aria-pressed', 'false');
     await expect(card(page, 'Письмо')).toHaveAttribute('aria-pressed', 'false');
     // The programme's format for today: exactly one of gap and fix.
+    const gap = card(page, 'Вставить пропуск');
+    const fix = card(page, 'Исправить предложение');
     await expect.poll(async () => [await gap.getAttribute('aria-pressed'), await fix.getAttribute('aria-pressed')].filter((v) => v === 'true').length).toBe(1);
-    await expect(page.getByRole('button', { name: 'Добавить', exact: true })).toBeEnabled();
+    // Rewrite has no checked text in this fixture.
+    await expect(card(page, 'Переписать')).toBeDisabled();
+    await expect(card(page, 'Переписать')).toContainText('нет текста');
+  });
+
+  test('the main part adds a round with the defaults right away and closes the panel', async ({ page }) => {
+    await page.goto('/?state=closed#/today');
+    await gearOf(page).click();
+    await expect(card(page, 'Вставить пропуск')).toBeVisible();
+    await addButton(page).click();
+    await expect(card(page, 'Вставить пропуск')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('My sister is an nurse')).toBeVisible();
   });
 
   test('pressing find-the-errors as well adds a round with a spot block', async ({ page }) => {
     await page.goto('/?state=closed#/today');
-    await page.getByRole('button', { name: 'Добавить вопросы' }).click();
+    await gearOf(page).click();
     await card(page, 'Найти ошибки').click();
-    await page.getByRole('button', { name: 'Добавить', exact: true }).click();
+    await addButton(page).click();
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('Выделите ошибку в тексте и нажмите «Исправить».')).toHaveCount(1);
   });
 
   test('pressing writing adds a round with a writing block', async ({ page }) => {
     await page.goto('/?state=closed#/today');
-    await page.getByRole('button', { name: 'Добавить вопросы' }).click();
+    await gearOf(page).click();
     await card(page, 'Письмо').click();
-    await page.getByRole('button', { name: 'Добавить', exact: true }).click();
+    await addButton(page).click();
     await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('textbox', { name: 'Ваш текст' })).toHaveCount(1);
   });
 
-  test('pressing every card off disables Добавить', async ({ page }) => {
+  test('pressing only Правописание adds a spelling block of words the lesson did not use', async ({ page }) => {
     await page.goto('/?state=closed#/today');
-    await page.getByRole('button', { name: 'Добавить вопросы' }).click();
-    const add = page.getByRole('button', { name: 'Добавить', exact: true });
-    await expect(add).toBeEnabled();
-    while ((await page.getByRole('button', { pressed: true }).count()) > 0) await page.getByRole('button', { pressed: true }).first().click();
-    await expect(add).toBeDisabled();
+    await gearOf(page).click();
+    await untickAll(page);
+    await card(page, 'Правописание').click();
+    await addButton(page).click();
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('To get something')).toBeVisible();
+    await expect(page.getByText('To think something is true')).toBeVisible();
+    await expect(page.getByText('Not optional')).toHaveCount(0);
   });
 
-  test('pressing Добавить вопросы again closes the panel', async ({ page }) => {
+  test('pressing only Повторение adds a review block of the lesson mistakes', async ({ page }) => {
     await page.goto('/?state=closed#/today');
-    const add = page.getByRole('button', { name: 'Добавить вопросы' });
-    await add.click();
+    await gearOf(page).click();
+    await untickAll(page);
+    await card(page, 'Повторение').click();
+    await addButton(page).click();
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Если предложение верно, нажмите ✓, иначе впишите исправленный фрагмент.')).toHaveCount(1);
+  });
+
+  test('with every card unpressed the main part still adds a round with the defaults', async ({ page }) => {
+    await page.goto('/?state=closed#/today');
+    await gearOf(page).click();
+    await untickAll(page);
+    await addButton(page).click();
+    await expect(page.getByRole('button', { name: 'Проверить ответы' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('My sister is an nurse')).toBeVisible();
+  });
+
+  test('pressing the gear again closes the panel', async ({ page }) => {
+    await page.goto('/?state=closed#/today');
+    await gearOf(page).click();
     await expect(card(page, 'Вставить пропуск')).toBeVisible();
-    await add.click();
+    await gearOf(page).click();
     await expect(card(page, 'Вставить пропуск')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Добавить', exact: true })).toHaveCount(0);
+    await expect(gearOf(page)).toHaveAttribute('aria-expanded', 'false');
   });
 });
 
@@ -244,7 +290,6 @@ test.describe('lesson picker: retry of an added round', () => {
   test('retrying after leaving Today sends the defaults, not an empty choice', async ({ page }) => {
     await page.goto('/?state=closed&fail=timeout#/today');
     await page.getByRole('button', { name: 'Добавить вопросы' }).click();
-    await page.getByRole('button', { name: 'Добавить', exact: true }).click();
     await expect(page.getByRole('alert')).toContainText('Preview failure: timeout', { timeout: 15_000 });
     await page.getByRole('link', { name: 'Настройки' }).click();
     await expect(page).toHaveURL(/#\/settings/);
@@ -252,6 +297,6 @@ test.describe('lesson picker: retry of an added round', () => {
     // The formats of the failed round are gone with the page: Retry must still send the defaults.
     await page.getByRole('button', { name: 'Повторить' }).click();
     await expect(page.getByRole('alert')).toContainText('Preview failure: timeout', { timeout: 15_000 });
-    await expect(page.getByRole('alert')).not.toContainText('Choose at least one task');
+    await expect(page.getByRole('alert')).not.toContainText('Choose at least one block');
   });
 });

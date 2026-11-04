@@ -2,6 +2,15 @@ import type { Db } from '@/core/ports';
 
 export interface SpellingWord { id: number; word: string; hint: string | null }
 
+/** The spelling words that any block of the session asks. */
+export async function listSessionSpellingWordIds(db: Db, sessionId: number): Promise<Set<number>> {
+  const rows = await db.select<{ id: number }>(
+    'SELECT DISTINCT i.spelling_word_id AS id FROM item i JOIN block b ON b.id = i.block_id WHERE b.session_id = ? AND i.spelling_word_id IS NOT NULL',
+    [sessionId],
+  );
+  return new Set(rows.map((r) => r.id));
+}
+
 export async function listSpellingWords(db: Db): Promise<SpellingWord[]> {
   return db.select<SpellingWord>('SELECT id, word, hint FROM spelling_word ORDER BY id');
 }

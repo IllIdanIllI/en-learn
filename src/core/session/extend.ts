@@ -3,8 +3,12 @@ import { effectiveVerdict } from '@/core/verdict';
 import { getSettings } from '@/core/db/repos/settings';
 import { deleteRound, getSession, hasOpenItems, reopenSession } from '@/core/db/repos/sessions';
 import { listGradedAnswerRows } from '@/core/db/repos/answers';
-import { buildGenerationContext, type BlockSpec, type GenerationContext, type RuleRef } from './context';
-import type { TaskFormat } from './choice';
+import { listSessionSpellingWordIds, listSpellingWords, type SpellingWord } from '@/core/db/repos/spelling';
+import { latestWritingSource } from '@/core/db/repos/writing';
+import { getSpellingStates } from '@/core/progress/history';
+import { selectSpellingWords } from '@/core/schedule/spelling';
+import { buildGenerationContext, todayMistakes, type BlockSpec, type GenerationContext, type RuleRef } from './context';
+import type { AddRound, TaskFormat } from './choice';
 import { BUSY, produce, type GenerateResult, type OnStage } from './generate';
 import { withJobLock } from './jobLock';
 import { loadDayInfo } from './plan';
@@ -44,25 +48,45 @@ export async function firstRoundFormat(deps: Deps, sessionId: number): Promise<T
   return first[0]?.format === 'gap' || first[0]?.format === 'fix' ? first[0].format : 'fix';
 }
 
-/**
- * "Add more questions": one added round for today's graded session, as round max + 1, with one task block per chosen format
- * (gap and fix on the task topic, spot on the error-spotting topics), then an essay block when `writing`. The session stays graded; the new round is open until it is answered.
- */
-export function extendSession(deps: Deps, sessionId: number, formats: TaskFormat[], writing: boolean, onStage?: OnStage): Promise<GenerateResult> {
-  return withJobLock(deps.db, () => extendUnlocked(deps, sessionId, formats, writing, onStage), BUSY);
+/** The spelling words of an added round: words today's session has not used, picked like a lesson's. */
+export async function roundSpelling(deps: Deps, sessionId: number, d: GenerationContext['date']): Promise<SpellingWord[]> {
+  const used = await listSessionSpellingWordIds(deps.db, sessionId);
+  const words = (await listSpellingWords(deps.db)).filter((w) => !used.has(w.id));
+  const ids = selectSpellingWords(await getSpellingStates(deps.db), words.map((w) => w.id), d, false);
+  return ids.flatMap((id) => words.find((w) => w.id === id) ?? []);
 }
 
-async function extendUnlocked(deps: Deps, sessionId: number, formats: TaskFormat[], writing: boolean, onStage?: OnStage): Promise<GenerateResult> {
+/**
+ * "Add more questions": one added round for today's graded session, as round max + 1. Its blocks, in order: spelling (written by the app),
+ * a review of today's mistakes, one task block per chosen format (gap and fix on the task topic, spot on the error-spotting topics),
+ * an essay, and a rewrite of the latest checked text (written by the app). The model is called only for review, tasks and the essay.
+ * The session stays graded; the new round is open until it is answered.
+ */
+export function extendSession(deps: Deps, sessionId: number, choice: AddRound, onStage?: OnStage): Promise<GenerateResult> {
+  return withJobLock(deps.db, () => extendUnlocked(deps, sessionId, choice, onStage), BUSY);
+}
+
+async function extendUnlocked(deps: Deps, sessionId: number, choice: AddRound, onStage?: OnStage): Promise<GenerateResult> {
   const d = deps.clock.today();
   const session = await getSession(deps.db, sessionId);
   if (!session) return { ok: false, message: 'Session not found' };
   if (session.status !== 'graded' || session.date !== d) return { ok: false, message: "Only today's graded session can get more questions" };
   if (await hasOpenItems(deps.db, sessionId)) return { ok: false, message: 'The session has questions to answer first' };
 
-  const chosen = FORMAT_ORDER.filter((f) => formats.includes(f));
-  // A light session never gets an essay, even in an added round.
-  const withWriting = writing && !session.isLight;
-  if (chosen.length === 0 && !withWriting) return { ok: false, message: 'Choose at least one task' };
+  const chosen = FORMAT_ORDER.filter((f) => choice.formats.includes(f));
+  // A light session never gets an essay or a rewrite, even in an added round.
+  const withWriting = choice.writing && !session.isLight;
+  const withRewrite = choice.rewrite && !session.isLight;
+  if (!choice.review && chosen.length === 0 && !choice.spelling && !withWriting && !withRewrite) return { ok: false, message: 'Choose at least one block' };
+
+  const info = await loadDayInfo(deps, d);
+  if (!info) return { ok: false, message: 'No programme' };
+  const mistakes = choice.review ? todayMistakes(info, d) : [];
+  if (choice.review && mistakes.length === 0) return { ok: false, message: 'No mistakes to review' };
+  const words = choice.spelling ? await roundSpelling(deps, sessionId, d) : [];
+  if (choice.spelling && words.length === 0) return { ok: false, message: 'No spelling words left' };
+  const source = withRewrite ? await latestWritingSource(deps.db, d, true) : null;
+  if (withRewrite && !source) return { ok: false, message: 'No text to rewrite' };
 
   let ctx: GenerationContext;
   try {
@@ -85,26 +109,43 @@ async function extendUnlocked(deps: Deps, sessionId: number, formats: TaskFormat
   const specs: BlockSpec[] = chosen.map((format) =>
     format === 'spot' || !taskRef ? { kind: 'task', format } : { kind: 'task', format, topicKey: taskRef.topic.key },
   );
+  if (choice.review) specs.unshift({ kind: 'review', format: 'gap or fix' });
   if (withWriting) specs.push({ kind: 'writing', format: 'essay' });
+  // The topics of today's mistakes that have a rule may be asked about in the review block.
+  const allowed = [...ctx.allowed];
+  const allow = (r: RuleRef | null) => {
+    if (r && !allowed.some((a) => a.topic.key === r.topic.key)) allowed.push(r);
+  };
+  allow(taskRef);
+  for (const e of mistakes) {
+    const topic = info.topics.find((t) => t.key === e.topicKey);
+    const rule = topic ? info.rules.get(topic.id) : undefined;
+    if (topic && rule) allow({ topic, ruleId: rule.ruleId, version: rule.version, body: rule.body });
+  }
   const extended: GenerationContext = {
     ...ctx,
     blocks: specs,
     taskTopic: taskRef,
     spotTopics: chosen.includes('spot') ? ctx.spotTopics : [],
-    reviewInputs: [],
+    reviewDate: choice.review ? d : ctx.reviewDate,
+    reviewInputs: mistakes,
     inattention: [],
     dueTopics: [],
-    allowed: taskRef && !ctx.allowed.some((r) => r.topic.key === taskRef.topic.key) ? [...ctx.allowed, taskRef] : ctx.allowed,
+    allowed,
     extra: { prompts: prompts.map((p) => p.prompt).filter((p) => p !== '') },
   };
 
-  const made = await produce(deps, sessionId, extended, onStage);
+  // Nothing for the model to write (only spelling and rewrite): no call.
+  const made = specs.length === 0 ? { ok: true as const, gen: { blocks: [] }, defects: new Map<string, string>() } : await produce(deps, sessionId, extended, onStage);
   if (!made.ok) return made.code === undefined ? { ok: false, message: made.message } : { ok: false, message: made.message, code: made.code };
   const { nativeLanguage } = await getSettings(deps.db);
   const last = blocks.at(-1);
   const round = Math.max(1, ...blocks.map((b) => b.round)) + 1;
   try {
-    await writeBlocks(deps.db, sessionId, nativeLanguage, extended, made.gen, made.defects, [], { ord: (last?.ord ?? -1) + 1, round });
+    await writeBlocks(
+      deps.db, sessionId, nativeLanguage, extended, made.gen, made.defects, words, { ord: (last?.ord ?? -1) + 1, round },
+      source ? { sourceBlockId: source.blockId, text: source.text } : null,
+    );
   } catch (e) {
     await deleteRound(deps.db, sessionId, round);
     throw e;

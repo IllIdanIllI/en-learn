@@ -45,7 +45,7 @@ S2's vocabulary part: a word store, import from Obsidian, generated exercises, a
 
 - **Choice** (the definition plus 4 options; the other options are the learner's other words): only on a word's **very first** card, never after (the learner finds it too easy to guess).
 - The exercise type is picked at random from the stage. Within a type, the item used least recently comes first.
-- **Use it:** "Напишите предложение со словом «X»" / "Write a sentence with "X"", with a textarea, "Пропустить" / "Skip" and "Проверить" / "Check". A skipped card is not recorded. A stage-3 word that is skipped falls back to a translation exercise the next time, if one is left.
+- **Use it:** "Напишите предложение со словом «X»" / "Write a sentence with "X"", with a textarea, "Пропустить" / "Skip" and "Проверить" / "Check". A skipped card is not recorded. Skip replaces the card right away with a translation card of the same word if one exists; otherwise practice moves on.
 
 ## V5. Progress: stages and FSRS
 - **One FSRS card per word**, using the `ts-fsrs` library (MIT): default parameters, desired retention 0.90, `enable_short_term: false` (intervals in whole days), fuzz on.

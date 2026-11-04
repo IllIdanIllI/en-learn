@@ -63,7 +63,7 @@ S2's vocabulary part: a word store, import from Obsidian, generated exercises, a
 
 ## V6. Checking answers
 - **Typed answers** (anagram, gap, collocation, form): trimmed and case-insensitive exact match against the accepted answers.
-- **"Almost"** (Levenshtein distance 1 to an accepted answer): "Почти — одна буква не та. Попробуйте ещё раз." / "Almost — one letter is off. Try once more." This is allowed once per card: a correct retry counts as *Hard*, and a second miss is wrong.
+- **"Almost"** (Levenshtein distance 1 to an accepted answer): "Почти: одна буква не та. Попробуйте ещё раз." / "Almost: one letter is off. Try once more." This is allowed once per card: a correct retry counts as *Hard*, and a second miss is wrong.
 - **First-letter hint button:** the first letter appears in the field, and a correct answer counts as *Hard*. The anagram and the choice have no hint.
 - **Confusable and choice:** a click on an option, correct or wrong.
 - **Translation:** an exact match against an accepted answer (the same normalising, plus final punctuation ignored) is correct. Otherwise the accepted answers are shown with "Я ответил(а) верно" / "I was right" and "Я ошибся(лась)" / "I was wrong" (Good or Again). No LLM.

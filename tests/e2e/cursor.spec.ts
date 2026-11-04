@@ -41,6 +41,7 @@ const CASES: [string, string][] = [
   ['spot', 'today'], ['spot-graded', 'today'], ['writing', 'today'], ['writing-graded', 'today'], ['rewrite', 'today'],
   ['progress', 'progress'], ['writing-graded', 'progress'], ['graded', 'rules'], ['graded', 'errors'],
   ['writing-graded', 'errors'], ['writing-graded', 'writing'], ['graded', 'settings'], ['prereq_missing', 'prerequisites'],
+  ['words', 'words'], ['words', 'words/practice'], ['words-done', 'words/practice'],
 ];
 
 for (const [state, route] of CASES) {

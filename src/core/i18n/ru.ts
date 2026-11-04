@@ -128,6 +128,8 @@ export const ru: Record<keyof typeof en, string> = {
   'llm.grade': 'Проверка ответов',
   'llm.dispute': 'Споры',
   'llm.explain': 'Объяснение ошибки',
+  'llm.words': 'Слова: упражнения',
+  'llm.word_check': 'Слова: проверка предложения',
   'prereq.intro': 'Для работы нужна программа Claude в командной строке: установленная и с выполненным входом. Ни в одном из этих мест её нет.',
   'prereq.checked': 'Проверенные места',
   'prereq.result.missing': 'Не найден',

@@ -26,6 +26,8 @@ export const DEFAULT_SETTINGS: Settings = {
     grade: DEFAULT_MODEL,
     dispute: DEFAULT_MODEL,
     explain: DEFAULT_MODEL,
+    words: DEFAULT_MODEL,
+    word_check: DEFAULT_MODEL,
   },
   efforts: {
     rule_draft: 'medium',
@@ -35,6 +37,8 @@ export const DEFAULT_SETTINGS: Settings = {
     grade: 'high',
     dispute: 'medium',
     explain: 'medium',
+    words: 'medium',
+    word_check: 'medium',
   },
   budgetUsd: null,
   acceptedShorthands: ['✓'],

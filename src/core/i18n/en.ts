@@ -126,6 +126,8 @@ export const en = {
   'llm.grade': 'Grading',
   'llm.dispute': 'Disputes',
   'llm.explain': 'Error explanation',
+  'llm.words': 'Words: exercises',
+  'llm.word_check': 'Words: sentence check',
   'prereq.intro': 'English Exam Coach needs the Claude command line tool, installed and signed in. It was not found in any of these places.',
   'prereq.checked': 'Places checked',
   'prereq.result.missing': 'Not found',

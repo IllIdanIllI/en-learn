@@ -11,27 +11,32 @@ import { Rules } from '@/ui/pages/Rules';
 import { RuleView } from '@/ui/pages/RuleView';
 import { ErrorBank } from '@/ui/pages/ErrorBank';
 import { Writing } from '@/ui/pages/Writing';
+import { Words } from '@/ui/pages/Words';
+import { WordsJobProvider } from '@/ui/words/WordsJobProvider';
 
 export function AppRoutes() {
   return (
     <ErrorBoundary>
       <HashRouter>
         <GenerationProvider>
-          <Routes>
-            <Route element={<AppShell />}>
-              <Route index element={<Navigate to="/today" replace />} />
-              <Route path="today" element={<Today />} />
-              <Route path="progress" element={<Progress />} />
-              <Route path="rules" element={<Rules />} />
-              <Route path="rules/:id" element={<RuleView />} />
-              <Route path="errors" element={<ErrorBank />} />
-              <Route path="writing" element={<Writing />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="setup" element={<Setup />} />
-              <Route path="prerequisites" element={<Prerequisites />} />
-              <Route path="*" element={<Navigate to="/today" replace />} />
-            </Route>
-          </Routes>
+          <WordsJobProvider>
+            <Routes>
+              <Route element={<AppShell />}>
+                <Route index element={<Navigate to="/today" replace />} />
+                <Route path="today" element={<Today />} />
+                <Route path="progress" element={<Progress />} />
+                <Route path="rules" element={<Rules />} />
+                <Route path="rules/:id" element={<RuleView />} />
+                <Route path="errors" element={<ErrorBank />} />
+                <Route path="writing" element={<Writing />} />
+                <Route path="words" element={<Words />} />
+                <Route path="settings" element={<Settings />} />
+                <Route path="setup" element={<Setup />} />
+                <Route path="prerequisites" element={<Prerequisites />} />
+                <Route path="*" element={<Navigate to="/today" replace />} />
+              </Route>
+            </Routes>
+          </WordsJobProvider>
         </GenerationProvider>
       </HashRouter>
     </ErrorBoundary>

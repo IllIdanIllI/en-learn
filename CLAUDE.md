@@ -85,7 +85,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 # Project context
 - Start every new chat by reading `docs/superpowers/handoff.md`: current state, where the specs and decisions are, next stages and working preferences.
-- UI rule (learner, repeated): every interactive element has `cursor: pointer`, disabled ones `not-allowed`. The global rule is in `src/ui/styles/globals.css`; a custom clickable element (div/span with a handler, new ARIA role) must get it too, and e2e checks it where practical.
+- UI rule (learner, repeated): every interactive element has `cursor: pointer`, disabled ones `not-allowed`. The global rule is in `src/ui/styles/globals.css`; a custom clickable element (div/span with a handler, new ARIA role) must get it too, and `tests/e2e/cursor.spec.ts` checks every page (add a case for a new page or state).
 
 # graphify
 - **graphify** (`~/.claude/skills/graphify/SKILL.md`) - any input to knowledge graph. Trigger: `/graphify`

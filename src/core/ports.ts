@@ -79,4 +79,6 @@ export interface Deps {
   llm: Llm;
   clock: Clock;
   prompts: PromptStore;
+  /** Random source for the words feature; defaults to Math.random. */
+  rand?: () => number;
 }

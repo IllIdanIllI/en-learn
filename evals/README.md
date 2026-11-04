@@ -42,6 +42,19 @@ Cases are batched per topic into one `gradeSession` call with the message format
 - whether misspelled correct fixes reach `spellingErrors`;
 - errors: a failed call or a missing item.
 
+## Words suite (`evals/cases/words.json`)
+
+Five words: one with every field filled in, one with only the word, a phrasal verb, a word with no useful word family and a word with a near-synonym. They are added to a fresh temp database and sent through the app's real `generateWords` (one batch, the `words` call, the batch check and its retry).
+
+Per word it reports the generation status the app ends with (`ready` or `failed`) and the number of `wordProblems` (the app's check of the exercise counts, `___` placement, answers, options and translations) on the model's final reply, with the problem texts listed below the table. Cost and time are for the whole batch, because one call covers all five words. It measures whether the model produces exercises that pass the app's checks without help; it does not judge whether the sentences are good teaching material.
+
+```
+yarn eval --suite words                     # only this suite
+yarn eval --suite all                       # default: generate, grade and words
+```
+
+It is billed like the other suites (one `words` call, more if the check retries). Run it when you change `prompts/words.md` or the model for words.
+
 ## Review the labels before trusting the scores
 
 The labels were written from `seed/rules/*.md` by the assistant, not by you. Some are judgement calls (the `rule_gap` cases, `art-05`, a defective item, `tps-06` where `ok` is read as unclear). Open `evals/cases/grade.json`, read each `why`, and change any label you disagree with; a wrong label makes a good model look bad or the reverse. The mismatch table in the result lists the label reason next to what the model said, so disagreements are quick to settle. Rule sections are written in Russian because the seed rules are.

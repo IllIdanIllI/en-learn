@@ -133,6 +133,20 @@ Spec `specs/2026-11-02-writing-design.md`, plan `plans/2026-11-02-writing.md`.
 - The gear segment keeps the Start button's background while open (learner's request) — cost if wrong: the open state is less visible on the button.
 - An empty essay is not stored until the lesson is finished (then it counts as skipped, with no check and no items) — cost if wrong: an essay left empty keeps the lesson open until "Завершить урок".
 
+## Words (2026-11-04)
+
+Spec `specs/2026-11-04-words-design.md`, plan `plans/2026-11-04-words.md`.
+
+- D10 (S1 core-loop spec: the learner enters vocabulary manually, S2) is superseded: words come from a one-off Obsidian paste import plus adding by hand — cost if wrong: a later vocabulary source (deck files, sync) needs its own import path.
+- Skip on "use it" replaces the card right away with a translation card of the same word (or moves on) — cost if wrong: a skipped "use it" can never come back in the same practice.
+- Words "use it" errors appear in the error bank (label Слова/Words), are not disputable and do not feed the lesson review — cost if wrong: a wrongly flagged word error cannot be disputed and does not come back as a lesson re-check.
+- Choice (pick from 4) only on a word's very first card — cost if wrong: later new-word cards give no recognition step.
+- Oxford search link when a card has no https link; the LLM never writes links — cost if wrong: a card may open a search page instead of the exact entry.
+- Opener plugin added with permission `opener:allow-open-url` scoped to `https://*` only (addition to security round 1, approved by the learner); rule-source links in RuleBody are unchanged (open item) — cost if wrong: any https site can be opened from the app, and rule sources stay plain text.
+- UI wording: "again" and "—" are banned by `tests/core/i18n.test.ts`, so EN busy = "A lesson is being built, try later" and Almost = "Almost: one letter is off. Try once more." / "Почти: одна буква не та. Попробуйте ещё раз." — cost if wrong: copy is slightly less natural than the spec's first wording.
+- Generation: batches of 5, 300 s timeout, job lock per batch; a failed batch marks its words failed and the run continues; busy stops the run and leaves the rest pending (shown with Retry) — cost if wrong: a long import takes several lock windows, and a busy lesson build delays word generation.
+- ts-fsrs pinned at 5.4.2 (6.0.0 was too new); `@tauri-apps/plugin-opener` pinned at 2.5.2 — cost if wrong: a newer release's fixes are missed until the pins are raised.
+
 ## Still open
 
 - **Mac-only checks** (`docs/macos-checklist.md`): `$HOME` in the shell permission, long multi-line arguments, plugin-sql migrations, the not-signed-in output, PATH/HOME when launched from Finder. Not verifiable in the Linux build container.

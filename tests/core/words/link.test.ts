@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { wordLink } from '@/core/words/link';
+import { isHttpsLink, wordLink } from '@/core/words/link';
 
 const OXFORD = 'https://www.oxfordlearnersdictionaries.com/search/english/?q=';
 
@@ -15,4 +15,11 @@ test('http, javascript:, file: and empty → Oxford search link', () => {
 
 test('word with spaces is encoded', () => {
   expect(wordLink('give up', '')).toBe(`${OXFORD}give%20up`);
+});
+
+test('isHttpsLink: trimmed, starts with https:// and longer than it', () => {
+  expect(isHttpsLink('')).toBe(false);
+  expect(isHttpsLink('https://')).toBe(false);
+  expect(isHttpsLink('http://x')).toBe(false);
+  expect(isHttpsLink(' https://x.com ')).toBe(true);
 });

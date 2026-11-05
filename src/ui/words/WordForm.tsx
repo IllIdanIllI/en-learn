@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { t } from '@/core/i18n';
 import { DuplicateWord, insertWord, updateWord } from '@/core/db/repos/words';
-import { wordLink } from '@/core/words/link';
+import { isHttpsLink } from '@/core/words/link';
 import type { Word, WordFields } from '@/core/words/types';
 import { useCore } from '@/ui/app/CoreProvider';
 import { Button } from '@/ui/components/ui/button';
@@ -73,16 +73,16 @@ export function WordForm({ word, onSaved, onCancel }: { word?: Word; onSaved: ()
     <div>
       <div>
         <label htmlFor={`${id}-${key}`} className="label text-muted-foreground">{label}</label>
-        {extra?.dictionary && text.trim() !== '' && (
+        {extra?.dictionary && isHttpsLink(link) && (
           <span className="label text-muted-foreground">
             {' ('}
-            <ExternalLink href={wordLink(text.trim(), link)} className="text-primary underline underline-offset-2">{t(lang, 'words.openLinkShort')}</ExternalLink>
+            <ExternalLink href={link.trim()} className="text-primary underline underline-offset-2">{t(lang, 'words.openLinkShort')}</ExternalLink>
             {')'}
           </span>
         )}
       </div>
       {extra?.area ? (
-        <Textarea id={`${id}-${key}`} className="mt-1 min-h-0 resize-y" rows={3} value={value} onChange={(e) => set(e.target.value)} />
+        <Textarea id={`${id}-${key}`} className="mt-1 min-h-0 resize-y [font-family:inherit]! text-sm!" rows={3} value={value} onChange={(e) => set(e.target.value)} />
       ) : (
         <FieldInput
           id={`${id}-${key}`}

@@ -1,10 +1,9 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { t, type Lang } from '@/core/i18n';
 import { setSetting } from '@/core/db/repos/settings';
 import type { WordsOverview } from '@/core/words/practice';
 import type { Stage } from '@/core/words/types';
 import { useCore } from '@/ui/app/CoreProvider';
-import { Button } from '@/ui/components/ui/button';
 
 const STAGES: Stage[] = [1, 2, 3];
 
@@ -29,29 +28,45 @@ export function WordsSummary({ overview, lang }: { overview: WordsOverview; lang
     }
   };
 
+  const tiles = [
+    { label: t(lang, 'words.inProgress'), value: inProgress, tone: 'text-primary' },
+    { label: t(lang, 'words.learned'), value: learned, tone: 'text-success' },
+    { label: t(lang, 'words.total'), value: total, tone: '' },
+  ];
+
   return (
     <div className="mt-4">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <span className="text-sm">{line}</span>
-        <div role="img" aria-label={line} className="flex h-2 w-40 overflow-hidden rounded-full bg-input">
-          <div className="h-full bg-success" style={{ width: pct(learned, total) }} />
-          <div className="h-full bg-primary" style={{ width: pct(inProgress, total) }} />
-        </div>
-        <Button variant="ghost" size="sm" aria-expanded={open} onClick={toggle}>
-          {open ? `${t(lang, 'words.hide')} ▴` : `${t(lang, 'words.details')} ▾`}
-        </Button>
+      <div className="grid grid-cols-3 gap-3">
+        {tiles.map((tile) => (
+          <div key={tile.label} data-testid="words-tile" className="rounded-lg bg-card px-4 py-3">
+            <div className="label text-muted-foreground">{tile.label}</div>
+            <div className={`tabular text-3xl font-bold ${tile.tone}`}>{tile.value}</div>
+          </div>
+        ))}
       </div>
+      <div role="img" aria-label={line} className="mt-3 flex h-2 w-full overflow-hidden rounded-full bg-input">
+        <div className="h-full bg-success" style={{ width: pct(learned, total) }} />
+        <div className="h-full bg-primary" style={{ width: pct(inProgress, total) }} />
+      </div>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={toggle}
+        className="mt-3 cursor-pointer text-sm text-muted-foreground underline decoration-dotted underline-offset-4 hover:text-foreground"
+      >
+        {open ? `${t(lang, 'words.hide')} ▴` : `${t(lang, 'words.details')} ▾`}
+      </button>
       {open && (
-        <ul data-testid="words-details" className="mt-3 flex flex-wrap gap-x-6 gap-y-1 rounded-md bg-card p-3 text-sm">
-          <li>
-            <span className="text-muted-foreground">{t(lang, 'words.dueLabel')}</span> <span className="tabular">{dueToday}</span>
-          </li>
+        <dl data-testid="words-details" className="mt-3 grid w-fit grid-cols-[auto_auto] gap-x-6 gap-y-1 rounded-md bg-card p-3 text-sm">
+          <dt className="text-muted-foreground">{t(lang, 'words.dueLabel')}</dt>
+          <dd className="tabular">{dueToday}</dd>
           {STAGES.map((s) => (
-            <li key={s}>
-              <span className="text-muted-foreground">{t(lang, `words.stage.${s}`)}</span> <span className="tabular">{counts[s]}</span>
-            </li>
+            <Fragment key={s}>
+              <dt className="text-muted-foreground">{t(lang, `words.stage.${s}`)}</dt>
+              <dd className="tabular">{counts[s]}</dd>
+            </Fragment>
           ))}
-        </ul>
+        </dl>
       )}
     </div>
   );

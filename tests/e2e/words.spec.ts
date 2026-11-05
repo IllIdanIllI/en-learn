@@ -113,10 +113,15 @@ test.describe('words page', () => {
 test.describe('summary and +10 new words', () => {
   const addNew = (page: Page) => page.getByRole('button', { name: '+10 новых слов' });
 
-  test('the header shows in progress, learned and total, failed word included', async ({ page }) => {
+  test('the header shows in progress, learned and total as tiles, failed word included', async ({ page }) => {
     await page.goto('/?state=words#/words');
     // Seed: six reviewed words, one of them Learned (stage 4), eight words in all.
-    await expect(page.getByText('В процессе: 5 · Выучено: 1 · Всего: 8')).toBeVisible();
+    for (const [label, n] of [['В процессе', '5'], ['Выучено', '1'], ['Всего', '8']]) {
+      const tile = page.getByTestId('words-tile').filter({ hasText: label });
+      await expect(tile.getByText(label, { exact: true })).toBeVisible();
+      await expect(tile.getByText(n, { exact: true })).toBeVisible();
+    }
+    await expect(page.getByRole('img', { name: 'В процессе: 5 · Выучено: 1 · Всего: 8' })).toBeVisible();
     await expect(page.getByText(/Начато/)).toHaveCount(0);
     await expect(addNew(page)).toHaveCount(0);
   });
@@ -125,13 +130,16 @@ test.describe('summary and +10 new words', () => {
     await page.goto('/?state=words#/words');
     const toggle = page.getByRole('button', { name: /Подробнее/ });
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggle).toHaveText('Подробнее ▾');
     await expect(page.getByTestId('words-details')).toHaveCount(0);
     await toggle.click();
     const panel = page.getByTestId('words-details');
     await expect(panel).toContainText('К повторению сегодня');
+    await expect(panel.locator('dt')).toHaveCount(4);
     for (const stage of ['Новое', 'Вспоминание', 'Употребление']) await expect(panel).toContainText(stage);
     const hide = page.getByRole('button', { name: /Скрыть/ });
     await expect(hide).toHaveAttribute('aria-expanded', 'true');
+    await expect(hide).toHaveText('Скрыть ▴');
     await hide.click();
     await expect(panel).toHaveCount(0);
     await expect(page.getByRole('button', { name: /Подробнее/ })).toHaveAttribute('aria-expanded', 'false');
@@ -148,7 +156,7 @@ test.describe('summary and +10 new words', () => {
 
   test('words-limit: Start is disabled, +10 opens practice with a new word', async ({ page }) => {
     await page.goto('/?state=words-limit#/words');
-    await expect(page.getByText('В процессе: 10 · Выучено: 0 · Всего: 21')).toBeVisible();
+    await expect(page.getByRole('img', { name: 'В процессе: 10 · Выучено: 0 · Всего: 21' })).toBeVisible();
     await expect(page.getByText(/Начато/)).toHaveCount(0);
     await expect(page.getByText('Начать практику')).toHaveAttribute('aria-disabled', 'true');
     // Start practice and +10 share one row.
@@ -284,7 +292,7 @@ test.describe('around the lessons', () => {
     await page.getByRole('link', { name: 'Слова: 7 к практике → Практика' }).click();
     await expect(page.getByRole('heading', { name: 'Слова' })).toBeVisible();
     await page.getByRole('button', { name: /Подробнее/ }).click();
-    await expect(page.getByTestId('words-details')).toContainText('К повторению сегодня 6');
+    await expect(page.getByTestId('words-details')).toContainText('К повторению сегодня6');
   });
 
   test('the error bank shows a Words error after Check', async ({ page }) => {
@@ -329,22 +337,40 @@ test.describe('a page per word', () => {
     await expect(page.locator('textarea#word-1-example')).toBeVisible();
   });
 
-  test('the dictionary link sits in the Link title, outside the label; the old link under the form is gone', async ({ page }) => {
+  test('the seeded word has no link, so the Link title has no dictionary link; the old link under the form is gone', async ({ page }) => {
     await page.goto('/?state=words#/words/1');
-    const links = page.getByRole('link', { name: 'открыть в словаре', exact: true });
-    await expect(links).toHaveCount(1);
-    await expect(links).toHaveAttribute('href', 'https://www.oxfordlearnersdictionaries.com/search/english/?q=resilient');
+    await expect(page.getByRole('link', { name: 'открыть в словаре', exact: true })).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'Открыть в словаре', exact: true })).toHaveCount(0);
-    await expect(page.locator('label[for="word-1-link"] a')).toHaveCount(0);
     await expect(page.locator('label[for="word-1-link"]')).toHaveText('Ссылка');
   });
 
-  test('Add word: the dictionary link appears only after typing a word', async ({ page }) => {
+  test('typing an https link into the Link field shows the dictionary link with that href', async ({ page }) => {
+    await page.goto('/?state=words#/words/1');
+    const link = page.getByRole('link', { name: 'открыть в словаре', exact: true });
+    await page.getByLabel('Ссылка', { exact: true }).fill('http://example.com/x');
+    await expect(link).toHaveCount(0);
+    await page.getByLabel('Ссылка', { exact: true }).fill(' https://example.com/resilient ');
+    await expect(link).toHaveAttribute('href', 'https://example.com/resilient');
+    await expect(page.locator('label[for="word-1-link"] a')).toHaveCount(0);
+  });
+
+  test('Definition and Example use the same font as the other fields', async ({ page }) => {
+    await page.goto('/?state=words#/words/1');
+    const font = (sel: string) => page.locator(sel).evaluate((el) => getComputedStyle(el).fontFamily);
+    const input = await font('input#word-1-synonyms');
+    expect(await font('textarea#word-1-definition')).toBe(input);
+    expect(await font('textarea#word-1-example')).toBe(input);
+  });
+
+  test('Add word: the dictionary link appears only after an https link is typed', async ({ page }) => {
     await page.goto('/?state=words#/words');
     await page.getByRole('button', { name: 'Добавить слово' }).click();
-    await expect(page.getByRole('link', { name: 'открыть в словаре', exact: true })).toHaveCount(0);
+    const link = page.getByRole('link', { name: 'открыть в словаре', exact: true });
+    await expect(link).toHaveCount(0);
     await page.getByLabel('Слово', { exact: true }).fill('lucid');
-    await expect(page.getByRole('link', { name: 'открыть в словаре', exact: true })).toHaveAttribute('href', /\?q=lucid$/);
+    await expect(link).toHaveCount(0);
+    await page.getByLabel('Ссылка', { exact: true }).fill('https://example.com/lucid');
+    await expect(link).toHaveAttribute('href', 'https://example.com/lucid');
   });
 
   for (const control of ['top', 'bottom'] as const) {

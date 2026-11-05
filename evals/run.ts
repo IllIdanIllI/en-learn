@@ -1,6 +1,6 @@
 /**
  * Model evals through the app's real path (buildClaudeArgs, parseEnvelope, callStructured, generateSession, gradeSession)
- * with the real `claude` binary. Run: `yarn eval [--model claude-haiku-5-5] [--suite generate|grade|all]`.
+ * with the real `claude` binary. Run: `yarn eval [--model claude-haiku-5-5] [--suite generate|grade|words|all]`.
  * Spends real money: see evals/README.md.
  */
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -11,12 +11,17 @@ import type { GradeResult } from '@/core/llm/types';
 import { addDays } from '@/core/dates';
 import { insertDraftSession, setSessionStatus } from '@/core/db/repos/sessions';
 import { generateSession } from '@/core/session/generate';
+import { generateWords } from '@/core/words/generate';
+import { wordProblems } from '@/core/words/generated';
+import { insertWord, listWords } from '@/core/db/repos/words';
+import type { Generation } from '@/core/words/types';
+import type { WordsReply } from '@/core/llm/types';
 import { gradeSession } from '@/core/grading/grade';
 import { proseOf } from '@/core/grading/input';
 import { toneViolations } from '@/core/validate/tone';
 import { diskPrompts, NodeClaudeCli, RecordingLlm, ROOT, seededDb, tempCwd } from '../scripts/lib/nodeHarness';
 import { addBlock, addItem, seedHistory, type HistorySession } from './fixtures';
-import { EXPECTED_VERDICTS, scoreEval, type CaseResult, type EvalScore, type GradeCase } from './score';
+import { EXPECTED_VERDICTS, scoreEval, suitesFor, type CaseResult, type EvalScore, type GradeCase } from './score';
 
 const SEED_TODAY = '2026-10-26'; // Monday: programme week 1 starts here
 const GRADE_DATE = '2026-12-01';
@@ -26,13 +31,16 @@ interface GenResult {
   id: string; description: string; ok: boolean; message: string; attempts: number; firstAttempt: string[]; firstError: string;
   defects: number | null; costUsd: number; durationMs: number;
 }
+interface WordsCase { id: string; description: string; word: string; definition?: string; translation?: string; example?: string; synonyms?: string[]; link?: string }
+interface WordResult { id: string; word: string; generation: Generation | 'missing'; problems: string[] }
+interface WordsRun { message: string; results: WordResult[]; calls: number; costUsd: number; durationMs: number }
 interface BatchInfo { name: string; items: number; gradeCalls: number; firstResponseToneViolations: number; costUsd: number; durationMs: number; note: string }
 interface GradeRun {
   cases: GradeCase[]; results: CaseResult[]; score: EvalScore; batches: BatchInfo[];
   details: Map<string, { explanation: string; ruleSection: string }>;
 }
 
-function parseArgs(argv: string[]): { model: string; suite: 'generate' | 'grade' | 'all' } {
+function parseArgs(argv: string[]): { model: string; suite: 'generate' | 'grade' | 'words' | 'all' } {
   let model = 'claude-haiku-5-5';
   let suite = 'all';
   for (let i = 0; i < argv.length; i++) {
@@ -42,10 +50,10 @@ function parseArgs(argv: string[]): { model: string; suite: 'generate' | 'grade'
       if (v === undefined) throw new Error(`${a} needs a value`);
       if (a === '--model') model = v;
       else suite = v;
-    } else throw new Error(`Unknown argument ${a}. Usage: yarn eval [--model <id>] [--suite generate|grade|all]`);
+    } else throw new Error(`Unknown argument ${a}. Usage: yarn eval [--model <id>] [--suite generate|grade|words|all]`);
   }
   if (!model.startsWith('claude-')) throw new Error(`Model must be a claude-* id, got ${model}`);
-  if (suite !== 'generate' && suite !== 'grade' && suite !== 'all') throw new Error(`Unknown suite ${suite}`);
+  if (suite !== 'generate' && suite !== 'grade' && suite !== 'words' && suite !== 'all') throw new Error(`Unknown suite ${suite}`);
   return { model, suite };
 }
 
@@ -93,6 +101,43 @@ async function runGenerate(model: string): Promise<GenResult[]> {
     console.error(`[generate] ${c.id}: ${r.ok ? 'ok' : 'FAILED'} attempts=${r.attempts} violations=${firstAttempt.length} defects=${defects ?? '-'} $${r.costUsd.toFixed(4)} ${(durationMs / 1000).toFixed(0)}s`);
   }
   return out;
+}
+
+// --------------------------------------------------------------------- words
+
+async function runWords(model: string): Promise<WordsRun> {
+  const cases = readJson<{ cases: WordsCase[] }>(path.join(ROOT, 'evals/cases/words.json')).cases;
+  const clock = new FixedClock(GRADE_DATE);
+  const db = await seededDb({ model, clock, seedToday: SEED_TODAY });
+  const llm = new RecordingLlm(new NodeClaudeCli(tempCwd('enlearn-eval')));
+  const deps: Deps = { db, llm, clock, prompts: diskPrompts };
+  const ids = new Map<string, number>();
+  for (const c of cases) {
+    ids.set(c.id, await insertWord(db, {
+      word: c.word, definition: c.definition ?? '', translation: c.translation ?? '', example: c.example ?? '',
+      synonyms: c.synonyms ?? [], link: c.link ?? '', added: GRADE_DATE,
+    }, clock.now()));
+  }
+  const started = Date.now();
+  let message = '';
+  try {
+    const res = await generateWords(deps, [...ids.values()]);
+    if (!res.ok) message = res.message;
+  } catch (e) {
+    message = e instanceof Error ? e.message : String(e);
+  }
+  const durationMs = Date.now() - started;
+  const stored = await listWords(db);
+  const reply = llm.lastData<WordsReply>('words');
+  const results: WordResult[] = cases.map((c) => {
+    const w = stored.find((x) => x.id === ids.get(c.id));
+    const g = reply?.words.find((x) => x.word.trim().toLowerCase() === c.word.trim().toLowerCase());
+    return { id: c.id, word: c.word, generation: w?.generation ?? 'missing', problems: g ? wordProblems(g, c.word) : ['no reply for this word'] };
+  });
+  const calls = llm.calls.filter((x) => x.kind === 'words');
+  const r: WordsRun = { message, results, calls: calls.length, costUsd: sum(calls.map((x) => x.res.costUsd)), durationMs };
+  console.error(`[words] ${results.length} words, ${results.filter((x) => x.generation !== 'ready').length} not ready, ${r.calls} call(s), $${r.costUsd.toFixed(4)} ${(durationMs / 1000).toFixed(0)}s`);
+  return r;
 }
 
 // ------------------------------------------------------------------- grading
@@ -245,17 +290,40 @@ function gradeSection(run: GradeRun): string[] {
   return out;
 }
 
+function wordsSection(run: WordsRun): string[] {
+  const ready = run.results.filter((r) => r.generation === 'ready').length;
+  const out = [
+    '## Words suite', '',
+    `The app's \`generateWords\` on ${run.results.length} words in one batch (the words call, the batch check, one retry) against a fresh temp database. \`wordProblems\` is computed on the model's final reply, the same check the app uses to mark a word failed.`, '',
+    `- Ready: **${ready}/${run.results.length}** (${pct(ready / run.results.length)})`,
+    `- Words calls made: ${run.calls} (one batch, so one cost for all words)`,
+    `- Cost ${usd(run.costUsd)}, ${secs(run.durationMs)}`,
+    ...(run.message === '' ? [] : [`- Run failed: ${esc(run.message)}`]), '',
+    '| word | generation | wordProblems |', '| --- | --- | --- |',
+    ...run.results.map((r) => `| ${esc(r.word)} | ${r.generation} | ${r.problems.length} |`),
+  ];
+  const bad = run.results.filter((r) => r.problems.length > 0);
+  if (bad.length > 0) {
+    out.push('', '### Problems', '');
+    for (const r of bad) for (const p of r.problems) out.push(`- ${esc(p)}`);
+  }
+  return out;
+}
+
 async function main(): Promise<void> {
   const { model, suite } = parseArgs(process.argv.slice(2));
   const date = new Date().toLocaleDateString('sv');
-  const gen = suite === 'grade' ? null : await runGenerate(model);
-  const grade = suite === 'generate' ? null : await runGrade(model);
-  const total = sum([...(gen ?? []).map((r) => r.costUsd), ...(grade?.batches ?? []).map((b) => b.costUsd)]);
+  const run = suitesFor(suite);
+  const gen = run.generate ? await runGenerate(model) : null;
+  const grade = run.grade ? await runGrade(model) : null;
+  const words = run.words ? await runWords(model) : null;
+  const total = sum([...(gen ?? []).map((r) => r.costUsd), ...(grade?.batches ?? []).map((b) => b.costUsd), words?.costUsd ?? 0]);
   const md = [
     `# Model eval: ${model}`, '',
     `Date ${date}. Suite: ${suite}. Total cost: **${usd(total)}**.`, '',
     ...(gen ? [...generateSection(gen), ''] : []),
-    ...(grade ? gradeSection(grade) : []),
+    ...(grade ? [...gradeSection(grade), ''] : []),
+    ...(words ? wordsSection(words) : []),
   ].join('\n') + '\n';
   const dir = path.join(ROOT, 'evals/results');
   mkdirSync(dir, { recursive: true });

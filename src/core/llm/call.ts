@@ -32,6 +32,7 @@ export async function callStructured<T>(
 ): Promise<LlmResult<T>> {
   const settings = await getSettings(deps.db);
   const prompt = await deps.prompts.load(kind);
+  const spelling = settings.spellingVariant === 'american' ? 'American' : 'British';
   const language = settings.nativeLanguage === 'ru' ? 'Russian' : 'English';
   const model = settings.models[kind];
   const effort = settings.efforts[kind];
@@ -41,13 +42,13 @@ export async function callStructured<T>(
   for (let attempt = 1; attempt <= (opts.maxAttempts ?? DEFAULT_MAX_ATTEMPTS); attempt++) {
     const res = await deps.llm.call({
       kind,
-      systemPrompt: `${COMMON_RULES}\n\n${prompt.system.replaceAll('{{nativeLanguage}}', language)}`,
+      systemPrompt: `${COMMON_RULES}\n\n${prompt.system.replaceAll('{{nativeLanguage}}', language).replaceAll('{{spellingVariant}}', spelling)}`,
       userPrompt,
       schema: prompt.schema,
       model,
       effort,
       budgetUsd: settings.budgetUsd,
-      timeoutMs: kind === 'generate_session' ? 300000 : 120000,
+      timeoutMs: kind === 'generate_session' || kind === 'words' ? 300000 : 120000,
       ...(opts.persist ? { persist: true } : {}),
       ...(opts.resume !== undefined ? { resume: opts.resume } : {}),
     });

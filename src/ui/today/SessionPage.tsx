@@ -35,12 +35,14 @@ const DRAFT_DELAY_MS = 300;
  * Answers live in component state keyed by item id and `${blockId}:${paragraph}`, and are saved as drafts (debounced)
  * so a reload or another page does not lose them. Without `onRebuild` the session cannot be rebuilt (an earlier day).
  */
-export function SessionPage({ sessionId, rebuilding, loader = null, solving = false, onRebuild, onGraded, onClose }: {
+export function SessionPage({ sessionId, rebuilding, loader = null, solving = false, onRebuild, onGraded, onClose, afterHeader }: {
   sessionId: number; rebuilding: boolean; loader?: LoaderView | null; onRebuild?: (light: boolean) => void; onGraded?: () => void;
   /** Reopened skipped items of a graded session: only the blocks with unanswered items, nothing else. */
   solving?: boolean;
   /** Today's session only: a button in the action bar once everything is graded. */
   onClose?: () => void;
+  /** Rendered right under the lesson header. */
+  afterHeader?: React.ReactNode;
 }) {
   const { deps, lang, settings } = useCore();
   const [view, setView] = useState<SessionView | null>(null);
@@ -355,6 +357,7 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
     <SessionActionsProvider value={actions}>
       <div ref={root}>
         <SessionHeader view={view} lang={lang} rebuilding={rebuilding} solving={solving} onRebuild={rebuild} />
+        {afterHeader}
         {settings.design === 'grove' && answerable && !solving && <AnswerMeter filled={answerSegments(view, items, spot)} lang={lang} />}
         {loader && <Loader lang={lang} {...loader} />}
         {solving ? (

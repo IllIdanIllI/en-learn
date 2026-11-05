@@ -125,7 +125,8 @@ export async function replaceProgramme(db: Db, input: ProgrammeInput): Promise<v
     `DELETE FROM topic WHERE key NOT IN (${marks})
        AND id NOT IN (SELECT topic_id FROM item WHERE topic_id IS NOT NULL)
        AND id NOT IN (SELECT topic_id FROM rule)
-       AND id NOT IN (SELECT topic_id FROM session_support)`,
+       AND id NOT IN (SELECT topic_id FROM session_support)
+       AND id NOT IN (SELECT topic_id FROM word_error WHERE topic_id IS NOT NULL)`,
     keys,
   );
   // Topics left over are referenced; keep them out of the programme and error-spotting texts.

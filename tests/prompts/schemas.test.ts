@@ -3,9 +3,9 @@ import { Validator } from '@cfworker/json-schema';
 import { describe, expect, test } from 'vitest';
 import { bundledPrompts } from '@/core/llm/bundledPrompts';
 import type { LlmKind } from '@/core/domain';
-import type { DisputeBatchReply, ExplainReply, GeneratedSession, GradeResult, RuleChatReply, RuleDraft, ValidationResult } from '@/core/llm/types';
+import type { DisputeBatchReply, ExplainReply, GeneratedSession, GradeResult, RuleChatReply, RuleDraft, ValidationResult, WordCheckReply, WordsReply } from '@/core/llm/types';
 
-const kinds: LlmKind[] = ['rule_draft', 'rule_chat', 'generate_session', 'validate_session', 'grade', 'dispute', 'explain'];
+const kinds: LlmKind[] = ['rule_draft', 'rule_chat', 'generate_session', 'validate_session', 'grade', 'dispute', 'explain', 'words', 'word_check'];
 const validator = (schema: object) => new Validator(schema, '2019-09', false);
 const fixture = (kind: string, which: 'valid' | 'invalid'): unknown =>
   JSON.parse(readFileSync(`tests/fixtures/llm/${kind}.${which}.json`, 'utf8'));
@@ -19,6 +19,8 @@ export const typedFixtures = [
   fixture('rule_chat', 'valid') as RuleChatReply,
   fixture('dispute', 'valid') as DisputeBatchReply,
   fixture('explain', 'valid') as ExplainReply,
+  fixture('words', 'valid') as WordsReply,
+  fixture('word_check', 'valid') as WordCheckReply,
 ];
 
 function strictObjects(node: unknown, path: string, problems: string[]): void {
@@ -62,7 +64,7 @@ describe.each(kinds)('%s', (kind) => {
 });
 
 test('learner-facing prompts use the native language placeholder', () => {
-  for (const kind of ['rule_draft', 'rule_chat', 'grade', 'dispute', 'explain'] as const) {
+  for (const kind of ['rule_draft', 'rule_chat', 'grade', 'dispute', 'explain', 'words', 'word_check'] as const) {
     expect(bundledPrompts[kind].system).toContain('{{nativeLanguage}}');
   }
 });

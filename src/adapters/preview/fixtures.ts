@@ -1,5 +1,6 @@
 import type { Clock, Deps, Llm, LlmErrorCode, ProcessRunner } from '@/core/ports';
 import type { ISODate } from '@/core/domain';
+import { appDate, canStartNewDay, DEFAULT_DAY, localDate, type DayConfig } from '@/core/day';
 import type { PrereqResult } from '@/core/prereq';
 import { CLAUDE_LOCATIONS } from '@/core/llm/claude';
 import { bundledPrompts } from '@/core/llm/bundledPrompts';
@@ -11,14 +12,18 @@ import { generateSession } from '@/core/session/generate';
 import { gradeSession } from '@/core/grading/grade';
 import { closeSession, listGradingItems, getSessionByDate } from '@/core/db/repos/sessions';
 import { findOrCreateSpellingWord } from '@/core/db/repos/spelling';
+import { insertReview, insertWord, replaceExercises, setGeneration } from '@/core/db/repos/words';
 import { createSqlJsDb } from './sqljsDb';
 import { previewLlm } from './previewLlm';
 import { MINI_PROGRAMME, MINI_RULES } from './miniSeed';
+import { exercisesOf, FAILED_WORD, LIMIT_WORDS, PREVIEW_WORDS, type PreviewWord } from './wordsSeed';
+
+export { LIMIT_WORD_ANSWERS, PREVIEW_WORD_ANSWERS } from './wordsSeed';
 
 export const PREVIEW_STATES = [
   'empty', 'no_session', 'generated', 'questions', 'graded', 'progress', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing',
   'earlier_session', 'progress_archived', 'closed', 'open-round', 'round-graded', 'skipped', 'skipped-round', 'fireflies',
-  'spot', 'spot-graded', 'writing', 'writing-graded', 'rewrite',
+  'spot', 'spot-graded', 'writing', 'writing-graded', 'rewrite', 'words', 'words-done', 'words-limit',
 ] as const;
 export type PreviewState = (typeof PREVIEW_STATES)[number];
 
@@ -46,6 +51,34 @@ const ANSWERS: Record<string, string> = {
   'I saw a elephant at the zoo.': 'one elephant',
 };
 
+/** Seeded random source: the words practice picks the same cards on every load of a preview state. */
+function mulberry32(seed: number): () => number {
+  let a = seed;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Seeds the words through the repo, not the LLM; `done` also answers every ready word today. */
+async function seedWords(deps: Deps, done: boolean, list: PreviewWord[] = PREVIEW_WORDS): Promise<void> {
+  const now = deps.clock.now();
+  const review = (wordId: number, date: ISODate) =>
+    insertReview(deps.db, { wordId, cardType: 'gap', exerciseId: null, answeredAt: `${date}T12:00:00.000Z`, date, result: 'correct', counted: true, text: '' });
+  for (const w of list) {
+    const id = await insertWord(deps.db, { word: w.word, translation: w.translation, definition: w.definition, example: w.example, synonyms: w.synonyms, link: '', added: w.added }, now);
+    await replaceExercises(deps.db, id, exercisesOf(w));
+    await setGeneration(deps.db, id, 'ready');
+    for (const date of w.reviews) await review(id, date);
+    if (done) await review(id, deps.clock.today());
+  }
+  if (list !== PREVIEW_WORDS) return;
+  const failed = await insertWord(deps.db, { word: FAILED_WORD, translation: '', definition: '', example: '', synonyms: [], link: '', added: '2026-10-19' }, now);
+  await setGeneration(deps.db, failed, 'failed');
+}
+
 const TUESDAY = '2026-10-20';
 const WEDNESDAY = '2026-10-21';
 const THURSDAY = '2026-10-22';
@@ -70,14 +103,36 @@ const EARLIER_DAYS: { date: ISODate; light: boolean }[] = [
   { date: '2026-10-18', light: true },
 ];
 
-/** A clock the fixture can move between days; the app gets it at the final date. */
+/**
+ * A clock the fixture can move between days; the app gets it at the final date.
+ * After `simulateEarly()` it reads as local time 03:00 on the day after the set date, so the app's date
+ * is still the set date and "Start a new day" is available; the day config applies only then.
+ */
 class SteppedClock implements Clock {
+  private early = false;
+  private cfg: DayConfig = DEFAULT_DAY;
   constructor(private date: ISODate) {}
   set(date: ISODate): void {
     this.date = date;
   }
+  simulateEarly(): void {
+    this.early = true;
+  }
+  configure(cfg: DayConfig): void {
+    this.cfg = cfg;
+  }
+  private local(): Date {
+    const [y = 0, m = 1, d = 1] = this.date.split('-').map(Number);
+    return new Date(y, m - 1, d + 1, 3, 0);
+  }
   today(): ISODate {
-    return this.date;
+    return this.early ? appDate(this.local(), this.cfg) : this.date;
+  }
+  calendarDate(): ISODate {
+    return this.early ? localDate(this.local()) : this.date;
+  }
+  canStartNewDay(): boolean {
+    return this.early && canStartNewDay(this.local(), this.cfg);
   }
   now(): string {
     return `${this.date}T12:00:00.000Z`;
@@ -93,6 +148,11 @@ export function parsePreviewState(search: string): PreviewState {
 export function parsePreviewDelay(search: string): number {
   const ms = Number(new URLSearchParams(search).get('delay'));
   return Number.isFinite(ms) && ms > 0 ? Math.min(ms, 60_000) : 0;
+}
+
+/** `?early=1` makes the clock read 03:00 on the day after the fixture's date, to see the "Start a new day" state. */
+export function parsePreviewEarly(search: string): boolean {
+  return new URLSearchParams(search).get('early') === '1';
 }
 
 /** `?fail=` makes every LLM call fail with that code, to see the messages the app gives for it. */
@@ -176,13 +236,15 @@ async function playDay(deps: Deps, light: boolean): Promise<void> {
   await answerToday(deps, 'graded');
 }
 
-export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
+export async function buildPreview(state: PreviewState, options: { early?: boolean } = {}): Promise<PreviewCore> {
   const clock = new SteppedClock(state === 'rest' ? WEDNESDAY : state.startsWith('spot') ? MONDAY : state.startsWith('writing') ? SATURDAY : state === 'rewrite' ? SUNDAY : TUESDAY);
+  if (options.early) clock.simulateEarly();
   const deps: Deps = {
     db: await createSqlJsDb(),
     llm: previewLlm,
     clock,
     prompts: { load: async (kind) => bundledPrompts[kind] },
+    rand: mulberry32(1),
   };
   await startApp(deps);
 
@@ -200,6 +262,8 @@ export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
   for (const [word, hint] of SPELLING_WORDS) await findOrCreateSpellingWord(deps.db, word, hint, clock.now());
 
   const today = clock.today();
+  if (state === 'words' || state === 'words-done') await seedWords(deps, state === 'words-done');
+  if (state === 'words-limit') await seedWords(deps, false, LIMIT_WORDS);
   if (state === 'fireflies') {
     // Yesterday's lesson was played, so the sidebar garden has fireflies; today has no session yet.
     clock.set('2026-10-19');

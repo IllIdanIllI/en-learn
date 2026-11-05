@@ -1,10 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
+import { LIMIT_WORD_ANSWERS } from '../../src/adapters/preview/wordsSeed';
 
 // Learner's rule (CLAUDE.md): every interactive element shows the pointer cursor; disabled ones show `not-allowed`.
 // Each page is opened in a few preview states; open panels and expandable rows are opened too, then every interactive element is checked.
 
 const INTERACTIVE = [
-  'button', 'a[href]', 'summary', 'select', 'label[for]',
+  'button', 'a[href]', 'summary', 'select',
   'input[type="checkbox"]', 'input[type="radio"]',
   '[role="button"]', '[role="link"]', '[role="menuitem"]', '[role="menuitemcheckbox"]', '[role="menuitemradio"]',
   '[role="option"]', '[role="tab"]', '[role="switch"]', '[role="checkbox"]', '[role="radio"]',
@@ -41,6 +42,8 @@ const CASES: [string, string][] = [
   ['spot', 'today'], ['spot-graded', 'today'], ['writing', 'today'], ['writing-graded', 'today'], ['rewrite', 'today'],
   ['progress', 'progress'], ['writing-graded', 'progress'], ['graded', 'rules'], ['graded', 'errors'],
   ['writing-graded', 'errors'], ['writing-graded', 'writing'], ['graded', 'settings'], ['prereq_missing', 'prerequisites'],
+  ['words', 'words'], ['words', 'words/practice'], ['words-done', 'words/practice'], ['words-limit', 'words'],
+  ['words', 'words/1'], ['words', 'words/abc'],
 ];
 
 for (const [state, route] of CASES) {
@@ -53,9 +56,45 @@ for (const [state, route] of CASES) {
   });
 }
 
+test('field titles (label[for]) keep the default cursor', async ({ page }) => {
+  await page.goto('/?state=words#/words/1');
+  await page.locator('label[for]').first().waitFor();
+  const cursors = await page.locator('label[for]').evaluateAll((els) => els.map((el) => getComputedStyle(el).cursor));
+  expect(cursors.length).toBeGreaterThan(0);
+  for (const c of cursors) expect(['auto', 'default']).toContain(c);
+});
+
+test('pointer cursor: words with the details panel open', async ({ page }) => {
+  await page.goto('/?state=words#/words');
+  await page.getByRole('button', { name: /Подробнее/ }).click();
+  await expect(page.getByTestId('words-details')).toBeVisible();
+  expect(await wrongCursors(page)).toEqual([]);
+});
+
+test('pointer cursor: settings with a new day available', async ({ page }) => {
+  await page.goto('/?state=graded&early=1#/settings');
+  await page.getByRole('button', { name: 'Начать новый день' }).waitFor();
+  expect(await wrongCursors(page)).toEqual([]);
+});
+
 test('pointer cursor: settings with a select list open', async ({ page }) => {
   await page.goto('/?state=graded#/settings');
   await page.getByRole('combobox').first().click();
   await expect(page.getByRole('option').first()).toBeVisible();
+  expect(await wrongCursors(page)).toEqual([]);
+});
+
+test('pointer cursor: practice end screen with +10 new words', async ({ page }) => {
+  await page.goto('/?state=words-limit#/words');
+  await page.getByRole('button', { name: '+10 новых слов' }).click();
+  for (let i = 0; i < 10; i++) {
+    const card = page.locator('[data-card-type]');
+    await card.waitFor();
+    const correct = LIMIT_WORD_ANSWERS[(await card.locator('p.reading').first().innerText()).trim()];
+    expect(correct).toBeDefined();
+    await card.getByRole('button', { name: correct!, exact: true }).click();
+    await page.getByRole('button', { name: 'Дальше' }).click();
+  }
+  await expect(page.getByTestId('practice-end').getByRole('button', { name: '+10 новых слов' })).toBeVisible();
   expect(await wrongCursors(page)).toEqual([]);
 });

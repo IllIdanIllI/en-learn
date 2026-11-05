@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { BookOpen, CalendarDays, ChartLine, CircleAlert, PenLine, Settings as SettingsIcon, type LucideIcon } from 'lucide-react';
+import { BookA, BookOpen, CalendarDays, ChartLine, CircleAlert, PenLine, Settings as SettingsIcon, type LucideIcon } from 'lucide-react';
 import { t, type MessageKey } from '@/core/i18n';
 import { cn } from '@/lib/utils';
 import { Garden } from '@/ui/grove/Garden';
@@ -11,6 +11,7 @@ const ITEMS: { to: string; key: MessageKey; icon: LucideIcon }[] = [
   { to: '/rules', key: 'nav.rules', icon: BookOpen },
   { to: '/errors', key: 'nav.errors', icon: CircleAlert },
   { to: '/writing', key: 'nav.writing', icon: PenLine },
+  { to: '/words', key: 'nav.words', icon: BookA },
   { to: '/settings', key: 'nav.settings', icon: SettingsIcon },
 ];
 

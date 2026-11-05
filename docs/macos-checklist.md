@@ -151,3 +151,29 @@ R. **The stop button ends the real CLI call.**
    - Action: answer at least one task question wrongly, press "Завершить урок", then press the stop button (ring with a square) within a few seconds.
    - Expected: the lesson stays open with your answers, no error message; in Activity Monitor no `claude` process stays running; `sqlite3 enlearn.db "select kind, ok, error from llm_call order by id desc limit 1"` prints `grade|0|cancelled: Stopped by the learner`.
    - If it fails: record what stayed (process, error message) and the `llm_call` row.
+
+## Words (2026-11-04)
+
+S. **Words: opener plugin, import, generation, "use it".**
+   - Action 1: in `src-tauri`, run `cargo check` (and `cargo build` or `yarn tauri build`) with `tauri-plugin-opener` added.
+   - Expected: it compiles with no error.
+   - Action 2: on the Words page open a word that has an https link and click its dictionary link; then a word with no link (Oxford search link).
+   - Expected: the page opens in the default browser; a link that does not start with `https://` is never opened (the Oxford search link is used instead).
+   - Action 3: paste a real Obsidian export into the import field and import it.
+   - Expected: the words appear with their fields, the summary counts match, and nothing is lost or duplicated.
+   - Action 4: generate exercises for a few words with the real CLI.
+   - Expected: the words become ready (or failed with Retry), with no error toast; a lesson build running at the same time leaves the rest pending with Retry.
+   - Action 5: practise until a "use it" card appears and answer it with a sentence.
+   - Expected: the real CLI checks it; errors show with an explanation and appear in the error bank under Слова/Words.
+   - If it fails: record the message and the `llm_call` rows (kinds `words`, `word_check`).
+
+## App icon and day start (2026-11-05)
+
+T. **Night Dock icon, Light restore, day start.**
+   - Action 1: Settings → App icon → Night. Quit and start the app (release build, then `yarn tauri dev`).
+   - Expected: the Dock shows the Night icon from launch, in both. Finder and Launchpad show the Light icon.
+   - Action 2: switch App icon back to Light.
+   - Expected: the Dock shows the bundle icon (in `tauri dev` there is no bundle, so Light may show a generic icon until restart).
+   - Action 3: leave the app open across the day start hour; then, before 05:00, press "Start a new day".
+   - Expected: the date changes at the start hour with the app open; "Start a new day" moves the date to today.
+   - If it fails: record the step, the macOS version and the Rust console output.

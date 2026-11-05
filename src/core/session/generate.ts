@@ -30,7 +30,7 @@ export type OnStage = (stage: GenStage, attempt: number) => void;
 export type GenerateResult = { ok: true; sessionId: number } | { ok: false; message: string; code?: GenerateErrorCode };
 
 /** What a job returns when another one holds the lock. */
-export const BUSY: GenerateResult = { ok: false, message: 'A lesson is already being generated', code: 'busy' };
+export const BUSY: GenerateResult = { ok: false, message: 'Another task is running', code: 'busy' };
 
 const MAX_ATTEMPTS = 2;
 /** Retrying cannot help with these. */

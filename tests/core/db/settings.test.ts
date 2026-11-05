@@ -15,14 +15,21 @@ describe('settings repo', () => {
         grade: 'claude-sonnet-5-5',
         dispute: 'claude-sonnet-5-5',
         explain: 'claude-sonnet-5-5',
+        words: 'claude-sonnet-5-5',
+        word_check: 'claude-sonnet-5-5',
       },
-      efforts: { rule_draft: 'medium', rule_chat: 'medium', generate_session: 'medium', validate_session: 'medium', grade: 'high', dispute: 'medium', explain: 'medium' },
+      efforts: { rule_draft: 'medium', rule_chat: 'medium', generate_session: 'medium', validate_session: 'medium', grade: 'high', dispute: 'medium', explain: 'medium', words: 'medium', word_check: 'medium' },
       budgetUsd: null,
       acceptedShorthands: ['✓'],
       spellingVariant: 'british',
       theme: 'dark',
       design: 'grove',
+      appIcon: 'light',
       closedSessions: [],
+      dayStartHour: 5,
+      dayOverride: null,
+      wordsExtraNew: null,
+      wordsStatsOpen: false,
     });
   });
 

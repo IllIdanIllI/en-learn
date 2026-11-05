@@ -31,3 +31,10 @@ Agreed with the learner in chat on 2026-11-05 after trying round 1. Binding wher
 - Vitest: `wordsOverview` `inProgress` / `learned` / `total` (a Learned word is not in progress; a failed-generation reviewed word counts in progress; total includes all).
 - E2E (words.spec): the summary line values in `words` and `words-limit`; Details opens and closes the panel with Due today and the stage counts; the +10 button is in the same row as Start practice; the word page ← stays in view after scrolling to the bottom; Definition and Example are `textarea`s; the Link title contains the dictionary link and the old link is gone.
 - cursor.spec: field titles are no longer checked; the Details button and the dictionary link are pointer; a computed-style check that a field title (`label[for]`) has the default cursor.
+
+## Round 3 (agreed 2026-11-05, after trying round 2)
+- **G1a. Summary as three tiles** (replaces the G1 summary line): tiles "В процессе" / "In progress" (number in the primary/moon-yellow colour), "Выучено" / "Learned" (success colour), "Всего" / "Total" (default colour); label small and muted above a large number. The two-colour bar sits under the tiles (same widths rule; accessible label = "In progress X · Learned Y · Total Z").
+- **G1b. Details toggle** is a text link style button (muted, dotted underline): "Подробнее ▾" / "Details ▾" and "Скрыть ▴" / "Hide ▴". It keeps `aria-expanded` and the pointer cursor.
+- **G1c. Details panel** is a vertical two-column list (label muted, number right of it): Due today, New, Recall, Use.
+- **G3a.** Definition and Example text areas use the same font as the other fields (not the monospace answer font).
+- **G5a.** The "(open in dictionary)" part of the Link title is shown only when the Link field holds a valid `https://` link (same validity rule as `wordLink`), and opens that link. Practice feedback keeps its current rule: the stored link if it is a valid `https://` link, otherwise the Oxford search link.

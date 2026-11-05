@@ -1,5 +1,5 @@
-import { Fragment, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { t } from '@/core/i18n';
 import { extraNewFor } from '@/core/words/queue';
 import { getSettings } from '@/core/db/repos/settings';
@@ -13,7 +13,6 @@ import { FieldInput } from '@/ui/components/ui/field-input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/ui/components/ui/table';
 import { Notice } from '@/ui/today/chips';
 import { ImportPanel } from '@/ui/words/ImportPanel';
-import { WordDetails } from '@/ui/words/WordDetails';
 import { WordForm } from '@/ui/words/WordForm';
 import { useWordsJob } from '@/ui/words/WordsJobProvider';
 
@@ -32,8 +31,8 @@ export function Words() {
   const today = deps.clock.today();
   const [reload, setReload] = useState(0);
   const [panel, setPanel] = useState<Panel>(null);
-  const [open, setOpen] = useState<number | null>(null);
-  const [search, setSearch] = useState('');
+  const [params, setParams] = useSearchParams();
+  const search = params.get('q') ?? '';
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
@@ -116,7 +115,7 @@ export function Words() {
             className="mt-1"
             placeholder={t(lang, 'words.search.placeholder')}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => setParams(e.target.value === '' ? {} : { q: e.target.value }, { replace: true })}
           />
         </div>
       </div>
@@ -152,42 +151,30 @@ export function Words() {
           </TableHeader>
           <TableBody>
             {shown.map((v) => {
-              const isOpen = open === v.word.id;
               const creating = job.active.has(v.word.id);
               const failed = !creating && v.word.generation !== 'ready';
               return (
-                <Fragment key={v.word.id}>
-                  <TableRow>
-                    <TableCell>
-                      <button
-                        type="button"
-                        aria-expanded={isOpen}
-                        aria-controls={`word-details-${v.word.id}`}
-                        className="answer text-left hover:underline"
-                        onClick={() => setOpen(isOpen ? null : v.word.id)}
-                      >
-                        {v.word.word}
-                      </button>
-                      {creating && <div className="mt-1 text-sm text-muted-foreground">{t(lang, 'words.creating')}</div>}
-                      {failed && (
-                        <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-                          {t(lang, 'words.notCreated')}
-                          <Button size="sm" variant="outline" onClick={() => job.run([v.word.id])}>{t(lang, 'words.retry')}</Button>
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{v.word.translation}</TableCell>
-                    <TableCell><StageChip stage={v.state.stage} label={t(lang, `words.stage.${v.state.stage}`)} /></TableCell>
-                    <TableCell className="tabular whitespace-nowrap text-muted-foreground">{v.state.due ?? t(lang, 'words.new')}</TableCell>
-                  </TableRow>
-                  {isOpen && (
-                    <TableRow className="hover:bg-transparent">
-                      <TableCell colSpan={4} id={`word-details-${v.word.id}`}>
-                        <WordDetails view={v} onChanged={changed} />
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </Fragment>
+                <TableRow key={v.word.id}>
+                  <TableCell>
+                    <Link
+                      to={`/words/${v.word.id}`}
+                      state={{ q: search }}
+                      className="answer text-left hover:underline"
+                    >
+                      {v.word.word}
+                    </Link>
+                    {creating && <div className="mt-1 text-sm text-muted-foreground">{t(lang, 'words.creating')}</div>}
+                    {failed && (
+                      <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                        {t(lang, 'words.notCreated')}
+                        <Button size="sm" variant="outline" onClick={() => job.run([v.word.id])}>{t(lang, 'words.retry')}</Button>
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{v.word.translation}</TableCell>
+                  <TableCell><StageChip stage={v.state.stage} label={t(lang, `words.stage.${v.state.stage}`)} /></TableCell>
+                  <TableCell className="tabular whitespace-nowrap text-muted-foreground">{v.state.due ?? t(lang, 'words.new')}</TableCell>
+                </TableRow>
               );
             })}
           </TableBody>

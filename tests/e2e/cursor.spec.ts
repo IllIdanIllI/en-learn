@@ -42,6 +42,7 @@ const CASES: [string, string][] = [
   ['progress', 'progress'], ['writing-graded', 'progress'], ['graded', 'rules'], ['graded', 'errors'],
   ['writing-graded', 'errors'], ['writing-graded', 'writing'], ['graded', 'settings'], ['prereq_missing', 'prerequisites'],
   ['words', 'words'], ['words', 'words/practice'], ['words-done', 'words/practice'], ['words-limit', 'words'],
+  ['words', 'words/1'], ['words', 'words/abc'],
 ];
 
 for (const [state, route] of CASES) {

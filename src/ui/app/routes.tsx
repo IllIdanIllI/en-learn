@@ -12,6 +12,7 @@ import { RuleView } from '@/ui/pages/RuleView';
 import { ErrorBank } from '@/ui/pages/ErrorBank';
 import { Writing } from '@/ui/pages/Writing';
 import { Words } from '@/ui/pages/Words';
+import { WordPage } from '@/ui/pages/WordPage';
 import { WordsPractice } from '@/ui/pages/WordsPractice';
 import { WordsJobProvider } from '@/ui/words/WordsJobProvider';
 
@@ -32,6 +33,7 @@ export function AppRoutes() {
                 <Route path="writing" element={<Writing />} />
                 <Route path="words" element={<Words />} />
                 <Route path="words/practice" element={<WordsPractice />} />
+                <Route path="words/:id" element={<WordPage />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="setup" element={<Setup />} />
                 <Route path="prerequisites" element={<Prerequisites />} />

@@ -52,7 +52,7 @@ const openPractice = async (page: Page, state = 'words') => {
   await card(page).waitFor();
 };
 
-const row = (page: Page, word: string): Locator => page.getByRole('row').filter({ has: page.getByRole('button', { name: word, exact: true }) });
+const row = (page: Page, word: string): Locator => page.getByRole('row').filter({ has: page.getByRole('link', { name: word, exact: true }) });
 
 const CARDS = [
   '### a very long-lasting thing (долговечный)',
@@ -96,7 +96,7 @@ test.describe('words page', () => {
     await word.fill('LUCID');
     await page.getByRole('button', { name: 'Сохранить' }).click();
     await expect(page.getByRole('alert')).toHaveText('Такое слово уже есть');
-    await expect(page.getByRole('button', { name: 'lucid', exact: true })).toHaveCount(1);
+    await expect(page.getByRole('link', { name: 'lucid', exact: true })).toHaveCount(1);
   });
 
   test('a failed word shows Retry and is not practised', async ({ page }) => {
@@ -264,5 +264,62 @@ test.describe('around the lessons', () => {
     await page.getByRole('navigation').getByRole('link', { name: 'Банк ошибок' }).click();
     const bank = page.getByRole('row').filter({ hasText: 'Honestly' });
     await expect(bank).toContainText('Слова');
+  });
+});
+
+test.describe('a page per word', () => {
+  const back = (page: Page) => page.getByRole('link', { name: 'Назад к словам' });
+
+  test('a word opens its own page with fields, exercises and the bottom row', async ({ page }) => {
+    await page.goto('/?state=words#/words');
+    await row(page, 'resilient').getByRole('link', { name: 'resilient', exact: true }).click();
+    await expect(page).toHaveURL(/#\/words\/\d+$/);
+    await expect(page.getByRole('heading', { name: 'resilient', level: 1 })).toBeVisible();
+    await expect(page.getByLabel('Перевод')).toHaveValue('устойчивый');
+    await expect(page.getByRole('heading', { name: 'Упражнения' })).toBeVisible();
+    await expect(back(page)).toBeVisible();
+    await expect(page.getByRole('link', { name: '← Назад' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Создать заново' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Удалить' })).toBeVisible();
+  });
+
+  for (const control of ['top', 'bottom'] as const) {
+    test(`the ${control} back control keeps the list search`, async ({ page }) => {
+      await page.goto('/?state=words#/words');
+      await page.getByLabel('Поиск').fill('устой');
+      await expect(page).toHaveURL(/#\/words\?q=/);
+      await row(page, 'resilient').getByRole('link', { name: 'resilient', exact: true }).click();
+      await (control === 'top' ? back(page) : page.getByRole('link', { name: '← Назад' })).click();
+      await expect(page.getByLabel('Поиск')).toHaveValue('устой');
+      await expect(row(page, 'resilient')).toBeVisible();
+      await expect(row(page, 'ephemeral')).toHaveCount(0);
+    });
+  }
+
+  test('Delete asks, then returns to the list without the word', async ({ page }) => {
+    await page.goto('/?state=words#/words');
+    await row(page, 'ephemeral').getByRole('link', { name: 'ephemeral', exact: true }).click();
+    await page.getByRole('button', { name: 'Удалить' }).click();
+    await page.getByRole('button', { name: 'Да', exact: true }).click();
+    await expect(page).toHaveURL(/#\/words$/);
+    await expect(row(page, 'resilient')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'ephemeral', exact: true })).toHaveCount(0);
+  });
+
+  for (const id of ['999999', 'abc']) {
+    test(`/words/${id} says the word is not found`, async ({ page }) => {
+      await page.goto(`/?state=words#/words/${id}`);
+      await expect(page.getByText('Слово не найдено')).toBeVisible();
+      await expect(back(page)).toBeVisible();
+    });
+  }
+
+  test('Regenerate shows the creating notice, then the exercises', async ({ page }) => {
+    await page.goto('/?state=words#/words');
+    await row(page, 'resilient').getByRole('link', { name: 'resilient', exact: true }).click();
+    await page.getByRole('button', { name: 'Создать заново' }).click();
+    await expect(page.getByText('Создаю упражнения…')).toHaveCount(0, { timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: 'Упражнения' })).toBeVisible();
+    await expect(page.getByLabel('Текст').first()).toBeVisible();
   });
 });

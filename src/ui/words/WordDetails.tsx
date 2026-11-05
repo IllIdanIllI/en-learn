@@ -1,11 +1,12 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { t } from '@/core/i18n';
 import { deleteWord, updateExercise } from '@/core/db/repos/words';
 import { wordLink } from '@/core/words/link';
 import type { WordView } from '@/core/words/practice';
 import type { WordExercise } from '@/core/words/types';
 import { useCore } from '@/ui/app/CoreProvider';
-import { Button } from '@/ui/components/ui/button';
+import { Button, buttonVariants } from '@/ui/components/ui/button';
 import { Textarea } from '@/ui/components/ui/textarea';
 import { ExternalLink } from '@/ui/components/ExternalLink';
 import { Notice } from '@/ui/today/chips';
@@ -51,8 +52,8 @@ function ExerciseEditor({ exercise, onSaved }: { exercise: WordExercise; onSaved
   );
 }
 
-/** A row's expanded part: the word's fields, its exercises, Regenerate and Delete (with an inline confirmation). */
-export function WordDetails({ view, onChanged }: { view: WordView; onChanged: () => void }) {
+/** A word page's body: the word's fields, its exercises, and a bottom row with Back, Regenerate and Delete (with an inline confirmation). */
+export function WordDetails({ view, onChanged, onDeleted, backTo }: { view: WordView; onChanged: () => void; onDeleted: () => void; backTo: string }) {
   const { deps, lang } = useCore();
   const job = useWordsJob();
   const [confirming, setConfirming] = useState(false);
@@ -62,7 +63,7 @@ export function WordDetails({ view, onChanged }: { view: WordView; onChanged: ()
   const remove = async () => {
     try {
       await deleteWord(deps.db, word.id);
-      onChanged();
+      onDeleted();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setConfirming(false);
@@ -89,7 +90,8 @@ export function WordDetails({ view, onChanged }: { view: WordView; onChanged: ()
       </section>
       {error !== null && <Notice>{t(lang, 'words.saveError', { message: error })}</Notice>}
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="secondary" onClick={() => job.run([word.id])}>{t(lang, 'words.regenerate')}</Button>
+        <Link to={backTo} className={buttonVariants({ variant: 'ghost' })}>{t(lang, 'word.back')}</Link>
+        <Button variant="secondary" disabled={job.running} onClick={() => job.run([word.id])}>{t(lang, 'words.regenerate')}</Button>
         {confirming ? (
           <span className="flex items-center gap-2 text-sm">
             {t(lang, 'words.delete.confirm')}

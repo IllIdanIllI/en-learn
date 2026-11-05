@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { PREVIEW_WORD_ANSWERS } from '../../src/adapters/preview/wordsSeed';
+import { LIMIT_WORD_ANSWERS, PREVIEW_WORD_ANSWERS } from '../../src/adapters/preview/wordsSeed';
 
 const card = (page: Page) => page.locator('[data-card-type]');
 const cardType = async (page: Page) => (await card(page).getAttribute('data-card-type')) ?? '';
@@ -107,6 +107,41 @@ test.describe('words page', () => {
     await page.getByRole('link', { name: 'Начать практику' }).click();
     // Seven ready words are due or new; the failed one is not among them.
     await expect(page.getByText('1 / 7')).toBeVisible();
+  });
+});
+
+test.describe('started count and +10 new words', () => {
+  const addNew = (page: Page) => page.getByRole('button', { name: '+10 новых слов' });
+
+  test('the header shows how many words were started, failed word included', async ({ page }) => {
+    await page.goto('/?state=words#/words');
+    await expect(page.getByText('Начато: 6 из 8')).toBeVisible();
+    await expect(addNew(page)).toHaveCount(0);
+  });
+
+  test('words-limit: Start is disabled, +10 opens practice with a new word', async ({ page }) => {
+    await page.goto('/?state=words-limit#/words');
+    await expect(page.getByText('Начато: 10 из 21')).toBeVisible();
+    await expect(page.getByText('Начать практику')).toHaveAttribute('aria-disabled', 'true');
+    await addNew(page).click();
+    await card(page).waitFor();
+    await expect(page.getByText('1 / 10')).toBeVisible();
+    expect(await cardType(page)).toBe('choice');
+  });
+
+  test('words-limit: after +10 and ten cards the end screen offers +10', async ({ page }) => {
+    await page.goto('/?state=words-limit#/words');
+    await addNew(page).click();
+    for (let i = 0; i < 10; i++) {
+      await card(page).waitFor();
+      const correct = LIMIT_WORD_ANSWERS[await promptOf(page)];
+      expect(correct).toBeDefined();
+      await card(page).getByRole('button', { name: correct!, exact: true }).click();
+      await next(page).click();
+    }
+    const end = page.getByTestId('practice-end');
+    await expect(end).toContainText('Готово: 10 из 10');
+    await expect(end.getByRole('button', { name: '+10 новых слов' })).toBeVisible();
   });
 });
 

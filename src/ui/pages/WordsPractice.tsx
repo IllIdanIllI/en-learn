@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { getSettings } from '@/core/db/repos/settings';
 import { t } from '@/core/i18n';
+import { extraNewFor } from '@/core/words/queue';
 import {
-  buildPractice, cardFor, loadWordViews, recordAnswer, stageChanges, wordsOverview, type PracticeCard,
+  addExtraNew, buildPractice, cardFor, loadWordViews, recordAnswer, stageChanges, wordsOverview, type PracticeCard,
 } from '@/core/words/practice';
 import type { ReviewResult, Stage } from '@/core/words/types';
 import { useCore } from '@/ui/app/CoreProvider';
@@ -11,7 +13,7 @@ import { Notice } from '@/ui/today/chips';
 import { CardView } from '@/ui/words/CardView';
 import { PracticeEnd } from '@/ui/words/PracticeEnd';
 
-type Ended = { correct: number; total: number; up: { word: string; stage: Stage }[]; down: { word: string; stage: Stage }[]; canContinue: boolean };
+type Ended = { correct: number; total: number; up: { word: string; stage: Stage }[]; down: { word: string; stage: Stage }[]; canContinue: boolean; canAddNew: boolean };
 
 function Practice({ onContinue }: { onContinue: () => void }) {
   const { deps, lang } = useCore();
@@ -34,8 +36,9 @@ function Practice({ onContinue }: { onContinue: () => void }) {
     (async () => {
       const views = await loadWordViews(deps.db);
       before.current = new Map(views.map((v) => [v.word.id, v.state.stage]));
-      const built = await buildPractice(deps);
-      if (built.length === 0) setNextDue((await wordsOverview(deps.db, deps.clock.today())).nextDue);
+      const extra = extraNewFor((await getSettings(deps.db)).wordsExtraNew, deps.clock.today());
+      const built = await buildPractice(deps, extra);
+      if (built.length === 0) setNextDue((await wordsOverview(deps.db, deps.clock.today(), extra)).nextDue);
       setCards(built);
     })().catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -47,12 +50,14 @@ function Practice({ onContinue }: { onContinue: () => void }) {
       const after = new Map(views.map((v) => [v.word.id, v.state.stage]));
       const names = new Map(views.map((v) => [v.word.id, v.word.word]));
       const answers = [...first.current.values()];
-      const overview = await wordsOverview(deps.db, deps.clock.today());
+      const extra = extraNewFor((await getSettings(deps.db)).wordsExtraNew, deps.clock.today());
+      const overview = await wordsOverview(deps.db, deps.clock.today(), extra);
       setEnded({
         correct: answers.filter(Boolean).length,
         total: answers.length,
         ...stageChanges(before.current, after, names),
         canContinue: overview.available > 0,
+        canAddNew: overview.canAddNew,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -89,7 +94,18 @@ function Practice({ onContinue }: { onContinue: () => void }) {
   };
 
   if (error !== null) return <Notice className="mt-6">{t(lang, 'words.loadError', { message: error })}</Notice>;
-  if (ended) return <PracticeEnd {...ended} onContinue={onContinue} />;
+  if (ended) {
+    return (
+      <PracticeEnd
+        {...ended}
+        onContinue={onContinue}
+        onAddNew={async () => {
+          await addExtraNew(deps.db, deps.clock.today());
+          onContinue();
+        }}
+      />
+    );
+  }
   if (!cards) return null;
   if (cards.length === 0) {
     return (

@@ -1,7 +1,9 @@
 import { Fragment, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { t } from '@/core/i18n';
-import { loadWordViews, wordsOverview, type WordView } from '@/core/words/practice';
+import { extraNewFor } from '@/core/words/queue';
+import { getSettings } from '@/core/db/repos/settings';
+import { addExtraNew, loadWordViews, wordsOverview, type WordView } from '@/core/words/practice';
 import type { Stage } from '@/core/words/types';
 import { cn } from '@/lib/utils';
 import { useCore } from '@/ui/app/CoreProvider';
@@ -32,7 +34,11 @@ export function Words() {
   const [panel, setPanel] = useState<Panel>(null);
   const [open, setOpen] = useState<number | null>(null);
   const [search, setSearch] = useState('');
-  const loaded = useLoaded(async () => ({ views: await loadWordViews(deps.db), overview: await wordsOverview(deps.db, today) }), `${job.version}-${reload}`);
+  const navigate = useNavigate();
+  const loaded = useLoaded(async () => {
+    const { wordsExtraNew } = await getSettings(deps.db);
+    return { views: await loadWordViews(deps.db), overview: await wordsOverview(deps.db, today, extraNewFor(wordsExtraNew, today)) };
+  }, `${job.version}-${reload}`);
   const changed = () => setReload((n) => n + 1);
   const views = loaded && 'data' in loaded ? loaded.data.views : null;
   const existing = useMemo(() => (views ?? []).map((v) => v.word.word), [views]);
@@ -52,7 +58,7 @@ export function Words() {
       {job.busy && <Notice className="mt-6">{t(lang, 'words.busy')}</Notice>}
       {job.error && <Notice className="mt-6">{job.error.message}</Notice>}
       {loaded && 'data' in loaded && (() => {
-        const { counts, dueToday, available } = loaded.data.overview;
+        const { counts, dueToday, available, started, canAddNew } = loaded.data.overview;
         return (
           <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
             <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
@@ -62,11 +68,22 @@ export function Words() {
                 </li>
               ))}
             </ul>
+            <span className="text-sm">{t(lang, 'words.started', { x: started, y: views?.length ?? 0 })}</span>
             <span className="text-sm">{t(lang, 'words.due', { n: dueToday })}</span>
             {available > 0 ? (
               <Link to="/words/practice" className={buttonVariants()}>{t(lang, 'words.start')}</Link>
             ) : (
               <a aria-disabled="true" className={cn(buttonVariants(), 'cursor-not-allowed opacity-50')}>{t(lang, 'words.start')}</a>
+            )}
+            {canAddNew && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  void addExtraNew(deps.db, today).then(() => navigate('/words/practice'));
+                }}
+              >
+                {t(lang, 'words.addNew')}
+              </Button>
             )}
           </div>
         );

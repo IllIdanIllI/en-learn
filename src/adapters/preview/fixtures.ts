@@ -16,14 +16,14 @@ import { insertReview, insertWord, replaceExercises, setGeneration } from '@/cor
 import { createSqlJsDb } from './sqljsDb';
 import { previewLlm } from './previewLlm';
 import { MINI_PROGRAMME, MINI_RULES } from './miniSeed';
-import { exercisesOf, FAILED_WORD, PREVIEW_WORDS } from './wordsSeed';
+import { exercisesOf, FAILED_WORD, LIMIT_WORDS, PREVIEW_WORDS, type PreviewWord } from './wordsSeed';
 
-export { PREVIEW_WORD_ANSWERS } from './wordsSeed';
+export { LIMIT_WORD_ANSWERS, PREVIEW_WORD_ANSWERS } from './wordsSeed';
 
 export const PREVIEW_STATES = [
   'empty', 'no_session', 'generated', 'questions', 'graded', 'progress', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing',
   'earlier_session', 'progress_archived', 'closed', 'open-round', 'round-graded', 'skipped', 'skipped-round', 'fireflies',
-  'spot', 'spot-graded', 'writing', 'writing-graded', 'rewrite', 'words', 'words-done',
+  'spot', 'spot-graded', 'writing', 'writing-graded', 'rewrite', 'words', 'words-done', 'words-limit',
 ] as const;
 export type PreviewState = (typeof PREVIEW_STATES)[number];
 
@@ -63,17 +63,18 @@ function mulberry32(seed: number): () => number {
 }
 
 /** Seeds the words through the repo, not the LLM; `done` also answers every ready word today. */
-async function seedWords(deps: Deps, done: boolean): Promise<void> {
+async function seedWords(deps: Deps, done: boolean, list: PreviewWord[] = PREVIEW_WORDS): Promise<void> {
   const now = deps.clock.now();
   const review = (wordId: number, date: ISODate) =>
     insertReview(deps.db, { wordId, cardType: 'gap', exerciseId: null, answeredAt: `${date}T12:00:00.000Z`, date, result: 'correct', counted: true, text: '' });
-  for (const w of PREVIEW_WORDS) {
+  for (const w of list) {
     const id = await insertWord(deps.db, { word: w.word, translation: w.translation, definition: w.definition, example: w.example, synonyms: w.synonyms, link: '', added: w.added }, now);
     await replaceExercises(deps.db, id, exercisesOf(w));
     await setGeneration(deps.db, id, 'ready');
     for (const date of w.reviews) await review(id, date);
     if (done) await review(id, deps.clock.today());
   }
+  if (list !== PREVIEW_WORDS) return;
   const failed = await insertWord(deps.db, { word: FAILED_WORD, translation: '', definition: '', example: '', synonyms: [], link: '', added: '2026-10-19' }, now);
   await setGeneration(deps.db, failed, 'failed');
 }
@@ -262,6 +263,7 @@ export async function buildPreview(state: PreviewState, options: { early?: boole
 
   const today = clock.today();
   if (state === 'words' || state === 'words-done') await seedWords(deps, state === 'words-done');
+  if (state === 'words-limit') await seedWords(deps, false, LIMIT_WORDS);
   if (state === 'fireflies') {
     // Yesterday's lesson was played, so the sidebar garden has fireflies; today has no session yet.
     clock.set('2026-10-19');

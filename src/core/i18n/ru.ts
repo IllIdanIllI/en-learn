@@ -401,6 +401,8 @@ export const ru: Record<keyof typeof en, string> = {
   'nav.words': 'Слова',
   'words.due': 'К повторению сегодня: {n}',
   'words.start': 'Начать практику',
+  'words.started': 'Начато: {x} из {y}',
+  'words.addNew': '+10 новых слов',
   'words.stage.1': 'Новое',
   'words.stage.2': 'Вспоминание',
   'words.stage.3': 'Употребление',

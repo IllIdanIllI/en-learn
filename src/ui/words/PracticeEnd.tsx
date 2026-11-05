@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { t } from '@/core/i18n';
 import type { Stage } from '@/core/words/types';
@@ -23,10 +24,12 @@ function Changes({ title, list }: { title: string; list: Change[] }) {
   );
 }
 
-export function PracticeEnd({ correct, total, up, down, canContinue, onContinue }: {
-  correct: number; total: number; up: Change[]; down: Change[]; canContinue: boolean; onContinue: () => void;
+export function PracticeEnd({ correct, total, up, down, canContinue, canAddNew, onContinue, onAddNew }: {
+  correct: number; total: number; up: Change[]; down: Change[]; canContinue: boolean; canAddNew: boolean;
+  onContinue: () => void; onAddNew: () => Promise<void>;
 }) {
   const { lang } = useCore();
+  const [busy, setBusy] = useState(false);
   return (
     <div data-testid="practice-end">
       <h1 className="headline">{t(lang, 'words.done', { x: correct, y: total })}</h1>
@@ -35,6 +38,18 @@ export function PracticeEnd({ correct, total, up, down, canContinue, onContinue 
       <div className="mt-8 flex flex-wrap gap-3">
         <Link to="/words" className={buttonVariants({ variant: 'secondary' })}>{t(lang, 'words.back')}</Link>
         {canContinue && <Button onClick={onContinue}>{t(lang, 'words.more')}</Button>}
+        {canAddNew && (
+          <Button
+            variant="secondary"
+            disabled={busy}
+            onClick={() => {
+              setBusy(true);
+              onAddNew().catch(() => setBusy(false));
+            }}
+          >
+            {t(lang, 'words.addNew')}
+          </Button>
+        )}
       </div>
     </div>
   );

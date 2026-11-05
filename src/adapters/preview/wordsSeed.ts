@@ -115,6 +115,31 @@ export const PREVIEW_WORD_ANSWERS: Record<string, string> = Object.fromEntries(
   ]),
 );
 
+const LIMIT_NAMES = [
+  'brisk', 'gentle', 'vivid', 'humble', 'sturdy', 'eager', 'swift', 'calm', 'bold', 'frail', 'noble',
+  'rustic', 'clever', 'stern', 'lively', 'modest', 'fierce', 'tidy', 'jolly', 'prudent', 'serene',
+];
+
+const limitWord = (word: string, i: number, reviewed: boolean): PreviewWord => ({
+  word, translation: `перевод ${word}`, definition: `the meaning of ${word} (${i})`, example: `This is an example with ${word}.`,
+  synonyms: [`${word}ish`], added: `2026-10-${String(i + 1).padStart(2, '0')}`,
+  reviews: reviewed ? ['2026-10-20'] : [],
+  gaps: [`A gap sentence number one for ${word} is ___.`, `A gap sentence number two for ${word} is ___.`],
+  collocations: [`a ${word} ___`],
+  form: { sentence: `A form sentence for ${word} is ___.`, cue: word, answer: `${word}ly` },
+  confusable: { sentence: `A confusable sentence for ${word} is ___.`, options: [word, `${word}er`], reason: `${word} is the right one.` },
+  translations: [{ text: `Русский текст про ${word}.`, answers: [`English text about ${word}.`] }],
+});
+
+/**
+ * The `words-limit` state: ten words already started today (one counted review today, next due in the future)
+ * and eleven ready never-reviewed words, so today's allowance of ten new words is used up.
+ */
+export const LIMIT_WORDS: PreviewWord[] = LIMIT_NAMES.map((w, i) => limitWord(w, i, i < 10));
+
+/** Like PREVIEW_WORD_ANSWERS, for the cards of LIMIT_WORDS. */
+export const LIMIT_WORD_ANSWERS: Record<string, string> = Object.fromEntries(LIMIT_WORDS.map((w) => [w.definition, w.word]));
+
 export function exercisesOf(w: PreviewWord): Omit<WordExercise, 'id' | 'wordId'>[] {
   const ex = (type: WordExercise['type'], prompt: string, answers: string[], more: Partial<WordExercise> = {}) => ({
     type, prompt, answers, translation: null, cue: null, options: null, note: null, ...more,

@@ -399,6 +399,8 @@ export const en = {
   'nav.words': 'Words',
   'words.due': 'Due today: {n}',
   'words.start': 'Start practice',
+  'words.started': 'Started: {x} of {y}',
+  'words.addNew': '+10 new words',
   'words.stage.1': 'New',
   'words.stage.2': 'Recall',
   'words.stage.3': 'Use',

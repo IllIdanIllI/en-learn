@@ -35,6 +35,8 @@ export function Words() {
   const [open, setOpen] = useState<number | null>(null);
   const [search, setSearch] = useState('');
   const navigate = useNavigate();
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
   const loaded = useLoaded(async () => {
     const { wordsExtraNew } = await getSettings(deps.db);
     return { views: await loadWordViews(deps.db), overview: await wordsOverview(deps.db, today, extraNewFor(wordsExtraNew, today)) };
@@ -55,6 +57,7 @@ export function Words() {
     <>
       <h1 className="headline">{t(lang, 'nav.words')}</h1>
       {loaded && 'error' in loaded && <Notice className="mt-6">{t(lang, 'words.loadError', { message: loaded.error })}</Notice>}
+      {addError && <Notice className="mt-6">{t(lang, 'words.saveError', { message: addError })}</Notice>}
       {job.busy && <Notice className="mt-6">{t(lang, 'words.busy')}</Notice>}
       {job.error && <Notice className="mt-6">{job.error.message}</Notice>}
       {loaded && 'data' in loaded && (() => {
@@ -78,8 +81,17 @@ export function Words() {
             {canAddNew && (
               <Button
                 variant="secondary"
+                disabled={adding}
                 onClick={() => {
-                  void addExtraNew(deps.db, today).then(() => navigate('/words/practice'));
+                  setAdding(true);
+                  setAddError(null);
+                  addExtraNew(deps.db, today).then(
+                    () => navigate('/words/practice'),
+                    (e: unknown) => {
+                      setAddError(e instanceof Error ? e.message : String(e));
+                      setAdding(false);
+                    },
+                  );
                 }}
               >
                 {t(lang, 'words.addNew')}

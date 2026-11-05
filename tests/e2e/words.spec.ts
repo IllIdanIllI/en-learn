@@ -123,8 +123,9 @@ test.describe('started count and +10 new words', () => {
     await page.goto('/?state=words-limit#/words');
     await expect(page.getByText('Начато: 10 из 21')).toBeVisible();
     await expect(page.getByText('Начать практику')).toHaveAttribute('aria-disabled', 'true');
-    await addNew(page).click();
+    await addNew(page).dblclick();
     await card(page).waitFor();
+    // A double click adds ten, not twenty: the practice holds ten new cards.
     await expect(page.getByText('1 / 10')).toBeVisible();
     expect(await cardType(page)).toBe('choice');
   });

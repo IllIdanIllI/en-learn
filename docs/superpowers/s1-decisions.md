@@ -156,6 +156,7 @@ Spec `specs/2026-11-05-words-feedback-1.md`, plan `plans/2026-11-05-words-feedba
 - Extra new words: "+10 new words" adds 10 to the day's new-word limit (stored per day as `wordsExtraNew`), on the Words page and the end screen — cost if wrong: the extra is tied to the app date and resets with the next day.
 - A page per word at `/words/:id` replaces the inline detail; the search stays in `?q=` — cost if wrong: old inline-detail links do not exist.
 - Icon: new bamboo "EN" icon; Light/Night Dock icon is macOS only and set while the app runs (Rust `set_app_icon`, choice in `app_icon.txt`); Finder, Launchpad and the closed Dock always show the bundled Light icon — cost if wrong: the Night choice is invisible when the app is closed; Rust is unverified until the Mac check (S).
+- Settings keys are stored camelCase (`dayStartHour`, `dayOverride`, `wordsExtraNew`, `appIcon`) following the existing convention, instead of the spec's snake_case names; `objc2-foundation` 0.3.2 is a third macOS-only direct dependency (needed for NSData) — cost if wrong: none for data, but a reader of the spec will look for snake_case keys.
 
 ## Still open
 

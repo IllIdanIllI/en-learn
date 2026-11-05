@@ -306,6 +306,16 @@ test.describe('a page per word', () => {
     await expect(page.getByRole('link', { name: 'ephemeral', exact: true })).toHaveCount(0);
   });
 
+  test('Delete keeps the list search', async ({ page }) => {
+    await page.goto('/?state=words#/words');
+    await page.getByLabel('Поиск').fill('устой');
+    await row(page, 'resilient').getByRole('link', { name: 'resilient', exact: true }).click();
+    await page.getByRole('button', { name: 'Удалить' }).click();
+    await page.getByRole('button', { name: 'Да', exact: true }).click();
+    await expect(page).toHaveURL(/#\/words\?q=/);
+    await expect(page.getByLabel('Поиск')).toHaveValue('устой');
+  });
+
   for (const id of ['999999', 'abc']) {
     test(`/words/${id} says the word is not found`, async ({ page }) => {
       await page.goto(`/?state=words#/words/${id}`);

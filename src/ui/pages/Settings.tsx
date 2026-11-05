@@ -74,7 +74,7 @@ export function Settings() {
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
-  const save = async <K extends keyof SettingsData>(key: K, value: SettingsData[K]) => {
+  const save = async <K extends keyof SettingsData>(key: K, value: SettingsData[K]): Promise<boolean> => {
     try {
       await setSetting(deps.db, key, value);
       setFailed(false);
@@ -82,9 +82,11 @@ export function Settings() {
       setSaved(true);
       window.clearTimeout(timer.current);
       timer.current = window.setTimeout(() => setSaved(false), 2000);
+      return true;
     } catch (e) {
       console.error('setting not saved', e);
       setFailed(true);
+      return false;
     }
   };
 
@@ -196,7 +198,7 @@ export function Settings() {
               value={settings.appIcon}
               options={(['light', 'night'] as const).map((v) => ({ value: v, label: t(lang, `settings.appIcon.${v}` as MessageKey) }))}
               onChange={(v) =>
-                void save('appIcon', v).then(() => setAppIcon(v === 'night')).catch((e: unknown) => console.error('app icon not changed', e))
+                void save('appIcon', v).then((ok) => (ok ? setAppIcon(v === 'night') : undefined)).catch((e: unknown) => console.error('app icon not changed', e))
               }
             />
           </Row>

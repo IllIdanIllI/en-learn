@@ -51,7 +51,7 @@ export function WordPage() {
       <h1 className="headline mt-4">{view.word.word}</h1>
       {job.active.has(view.word.id) && <p className="mt-2 text-sm text-muted-foreground">{t(lang, 'words.creating')}</p>}
       <div className="mt-6">
-        <WordDetails view={view} onChanged={() => setReload((n) => n + 1)} onDeleted={() => navigate('/words', { replace: true })} backTo={backTo} />
+        <WordDetails view={view} onChanged={() => setReload((n) => n + 1)} onDeleted={() => navigate(backTo, { replace: true })} backTo={backTo} />
       </div>
     </>
   );

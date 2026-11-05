@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { LIMIT_WORD_ANSWERS } from '../../src/adapters/preview/wordsSeed';
 
 // Learner's rule (CLAUDE.md): every interactive element shows the pointer cursor; disabled ones show `not-allowed`.
 // Each page is opened in a few preview states; open panels and expandable rows are opened too, then every interactive element is checked.
@@ -65,5 +66,20 @@ test('pointer cursor: settings with a select list open', async ({ page }) => {
   await page.goto('/?state=graded#/settings');
   await page.getByRole('combobox').first().click();
   await expect(page.getByRole('option').first()).toBeVisible();
+  expect(await wrongCursors(page)).toEqual([]);
+});
+
+test('pointer cursor: practice end screen with +10 new words', async ({ page }) => {
+  await page.goto('/?state=words-limit#/words');
+  await page.getByRole('button', { name: '+10 новых слов' }).click();
+  for (let i = 0; i < 10; i++) {
+    const card = page.locator('[data-card-type]');
+    await card.waitFor();
+    const correct = LIMIT_WORD_ANSWERS[(await card.locator('p.reading').first().innerText()).trim()];
+    expect(correct).toBeDefined();
+    await card.getByRole('button', { name: correct!, exact: true }).click();
+    await page.getByRole('button', { name: 'Дальше' }).click();
+  }
+  await expect(page.getByTestId('practice-end').getByRole('button', { name: '+10 новых слов' })).toBeVisible();
   expect(await wrongCursors(page)).toEqual([]);
 });

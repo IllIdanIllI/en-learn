@@ -1,13 +1,25 @@
 import type { Clock } from '@/core/ports';
 import type { ISODate } from '@/core/domain';
+import { appDate, canStartNewDay, DEFAULT_DAY, localDate, type DayConfig } from '@/core/day';
 
-const pad = (n: number): string => String(n).padStart(2, '0');
-
-/** Dates are the local calendar day; `now()` is an ISO instant. */
+/** Dates are the local calendar day shifted by the day config; `now()` is an ISO instant. */
 export class TauriClock implements Clock {
+  private cfg: DayConfig = DEFAULT_DAY;
+
+  configure(cfg: DayConfig): void {
+    this.cfg = cfg;
+  }
+
   today(): ISODate {
-    const d = new Date();
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    return appDate(new Date(), this.cfg);
+  }
+
+  calendarDate(): ISODate {
+    return localDate(new Date());
+  }
+
+  canStartNewDay(): boolean {
+    return canStartNewDay(new Date(), this.cfg);
   }
 
   now(): string {

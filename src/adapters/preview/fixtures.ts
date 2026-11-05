@@ -1,5 +1,6 @@
 import type { Clock, Deps, Llm, LlmErrorCode, ProcessRunner } from '@/core/ports';
 import type { ISODate } from '@/core/domain';
+import { appDate, canStartNewDay, DEFAULT_DAY, localDate, type DayConfig } from '@/core/day';
 import type { PrereqResult } from '@/core/prereq';
 import { CLAUDE_LOCATIONS } from '@/core/llm/claude';
 import { bundledPrompts } from '@/core/llm/bundledPrompts';
@@ -101,14 +102,36 @@ const EARLIER_DAYS: { date: ISODate; light: boolean }[] = [
   { date: '2026-10-18', light: true },
 ];
 
-/** A clock the fixture can move between days; the app gets it at the final date. */
+/**
+ * A clock the fixture can move between days; the app gets it at the final date.
+ * After `simulateEarly()` it reads as local time 03:00 on the day after the set date, so the app's date
+ * is still the set date and "Start a new day" is available; the day config applies only then.
+ */
 class SteppedClock implements Clock {
+  private early = false;
+  private cfg: DayConfig = DEFAULT_DAY;
   constructor(private date: ISODate) {}
   set(date: ISODate): void {
     this.date = date;
   }
+  simulateEarly(): void {
+    this.early = true;
+  }
+  configure(cfg: DayConfig): void {
+    this.cfg = cfg;
+  }
+  private local(): Date {
+    const [y = 0, m = 1, d = 1] = this.date.split('-').map(Number);
+    return new Date(y, m - 1, d + 1, 3, 0);
+  }
   today(): ISODate {
-    return this.date;
+    return this.early ? appDate(this.local(), this.cfg) : this.date;
+  }
+  calendarDate(): ISODate {
+    return this.early ? localDate(this.local()) : this.date;
+  }
+  canStartNewDay(): boolean {
+    return this.early && canStartNewDay(this.local(), this.cfg);
   }
   now(): string {
     return `${this.date}T12:00:00.000Z`;
@@ -124,6 +147,11 @@ export function parsePreviewState(search: string): PreviewState {
 export function parsePreviewDelay(search: string): number {
   const ms = Number(new URLSearchParams(search).get('delay'));
   return Number.isFinite(ms) && ms > 0 ? Math.min(ms, 60_000) : 0;
+}
+
+/** `?early=1` makes the clock read 03:00 on the day after the fixture's date, to see the "Start a new day" state. */
+export function parsePreviewEarly(search: string): boolean {
+  return new URLSearchParams(search).get('early') === '1';
 }
 
 /** `?fail=` makes every LLM call fail with that code, to see the messages the app gives for it. */
@@ -207,8 +235,9 @@ async function playDay(deps: Deps, light: boolean): Promise<void> {
   await answerToday(deps, 'graded');
 }
 
-export async function buildPreview(state: PreviewState): Promise<PreviewCore> {
+export async function buildPreview(state: PreviewState, options: { early?: boolean } = {}): Promise<PreviewCore> {
   const clock = new SteppedClock(state === 'rest' ? WEDNESDAY : state.startsWith('spot') ? MONDAY : state.startsWith('writing') ? SATURDAY : state === 'rewrite' ? SUNDAY : TUESDAY);
+  if (options.early) clock.simulateEarly();
   const deps: Deps = {
     db: await createSqlJsDb(),
     llm: previewLlm,

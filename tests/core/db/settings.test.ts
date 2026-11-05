@@ -25,6 +25,8 @@ describe('settings repo', () => {
       theme: 'dark',
       design: 'grove',
       closedSessions: [],
+      dayStartHour: 5,
+      dayOverride: null,
     });
   });
 

@@ -1,4 +1,5 @@
 import type { Effort, ISODate, LlmKind } from './domain';
+import type { DayConfig } from './day';
 
 export interface Db {
   execute(sql: string, params?: unknown[]): Promise<{ lastInsertId: number; rowsAffected: number }>;
@@ -6,7 +7,13 @@ export interface Db {
 }
 
 export interface Clock {
+  /** The app's date: the calendar date shifted by the day start hour and the new-day override. */
   today(): ISODate;
+  /** The local calendar date. */
+  calendarDate(): ISODate;
+  configure(cfg: DayConfig): void;
+  /** True while the app's date is behind the calendar date and a new day may be started. */
+  canStartNewDay(): boolean;
   now(): string;
 }
 

@@ -31,6 +31,7 @@ export async function bootTauri(): Promise<CoreInit> {
   const db = await openTauriDb(custom);
   await startApp({ db });
 
+  const settings = await getSettings(db);
   const cliDir = await ensureCliDir(appData);
   const runner = new TauriProcessRunner();
   const prereq = await checkPrerequisites(runner);
@@ -39,12 +40,13 @@ export async function bootTauri(): Promise<CoreInit> {
     ? new ClaudeCli(runner, prereq.location, cliDir, home)
     : { call: () => Promise.reject(new Error('claude is not available')) };
   const clock = new TauriClock();
+  clock.configure({ dayStartHour: settings.dayStartHour, overrideDate: settings.dayOverride });
   const deps: Deps = { db, llm, clock, prompts: new TauriPromptStore(dataDir) };
   return {
     deps,
     runner,
     prereq,
-    settings: await getSettings(db),
+    settings,
     loadSeedInput: () => {
       try {
         return loadSeed(clock.today());
@@ -63,14 +65,16 @@ export async function bootTauri(): Promise<CoreInit> {
 
 /** Browser preview: sql.js, canned LLM, fixed clock; `?state=` picks the fixture. */
 export async function bootPreview(search: string): Promise<CoreInit> {
-  const { buildPreview, parsePreviewState, parsePreviewDelay, parsePreviewFail, withDelay, withFailure } = await import('@/adapters/preview/fixtures');
+  const { buildPreview, parsePreviewState, parsePreviewDelay, parsePreviewEarly, parsePreviewFail, withDelay, withFailure } = await import('@/adapters/preview/fixtures');
   const { MINI_PROGRAMME, MINI_RULES } = await import('@/adapters/preview/miniSeed');
-  const core = await buildPreview(parsePreviewState(search));
+  const core = await buildPreview(parsePreviewState(search), { early: parsePreviewEarly(search) });
+  const settings = await getSettings(core.deps.db);
+  core.deps.clock.configure({ dayStartHour: settings.dayStartHour, overrideDate: settings.dayOverride });
   const deps = { ...core.deps, llm: withFailure(withDelay(core.deps.llm, parsePreviewDelay(search)), parsePreviewFail(search)) };
   return {
     ...core,
     deps,
-    settings: await getSettings(core.deps.db),
+    settings,
     loadSeedInput: () => ({ programme: MINI_PROGRAMME, rules: MINI_RULES }),
     dataDir: '~/Library/Application Support/English Exam Coach',
   };

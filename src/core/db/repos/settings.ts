@@ -1,5 +1,5 @@
 import type { Db } from '@/core/ports';
-import type { Effort, LlmKind } from '@/core/domain';
+import type { Effort, ISODate, LlmKind } from '@/core/domain';
 
 export interface Settings {
   nativeLanguage: 'ru' | 'en';
@@ -12,6 +12,10 @@ export interface Settings {
   design: 'grove' | 'lamp';
   /** Ids of sessions the learner closed; the last 30 are kept. */
   closedSessions: number[];
+  /** Whole hours 0-12: the app's day starts at this local hour. */
+  dayStartHour: number;
+  /** Calendar date set by "Start a new day"; null when unset. */
+  dayOverride: ISODate | null;
 }
 
 const DEFAULT_MODEL = 'claude-sonnet-5-5';
@@ -46,6 +50,8 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'dark',
   design: 'grove',
   closedSessions: [],
+  dayStartHour: 5,
+  dayOverride: null,
 };
 
 export async function getSettings(db: Db): Promise<Settings> {

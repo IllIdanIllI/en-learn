@@ -10,6 +10,8 @@ export interface Settings {
   spellingVariant: 'british' | 'american';
   theme: 'dark' | 'light' | 'system';
   design: 'grove' | 'lamp';
+  /** Dock icon on macOS while the app runs; the bundled icon is always Light. */
+  appIcon: 'light' | 'night';
   /** Ids of sessions the learner closed; the last 30 are kept. */
   closedSessions: number[];
   /** Whole hours 0-12: the app's day starts at this local hour. */
@@ -51,6 +53,7 @@ export const DEFAULT_SETTINGS: Settings = {
   spellingVariant: 'british',
   theme: 'dark',
   design: 'grove',
+  appIcon: 'light',
   closedSessions: [],
   dayStartHour: 5,
   dayOverride: null,

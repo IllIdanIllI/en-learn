@@ -24,6 +24,7 @@ describe('settings repo', () => {
       spellingVariant: 'british',
       theme: 'dark',
       design: 'grove',
+      appIcon: 'light',
       closedSessions: [],
       dayStartHour: 5,
       dayOverride: null,

@@ -166,3 +166,14 @@ S. **Words: opener plugin, import, generation, "use it".**
    - Action 5: practise until a "use it" card appears and answer it with a sentence.
    - Expected: the real CLI checks it; errors show with an explanation and appear in the error bank under Слова/Words.
    - If it fails: record the message and the `llm_call` rows (kinds `words`, `word_check`).
+
+## App icon and day start (2026-11-05)
+
+S. **Night Dock icon, Light restore, day start.**
+   - Action 1: Settings → App icon → Night. Quit and start the app (release build, then `yarn tauri dev`).
+   - Expected: the Dock shows the Night icon from launch, in both. Finder and Launchpad show the Light icon.
+   - Action 2: switch App icon back to Light.
+   - Expected: the Dock shows the bundle icon (in `tauri dev` there is no bundle, so Light may show a generic icon until restart).
+   - Action 3: leave the app open across the day start hour; then, before 05:00, press "Start a new day".
+   - Expected: the date changes at the start hour with the app open; "Start a new day" moves the date to today.
+   - If it fails: record the step, the macOS version and the Rust console output.

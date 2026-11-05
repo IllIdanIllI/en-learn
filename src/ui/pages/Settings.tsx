@@ -42,7 +42,7 @@ const parseBudget = (raw: string): number | null | 'invalid' => {
 };
 
 export function Settings() {
-  const { deps, lang, settings, prereq, dataDir, dataDirError, moveDataDir, refresh } = useCore();
+  const { deps, lang, settings, prereq, dataDir, dataDirError, moveDataDir, refresh, setAppIcon } = useCore();
   const [saved, setSaved] = useState(false);
   const timer = useRef<number | undefined>(undefined);
   const [budget, setBudget] = useState(settings.budgetUsd === null ? '' : String(settings.budgetUsd));
@@ -187,6 +187,18 @@ export function Settings() {
                 {t(lang, 'settings.newDay')}
               </Button>
             )}
+          </Row>
+        )}
+        {setAppIcon && (
+          <Row label={t(lang, 'settings.appIcon')} hint={t(lang, 'settings.appIconHint')}>
+            <Segmented
+              label={t(lang, 'settings.appIcon')}
+              value={settings.appIcon}
+              options={(['light', 'night'] as const).map((v) => ({ value: v, label: t(lang, `settings.appIcon.${v}` as MessageKey) }))}
+              onChange={(v) =>
+                void save('appIcon', v).then(() => setAppIcon(v === 'night')).catch((e: unknown) => console.error('app icon not changed', e))
+              }
+            />
           </Row>
         )}
         <Row label={t(lang, 'settings.budget')} htmlFor="settings-budget" hint={t(lang, 'settings.budgetHint')}>

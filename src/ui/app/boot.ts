@@ -5,9 +5,16 @@ import { checkPrerequisites } from '@/core/prereq';
 import type { Deps, Llm } from '@/core/ports';
 import type { CoreInit } from './CoreProvider';
 
+declare global {
+  interface Window {
+    /** Preview only: the last value passed to `setAppIcon`, for tests. */
+    __appIcon?: boolean;
+  }
+}
+
 /** Real app: Tauri adapters, SQLite file, the installed `claude` CLI. */
 export async function bootTauri(): Promise<CoreInit> {
-  const [{ appDataDir, appConfigDir, homeDir }, { openTauriDb }, { readDataDir, moveDataDir }, { ensureCliDir }, { TauriClock }, { TauriProcessRunner }, { TauriPromptStore }, { ClaudeCli }, { openUrl }] =
+  const [{ appDataDir, appConfigDir, homeDir }, { openTauriDb }, { readDataDir, moveDataDir }, { ensureCliDir }, { TauriClock }, { TauriProcessRunner }, { TauriPromptStore }, { ClaudeCli }, { openUrl }, { invoke }] =
     await Promise.all([
       import('@tauri-apps/api/path'),
       import('@/adapters/tauri/db'),
@@ -18,6 +25,7 @@ export async function bootTauri(): Promise<CoreInit> {
       import('@/adapters/tauri/promptStore'),
       import('@/adapters/tauri/claudeCli'),
       import('@tauri-apps/plugin-opener'),
+      import('@tauri-apps/api/core'),
     ]);
   const [appData, appConfig, home] = await Promise.all([appDataDir(), appConfigDir(), homeDir()]);
   let custom: string | null = null;
@@ -60,6 +68,7 @@ export async function bootTauri(): Promise<CoreInit> {
     reopenDb: () => openTauriDb(custom),
     makeLlm: (location) => new ClaudeCli(runner, location, cliDir, home),
     openUrl: (url) => openUrl(url),
+    ...(navigator.userAgent.includes('Mac') ? { setAppIcon: (night: boolean) => invoke<void>('set_app_icon', { night }) } : {}),
   };
 }
 
@@ -77,6 +86,10 @@ export async function bootPreview(search: string): Promise<CoreInit> {
     settings,
     loadSeedInput: () => ({ programme: MINI_PROGRAMME, rules: MINI_RULES }),
     dataDir: '~/Library/Application Support/English Exam Coach',
+    setAppIcon: (night) => {
+      window.__appIcon = night;
+      return Promise.resolve();
+    },
   };
 }
 

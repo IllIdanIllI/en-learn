@@ -147,6 +147,16 @@ Spec `specs/2026-11-04-words-design.md`, plan `plans/2026-11-04-words.md`.
 - Generation: batches of 5, 300 s timeout, job lock per batch; a failed batch marks its words failed and the run continues; busy stops the run and leaves the rest pending (shown with Retry) — cost if wrong: a long import takes several lock windows, and a busy lesson build delays word generation.
 - ts-fsrs pinned at 5.4.2 (6.0.0 was too new); `@tauri-apps/plugin-opener` pinned at 2.5.2 — cost if wrong: a newer release's fixes are missed until the pins are raised.
 
+## Words feedback round 1 (2026-11-05)
+
+Spec `specs/2026-11-05-words-feedback-1.md`, plan `plans/2026-11-05-words-feedback-1.md`.
+
+- Start of day: setting "Day starts at" (whole hours 00 to 12, default 05:00); app date = max(rule date, "Start a new day" override), so an override never moves the date back — cost if wrong: a new day started by mistake cannot be undone.
+- The clock stays synchronous and gets `configure({ dayStartHour, overrideDate })`; the app re-checks the date every minute and on focus — cost if wrong: a day can roll over up to a minute late.
+- Extra new words: "+10 new words" adds 10 to the day's new-word limit (stored per day as `wordsExtraNew`), on the Words page and the end screen — cost if wrong: the extra is tied to the app date and resets with the next day.
+- A page per word at `/words/:id` replaces the inline detail; the search stays in `?q=` — cost if wrong: old inline-detail links do not exist.
+- Icon: new bamboo "EN" icon; Light/Night Dock icon is macOS only and set while the app runs (Rust `set_app_icon`, choice in `app_icon.txt`); Finder, Launchpad and the closed Dock always show the bundled Light icon — cost if wrong: the Night choice is invisible when the app is closed; Rust is unverified until the Mac check (S).
+
 ## Still open
 
 - **Mac-only checks** (`docs/macos-checklist.md`): `$HOME` in the shell permission, long multi-line arguments, plugin-sql migrations, the not-signed-in output, PATH/HOME when launched from Finder. Not verifiable in the Linux build container.

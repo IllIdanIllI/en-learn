@@ -169,7 +169,7 @@ S. **Words: opener plugin, import, generation, "use it".**
 
 ## App icon and day start (2026-11-05)
 
-S. **Night Dock icon, Light restore, day start.**
+T. **Night Dock icon, Light restore, day start.**
    - Action 1: Settings → App icon → Night. Quit and start the app (release build, then `yarn tauri dev`).
    - Expected: the Dock shows the Night icon from launch, in both. Finder and Launchpad show the Light icon.
    - Action 2: switch App icon back to Light.

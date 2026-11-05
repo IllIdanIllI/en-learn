@@ -1,4 +1,5 @@
 import type { ISODate } from './domain';
+import type { Clock } from './ports';
 
 export interface DayConfig {
   /** Whole hours 0-12: the app's day starts at this local hour. */
@@ -30,4 +31,15 @@ export function appDate(now: Date, cfg: DayConfig): ISODate {
 /** True while the app's date is behind the calendar date (before the start hour). */
 export function canStartNewDay(now: Date, cfg: DayConfig): boolean {
   return cfg.dayStartHour > 0 && appDate(now, cfg) < localDate(now);
+}
+
+/** Returns a `check` that calls `onChange` when `clock.today()` differs from the last value it saw (the first is read now). */
+export function dayWatcher(clock: Clock, onChange: () => void): () => void {
+  let last = clock.today();
+  return () => {
+    const now = clock.today();
+    if (now === last) return;
+    last = now;
+    onChange();
+  };
 }

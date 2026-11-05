@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { appDate, canStartNewDay, ruleDate } from '@/core/day';
+import { appDate, canStartNewDay, dayWatcher, ruleDate } from '@/core/day';
+import type { Clock } from '@/core/ports';
 
 const at = (day: number, h: number, m = 0): Date => new Date(2026, 10, day, h, m);
 
@@ -30,5 +31,21 @@ describe('canStartNewDay', () => {
     expect(canStartNewDay(at(5, 6), { dayStartHour: 5, overrideDate: null })).toBe(false);
     expect(canStartNewDay(at(5, 3), { dayStartHour: 0, overrideDate: null })).toBe(false);
     expect(canStartNewDay(at(5, 3), { dayStartHour: 5, overrideDate: '2026-11-05' })).toBe(false);
+  });
+});
+
+describe('dayWatcher', () => {
+  it('calls onChange once per change of the app date', () => {
+    let date = '2026-11-05';
+    const clock = { today: () => date } as unknown as Clock;
+    let calls = 0;
+    const check = dayWatcher(clock, () => calls++);
+    check();
+    expect(calls).toBe(0);
+    date = '2026-11-06';
+    check();
+    expect(calls).toBe(1);
+    check();
+    expect(calls).toBe(1);
   });
 });

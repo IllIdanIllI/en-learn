@@ -54,6 +54,12 @@ for (const [state, route] of CASES) {
   });
 }
 
+test('pointer cursor: settings with a new day available', async ({ page }) => {
+  await page.goto('/?state=graded&early=1#/settings');
+  await page.getByRole('button', { name: 'Начать новый день' }).waitFor();
+  expect(await wrongCursors(page)).toEqual([]);
+});
+
 test('pointer cursor: settings with a select list open', async ({ page }) => {
   await page.goto('/?state=graded#/settings');
   await page.getByRole('combobox').first().click();

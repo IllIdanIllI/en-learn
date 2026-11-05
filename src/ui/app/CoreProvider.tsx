@@ -6,6 +6,7 @@ import type { PrereqResult } from '@/core/prereq';
 import { recheck } from './recheck';
 import type { ClaudeLocation } from '@/core/llm/claude';
 import type { ProgrammeInput, SeedRule } from '@/core/programme/setup';
+import { useDayWatch } from './useDayWatch';
 import { getSettings, type Settings } from '@/core/db/repos/settings';
 
 export interface SeedBundle { programme: ProgrammeInput; rules: SeedRule[] }
@@ -94,12 +95,15 @@ export function CoreProvider({ init, children }: { init: CoreInit; children: Rea
   const refresh = useCallback(() => {
     getSettings(deps.db).then(
       (s) => {
+        deps.clock.configure({ dayStartHour: s.dayStartHour, overrideDate: s.dayOverride });
         setSettings(s);
         setVersion((v) => v + 1);
       },
       (e: unknown) => console.error('refresh failed', e),
     );
   }, [deps]);
+
+  useDayWatch(deps.clock, refresh);
 
   const recheckPrerequisites = useCallback(async () => {
     if (!makeLlm) return prereq;

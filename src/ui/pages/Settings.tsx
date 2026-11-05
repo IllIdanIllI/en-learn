@@ -4,6 +4,7 @@ import { t, type MessageKey } from '@/core/i18n';
 import type { Effort, LlmKind } from '@/core/domain';
 import { CLAUDE_LOCATIONS } from '@/core/llm/claude';
 import { MoveRefused, moveTarget } from '@/core/dataFolder';
+import { formatTitleDate } from '@/core/dates';
 import { Button } from '@/ui/components/ui/button';
 import { setSetting, type Settings as SettingsData } from '@/core/db/repos/settings';
 import { FieldInput } from '@/ui/components/ui/field-input';
@@ -16,6 +17,7 @@ import { Notice } from '@/ui/today/chips';
 
 const MODELS = ['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-opus-5-5'];
 const EFFORTS: Effort[] = ['low', 'medium', 'high'];
+const HOURS = Array.from({ length: 13 }, (_, h) => h);
 const KINDS: LlmKind[] = ['rule_draft', 'rule_chat', 'generate_session', 'validate_session', 'grade', 'dispute', 'explain', 'words', 'word_check'];
 
 function Row({ label, htmlFor, hint, children }: { label: string; htmlFor?: string; hint?: string; children: React.ReactNode }) {
@@ -48,6 +50,7 @@ export function Settings() {
   const [failed, setFailed] = useState(false);
   const [moving, setMoving] = useState(false);
   const [moveError, setMoveError] = useState<string | null>(null);
+  const [confirmingDay, setConfirmingDay] = useState(false);
 
   const changeDataDir = async () => {
     if (!moveDataDir) return;
@@ -91,6 +94,8 @@ export function Settings() {
     setBudgetInvalid(parsed === 'invalid');
     if (parsed !== 'invalid') void save('budgetUsd', parsed);
   };
+
+  const canStartNewDay = deps.clock.canStartNewDay();
 
   const claude = prereq === null
     ? t(lang, 'settings.claudeUnchecked')
@@ -151,6 +156,39 @@ export function Settings() {
             onChange={(v) => void save('design', v)}
           />
         </Row>
+        <Row label={t(lang, 'settings.dayStart')} htmlFor="settings-day-start" hint={t(lang, 'settings.dayStartHint')}>
+          <Select
+            id="settings-day-start"
+            value={String(settings.dayStartHour)}
+            onValueChange={(v) => void save('dayStartHour', Number(v))}
+            options={HOURS.map((h) => ({ value: String(h), label: `${String(h).padStart(2, '0')}:00` }))}
+            className="w-28"
+          />
+        </Row>
+        {settings.dayStartHour > 0 && (
+          <Row label={t(lang, 'settings.newDay')} hint={canStartNewDay ? undefined : t(lang, 'settings.newDay.started')}>
+            {confirmingDay ? (
+              <span className="flex items-center gap-2 pt-1 text-sm">
+                {t(lang, 'settings.newDay.confirm', { date: formatTitleDate(deps.clock.calendarDate(), lang) })}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setConfirmingDay(false);
+                    void save('dayOverride', deps.clock.calendarDate());
+                  }}
+                >
+                  {t(lang, 'settings.newDay.yes')}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setConfirmingDay(false)}>{t(lang, 'settings.newDay.no')}</Button>
+              </span>
+            ) : (
+              <Button variant="secondary" disabled={!canStartNewDay} onClick={() => setConfirmingDay(true)}>
+                {t(lang, 'settings.newDay')}
+              </Button>
+            )}
+          </Row>
+        )}
         <Row label={t(lang, 'settings.budget')} htmlFor="settings-budget" hint={t(lang, 'settings.budgetHint')}>
           <FieldInput
             id="settings-budget"

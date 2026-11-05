@@ -29,6 +29,7 @@ describe('settings repo', () => {
       dayStartHour: 5,
       dayOverride: null,
       wordsExtraNew: null,
+      wordsStatsOpen: false,
     });
   });
 

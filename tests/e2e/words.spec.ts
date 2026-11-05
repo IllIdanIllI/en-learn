@@ -110,19 +110,50 @@ test.describe('words page', () => {
   });
 });
 
-test.describe('started count and +10 new words', () => {
+test.describe('summary and +10 new words', () => {
   const addNew = (page: Page) => page.getByRole('button', { name: '+10 новых слов' });
 
-  test('the header shows how many words were started, failed word included', async ({ page }) => {
+  test('the header shows in progress, learned and total, failed word included', async ({ page }) => {
     await page.goto('/?state=words#/words');
-    await expect(page.getByText('Начато: 6 из 8')).toBeVisible();
+    // Seed: six reviewed words, one of them Learned (stage 4), eight words in all.
+    await expect(page.getByText('В процессе: 5 · Выучено: 1 · Всего: 8')).toBeVisible();
+    await expect(page.getByText(/Начато/)).toHaveCount(0);
     await expect(addNew(page)).toHaveCount(0);
+  });
+
+  test('Details opens and closes the panel with Due today and the stage counts', async ({ page }) => {
+    await page.goto('/?state=words#/words');
+    const toggle = page.getByRole('button', { name: /Подробнее/ });
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByTestId('words-details')).toHaveCount(0);
+    await toggle.click();
+    const panel = page.getByTestId('words-details');
+    await expect(panel).toContainText('К повторению сегодня');
+    for (const stage of ['Новое', 'Вспоминание', 'Употребление']) await expect(panel).toContainText(stage);
+    const hide = page.getByRole('button', { name: /Скрыть/ });
+    await expect(hide).toHaveAttribute('aria-expanded', 'true');
+    await hide.click();
+    await expect(panel).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Подробнее/ })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('the Details state is remembered', async ({ page }) => {
+    await page.goto('/?state=words#/words');
+    await page.getByRole('button', { name: /Подробнее/ }).click();
+    await expect(page.getByTestId('words-details')).toBeVisible();
+    await page.getByRole('navigation').getByRole('link', { name: 'Настройки' }).click();
+    await page.getByRole('navigation').getByRole('link', { name: 'Слова' }).click();
+    await expect(page.getByTestId('words-details')).toBeVisible();
   });
 
   test('words-limit: Start is disabled, +10 opens practice with a new word', async ({ page }) => {
     await page.goto('/?state=words-limit#/words');
-    await expect(page.getByText('Начато: 10 из 21')).toBeVisible();
+    await expect(page.getByText('В процессе: 10 · Выучено: 0 · Всего: 21')).toBeVisible();
+    await expect(page.getByText(/Начато/)).toHaveCount(0);
     await expect(page.getByText('Начать практику')).toHaveAttribute('aria-disabled', 'true');
+    // Start practice and +10 share one row.
+    const startRow = page.getByText('Начать практику').locator('xpath=..');
+    await expect(startRow.getByRole('button', { name: '+10 новых слов' })).toBeVisible();
     await addNew(page).dblclick();
     await card(page).waitFor();
     // A double click adds ten, not twenty: the practice holds ten new cards.
@@ -252,7 +283,8 @@ test.describe('around the lessons', () => {
     await page.goto('/?state=words#/today');
     await page.getByRole('link', { name: 'Слова: 7 к практике → Практика' }).click();
     await expect(page.getByRole('heading', { name: 'Слова' })).toBeVisible();
-    await expect(page.getByText('К повторению сегодня: 6')).toBeVisible();
+    await page.getByRole('button', { name: /Подробнее/ }).click();
+    await expect(page.getByTestId('words-details')).toContainText('К повторению сегодня 6');
   });
 
   test('the error bank shows a Words error after Check', async ({ page }) => {

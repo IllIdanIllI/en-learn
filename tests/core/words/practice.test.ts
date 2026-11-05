@@ -134,17 +134,27 @@ describe('wordsOverview', () => {
   });
 });
 
-describe('started and extra new words', () => {
-  test('started counts reviewed words, including a failed-generation one', async () => {
+describe('in-progress counts and extra new words', () => {
+  test('inProgress, learned and total: a learned word is not in progress, a failed reviewed one is', async () => {
     const deps = await setup();
+    const learned = await addReady(deps, 'learned');
+    for (const d of ['2026-09-01', '2026-09-05', '2026-09-12', '2026-09-26', '2026-10-20', '2026-11-01']) {
+      await insertReview(deps.db, review(learned, d));
+    }
     const a = await addReady(deps, 'a');
     const f = await insertWord(deps.db, fields('f'), 't');
     await setGeneration(deps.db, f, 'failed');
-    await addReady(deps, 'unreviewed');
+    await addReady(deps, 'unreviewed1');
+    await addReady(deps, 'unreviewed2');
+    await insertWord(deps.db, fields('pending'), 't');
     await insertReview(deps.db, review(a, '2026-11-04'));
     await insertReview(deps.db, review(f, '2026-11-03'));
+    const views = await loadWordViews(deps.db);
+    expect(views.find((v) => v.word.id === learned)!.state.stage).toBe(4);
     const o = await wordsOverview(deps.db, '2026-11-04');
-    expect(o.started).toBe(2);
+    expect(o.inProgress).toBe(2);
+    expect(o.learned).toBe(1);
+    expect(o.total).toBe(6);
     expect(o.canAddNew).toBe(false);
   });
 

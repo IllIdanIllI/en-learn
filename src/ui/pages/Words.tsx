@@ -14,9 +14,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Notice } from '@/ui/today/chips';
 import { ImportPanel } from '@/ui/words/ImportPanel';
 import { WordForm } from '@/ui/words/WordForm';
+import { WordsSummary } from '@/ui/words/WordsSummary';
 import { useWordsJob } from '@/ui/words/WordsJobProvider';
 
-const STAGES: Stage[] = [1, 2, 3, 4];
 type Panel = 'add' | 'import' | null;
 
 function StageChip({ stage, label }: { stage: Stage; label: string }) {
@@ -60,42 +60,37 @@ export function Words() {
       {job.busy && <Notice className="mt-6">{t(lang, 'words.busy')}</Notice>}
       {job.error && <Notice className="mt-6">{job.error.message}</Notice>}
       {loaded && 'data' in loaded && (() => {
-        const { counts, dueToday, available, started, canAddNew } = loaded.data.overview;
+        const { overview } = loaded.data;
+        const { available, canAddNew } = overview;
         return (
-          <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
-            <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-              {STAGES.map((s) => (
-                <li key={s}>
-                  <span className="text-muted-foreground">{t(lang, `words.stage.${s}`)}</span> <span className="tabular">{counts[s]}</span>
-                </li>
-              ))}
-            </ul>
-            <span className="text-sm">{t(lang, 'words.started', { x: started, y: views?.length ?? 0 })}</span>
-            <span className="text-sm">{t(lang, 'words.due', { n: dueToday })}</span>
-            {available > 0 ? (
-              <Link to="/words/practice" className={buttonVariants()}>{t(lang, 'words.start')}</Link>
-            ) : (
-              <a aria-disabled="true" className={cn(buttonVariants(), 'cursor-not-allowed opacity-50')}>{t(lang, 'words.start')}</a>
-            )}
-            {canAddNew && (
-              <Button
-                variant="secondary"
-                disabled={adding}
-                onClick={() => {
-                  setAdding(true);
-                  setAddError(null);
-                  addExtraNew(deps.db, today).then(
-                    () => navigate('/words/practice'),
-                    (e: unknown) => {
-                      setAddError(e instanceof Error ? e.message : String(e));
-                      setAdding(false);
-                    },
-                  );
-                }}
-              >
-                {t(lang, 'words.addNew')}
-              </Button>
-            )}
+          <div className="mt-6">
+            <div className="flex flex-wrap items-center gap-3">
+              {available > 0 ? (
+                <Link to="/words/practice" className={buttonVariants()}>{t(lang, 'words.start')}</Link>
+              ) : (
+                <a aria-disabled="true" className={cn(buttonVariants(), 'cursor-not-allowed opacity-50')}>{t(lang, 'words.start')}</a>
+              )}
+              {canAddNew && (
+                <Button
+                  variant="secondary"
+                  disabled={adding}
+                  onClick={() => {
+                    setAdding(true);
+                    setAddError(null);
+                    addExtraNew(deps.db, today).then(
+                      () => navigate('/words/practice'),
+                      (e: unknown) => {
+                        setAddError(e instanceof Error ? e.message : String(e));
+                        setAdding(false);
+                      },
+                    );
+                  }}
+                >
+                  {t(lang, 'words.addNew')}
+                </Button>
+              )}
+            </div>
+            <WordsSummary overview={overview} lang={lang} />
           </div>
         );
       })()}

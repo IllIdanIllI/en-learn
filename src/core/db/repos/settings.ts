@@ -20,6 +20,8 @@ export interface Settings {
   dayOverride: ISODate | null;
   /** Extra new words the learner added for one date; ignored on other dates. */
   wordsExtraNew: { date: ISODate; extra: number } | null;
+  /** The Words page's details panel is open. */
+  wordsStatsOpen: boolean;
 }
 
 const DEFAULT_MODEL = 'claude-sonnet-5-5';
@@ -58,6 +60,7 @@ export const DEFAULT_SETTINGS: Settings = {
   dayStartHour: 5,
   dayOverride: null,
   wordsExtraNew: null,
+  wordsStatsOpen: false,
 };
 
 export async function getSettings(db: Db): Promise<Settings> {

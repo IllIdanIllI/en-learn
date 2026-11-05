@@ -157,9 +157,13 @@ export interface WordsOverview {
   dueToday: number;
   available: number;
   nextDue: ISODate | null;
-  /** Words with a counted review, over all words. */
-  started: number;
   canAddNew: boolean;
+  /** Words with a counted review that are not Learned. */
+  inProgress: number;
+  /** Words at stage 4. */
+  learned: number;
+  /** All words, pending and failed generation included. */
+  total: number;
 }
 
 export async function wordsOverview(db: Db, today: ISODate, extraNew = 0): Promise<WordsOverview> {
@@ -179,8 +183,10 @@ export async function wordsOverview(db: Db, today: ISODate, extraNew = 0): Promi
     dueToday,
     available: practiceQueue(queue, today, extraNew).length,
     nextDue: later[0] ?? null,
-    started: views.filter((v) => v.state.reviewed).length,
     canAddNew: canAddNew(queue, today, extraNew),
+    inProgress: views.filter((v) => v.state.reviewed && v.state.stage < 4).length,
+    learned: counts[4],
+    total: views.length,
   };
 }
 

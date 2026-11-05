@@ -56,6 +56,13 @@ for (const [state, route] of CASES) {
   });
 }
 
+test('pointer cursor: words with the details panel open', async ({ page }) => {
+  await page.goto('/?state=words#/words');
+  await page.getByRole('button', { name: /Подробнее/ }).click();
+  await expect(page.getByTestId('words-details')).toBeVisible();
+  expect(await wrongCursors(page)).toEqual([]);
+});
+
 test('pointer cursor: settings with a new day available', async ({ page }) => {
   await page.goto('/?state=graded&early=1#/settings');
   await page.getByRole('button', { name: 'Начать новый день' }).waitFor();

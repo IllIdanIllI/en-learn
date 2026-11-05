@@ -446,6 +446,7 @@ export const en = {
   'words.import.problem': 'card {n}: no Word',
   'words.import.go': 'Import {n} words',
   'words.openLink': 'Open in dictionary',
+  'words.openLinkShort': 'open in dictionary',
   'words.exercises': 'Exercises',
   'words.exercises.none': 'No exercises yet.',
   'words.ex.prompt': 'Text',

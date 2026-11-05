@@ -2,13 +2,11 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { t } from '@/core/i18n';
 import { deleteWord, updateExercise } from '@/core/db/repos/words';
-import { wordLink } from '@/core/words/link';
 import type { WordView } from '@/core/words/practice';
 import type { WordExercise } from '@/core/words/types';
 import { useCore } from '@/ui/app/CoreProvider';
 import { Button, buttonVariants } from '@/ui/components/ui/button';
 import { Textarea } from '@/ui/components/ui/textarea';
-import { ExternalLink } from '@/ui/components/ExternalLink';
 import { Notice } from '@/ui/today/chips';
 import { WordForm } from './WordForm';
 import { useWordsJob } from './WordsJobProvider';
@@ -73,11 +71,6 @@ export function WordDetails({ view, onChanged, onDeleted, backTo }: { view: Word
   return (
     <div className="grid gap-6 py-2">
       <WordForm key={word.id} word={word} onSaved={onChanged} />
-      <p className="text-sm">
-        <ExternalLink href={wordLink(word.word, word.link)} className="text-primary underline underline-offset-2">
-          {t(lang, 'words.openLink')}
-        </ExternalLink>
-      </p>
       <section>
         <h2 className="title">{t(lang, 'words.exercises')}</h2>
         {exercises.length === 0 ? (

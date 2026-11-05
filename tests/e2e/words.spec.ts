@@ -315,6 +315,38 @@ test.describe('a page per word', () => {
     await expect(page.getByRole('button', { name: 'Удалить' })).toBeVisible();
   });
 
+  test('the top back arrow stays in view while the page scrolls', async ({ page }) => {
+    await page.goto('/?state=words#/words/1');
+    await expect(back(page)).toBeInViewport();
+    await page.locator('main').evaluate((el) => { el.scrollTop = el.scrollHeight; });
+    await expect(page.getByRole('button', { name: 'Удалить' })).toBeInViewport();
+    await expect(back(page)).toBeInViewport();
+  });
+
+  test('Definition and Example are text areas', async ({ page }) => {
+    await page.goto('/?state=words#/words/1');
+    await expect(page.locator('textarea#word-1-definition')).toBeVisible();
+    await expect(page.locator('textarea#word-1-example')).toBeVisible();
+  });
+
+  test('the dictionary link sits in the Link title, outside the label; the old link under the form is gone', async ({ page }) => {
+    await page.goto('/?state=words#/words/1');
+    const links = page.getByRole('link', { name: 'открыть в словаре', exact: true });
+    await expect(links).toHaveCount(1);
+    await expect(links).toHaveAttribute('href', 'https://www.oxfordlearnersdictionaries.com/search/english/?q=resilient');
+    await expect(page.getByRole('link', { name: 'Открыть в словаре', exact: true })).toHaveCount(0);
+    await expect(page.locator('label[for="word-1-link"] a')).toHaveCount(0);
+    await expect(page.locator('label[for="word-1-link"]')).toHaveText('Ссылка');
+  });
+
+  test('Add word: the dictionary link appears only after typing a word', async ({ page }) => {
+    await page.goto('/?state=words#/words');
+    await page.getByRole('button', { name: 'Добавить слово' }).click();
+    await expect(page.getByRole('link', { name: 'открыть в словаре', exact: true })).toHaveCount(0);
+    await page.getByLabel('Слово', { exact: true }).fill('lucid');
+    await expect(page.getByRole('link', { name: 'открыть в словаре', exact: true })).toHaveAttribute('href', /\?q=lucid$/);
+  });
+
   for (const control of ['top', 'bottom'] as const) {
     test(`the ${control} back control keeps the list search`, async ({ page }) => {
       await page.goto('/?state=words#/words');

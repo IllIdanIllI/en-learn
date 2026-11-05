@@ -448,6 +448,7 @@ export const ru: Record<keyof typeof en, string> = {
   'words.import.problem': 'карточка {n}: нет Word',
   'words.import.go': 'Импортировать {n} слов',
   'words.openLink': 'Открыть в словаре',
+  'words.openLinkShort': 'открыть в словаре',
   'words.exercises': 'Упражнения',
   'words.exercises.none': 'Упражнений пока нет.',
   'words.ex.prompt': 'Текст',

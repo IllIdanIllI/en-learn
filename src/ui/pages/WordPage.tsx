@@ -23,9 +23,11 @@ export function WordPage() {
   const loaded = useLoaded(async () => (Number.isInteger(wordId) ? (await loadWordViews(deps.db)).find((v) => v.word.id === wordId) ?? null : null), `${job.version}-${reload}`);
 
   const back = (
-    <Link to={backTo} aria-label={t(lang, 'word.backAria')} className="inline-flex text-muted-foreground hover:text-foreground">
-      <ArrowLeft className="size-5" aria-hidden="true" />
-    </Link>
+    <div className="sticky top-0 z-10 bg-background py-2">
+      <Link to={backTo} aria-label={t(lang, 'word.backAria')} className="inline-flex text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="size-5" aria-hidden="true" />
+      </Link>
+    </div>
   );
   if (loaded === null) return back;
   if ('error' in loaded) {

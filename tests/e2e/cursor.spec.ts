@@ -5,7 +5,7 @@ import { LIMIT_WORD_ANSWERS } from '../../src/adapters/preview/wordsSeed';
 // Each page is opened in a few preview states; open panels and expandable rows are opened too, then every interactive element is checked.
 
 const INTERACTIVE = [
-  'button', 'a[href]', 'summary', 'select', 'label[for]',
+  'button', 'a[href]', 'summary', 'select',
   'input[type="checkbox"]', 'input[type="radio"]',
   '[role="button"]', '[role="link"]', '[role="menuitem"]', '[role="menuitemcheckbox"]', '[role="menuitemradio"]',
   '[role="option"]', '[role="tab"]', '[role="switch"]', '[role="checkbox"]', '[role="radio"]',
@@ -55,6 +55,14 @@ for (const [state, route] of CASES) {
     expect(await wrongCursors(page)).toEqual([]);
   });
 }
+
+test('field titles (label[for]) keep the default cursor', async ({ page }) => {
+  await page.goto('/?state=words#/words/1');
+  await page.locator('label[for]').first().waitFor();
+  const cursors = await page.locator('label[for]').evaluateAll((els) => els.map((el) => getComputedStyle(el).cursor));
+  expect(cursors.length).toBeGreaterThan(0);
+  for (const c of cursors) expect(['auto', 'default']).toContain(c);
+});
 
 test('pointer cursor: words with the details panel open', async ({ page }) => {
   await page.goto('/?state=words#/words');

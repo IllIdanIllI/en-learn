@@ -115,7 +115,13 @@ export function withDelay(llm: Llm, ms: number): Llm {
   if (ms === 0) return llm;
   return {
     async call(req) {
-      await new Promise((resolve) => setTimeout(resolve, ms));
+      // Stopping the call (req.signal) ends the wait early, as killing the CLI does in the app.
+      const stopped = await new Promise<boolean>((resolve) => {
+        if (req.signal?.aborted) return resolve(true);
+        const timer = setTimeout(() => resolve(false), ms);
+        req.signal?.addEventListener('abort', () => { clearTimeout(timer); resolve(true); }, { once: true });
+      });
+      if (stopped) return { ok: false, code: 'cancelled', message: 'Stopped by the learner', costUsd: 0, durationMs: 1, raw: '' };
       return llm.call(req);
     },
   };

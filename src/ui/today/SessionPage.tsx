@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Deps } from '@/core/ports';
 import { disputeItems, recordSupport } from '@/core/grading/actions';
 import { draftsToAnswers, itemDraftKey, loadDraftAnswers, saveDraftAnswer, spotDraftKey, writingDraftKey } from '@/core/db/repos/drafts';
 import { gradeSession, type ClarificationAnswer, type GradeOutcome, type Question } from '@/core/grading/grade';
@@ -53,6 +54,12 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
   const [replies, setReplies] = useState<Record<number, Reply>>({});
   const [finish, setFinish] = useState(false);
   const [busy, setBusy] = useState(false);
+  // The stop button aborts the running check: every LLM call of a check reads the controller of the current run.
+  const stop = useRef<AbortController | null>(null);
+  const gradeDeps = useMemo<Deps>(() => ({
+    ...deps,
+    llm: { call: (req) => deps.llm.call(stop.current ? { ...req, signal: stop.current.signal } : req) },
+  }), [deps]);
   const waiting = useWaitInfo(GRADING_KINDS, busy);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [disputes, setDisputes] = useState<Record<number, string>>({});
@@ -144,6 +151,7 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
       setFinish(false);
       setReload((n) => n + 1);
     } else if (outcome.kind === 'questions') setQuestions(outcome.questions);
+    else if (outcome.kind === 'cancelled') setFinish(false);
     else setFailure({ message: outcome.message, code: outcome.code, retry: outcome.retry });
   }, [onGraded]);
 
@@ -151,11 +159,13 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
     async (start: () => Promise<GradeOutcome>) => {
       setBusy(true);
       setFailure(null);
+      stop.current = new AbortController();
       try {
         handle(await start());
       } catch (e) {
         setFailure({ message: e instanceof Error ? e.message : String(e), retry: start });
       } finally {
+        stop.current = null;
         setBusy(false);
       }
     },
@@ -178,7 +188,7 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
         await flushAll(); // a late draft write must not land after the drafts are deleted by grading
         // A rewrite field still holding its prefilled source text submits that text.
         const prefilled = Object.fromEntries((view?.blocks ?? []).flatMap((b) => (b.writing?.text === null && b.writing.source ? [[b.id, b.writing.source.text] as const] : [])));
-        return gradeSession(deps, sessionId, { items, spot, texts: { ...prefilled, ...texts } }, clarifications(), { finish: finishing });
+        return gradeSession(gradeDeps, sessionId, { items, spot, texts: { ...prefilled, ...texts } }, clarifications(), { finish: finishing });
       });
     }
   };
@@ -388,9 +398,17 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
             <ActionBar>
               {answerable && (
                 <>
-                  <Button id="check-answers" disabled={busy} onClick={() => submit()}>
-                    {t(lang, busy ? 'today.checking' : 'today.check')}
-                  </Button>
+                  {busy ? (
+                    <Button id="check-answers" className="relative" aria-label={t(lang, 'today.stopCheck')} onClick={() => stop.current?.abort()}>
+                      {/* The label keeps the button's width; the stop icon sits on top of it. */}
+                      <span className="invisible" aria-hidden="true">{t(lang, 'today.check')}</span>
+                      <StopSpinner />
+                    </Button>
+                  ) : (
+                    <Button id="check-answers" onClick={() => submit()}>
+                      {t(lang, 'today.check')}
+                    </Button>
+                  )}
                   <Button variant="secondary" disabled={busy} onClick={() => submit(true)}>
                     {t(lang, 'today.finish')}
                   </Button>
@@ -408,5 +426,16 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
       </div>
     <RulePanel target={panel} onClose={() => setPanel(null)} />
     </SessionActionsProvider>
+  );
+}
+
+/** A turning ring with a square inside: "stop" while a check runs. */
+function StopSpinner() {
+  return (
+    <svg className="absolute inset-0 m-auto" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
+      <path className="animate-spin motion-reduce:animate-none" style={{ transformOrigin: '12px 12px' }} d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <rect x="8.5" y="8.5" width="7" height="7" rx="1.2" fill="currentColor" />
+    </svg>
   );
 }

@@ -22,6 +22,8 @@ export type GradeErrorCode = LlmErrorCode | 'session_not_found' | 'session_not_r
 export type GradeOutcome =
   | { kind: 'questions'; questions: Question[] }
   | { kind: 'graded' }
+  /** The learner stopped the check: nothing was stored, the answers stay open. */
+  | { kind: 'cancelled' }
   | { kind: 'error'; message: string; code?: GradeErrorCode; retry: () => Promise<GradeOutcome> };
 
 /**
@@ -208,6 +210,7 @@ async function run(
         return toneViolations(proseOf(r)).join('; ') || null;
       },
     });
+    if (!res.ok && res.code === 'cancelled') return { kind: 'cancelled' };
     if (!res.ok) return errorOutcome(res.message, again, res.code);
     fresh = res.data;
   }

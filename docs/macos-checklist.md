@@ -144,3 +144,10 @@ Q. **Update keeps earlier lessons (migration 0005 rebuilds the block table).**
    - Action: first copy `enlearn.db` aside before updating. Then start the updated app on a database from an earlier build (do not delete `enlearn.db` this time). Open Today and the session log.
    - Expected: the app starts with no error toast, earlier lessons still show with their blocks and answers, and `sqlite3 enlearn.db "select schema_version from meta"` prints 5.
    - If it fails: record the message and the console error, and restore the copy of `enlearn.db` before trying again.
+
+## Stop a check (2026-11-05)
+
+R. **The stop button ends the real CLI call.**
+   - Action: answer at least one task question wrongly, press "Завершить урок", then press the stop button (ring with a square) within a few seconds.
+   - Expected: the lesson stays open with your answers, no error message; in Activity Monitor no `claude` process stays running; `sqlite3 enlearn.db "select kind, ok, error from llm_call order by id desc limit 1"` prints `grade|0|cancelled: Stopped by the learner`.
+   - If it fails: record what stayed (process, error message) and the `llm_call` row.

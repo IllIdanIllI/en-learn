@@ -417,6 +417,15 @@ describe('gradeSession', () => {
     expect(llm.calls).toHaveLength(2);
   });
 
+  test('a stopped check stores nothing: the session stays open, the call is logged as cancelled', async () => {
+    const stopped: LlmResult<unknown> = { ok: false, code: 'cancelled', message: 'Stopped by the learner', costUsd: 0, durationMs: 5, raw: '' };
+    const { db, deps, sid } = await setup('2026-10-20', '2026-10-20', [stopped]);
+    expect(await gradeSession(deps, sid, subm({ items: { 2: 'a' } }), [])).toEqual({ kind: 'cancelled' });
+    expect((await sessionRow(db)).status).toBe('generated');
+    expect(await rows(db, 'SELECT * FROM answer')).toEqual([]);
+    expect(await rows(db, 'SELECT ok, error FROM llm_call')).toEqual([{ ok: 0, error: 'cancelled: Stopped by the learner' }]);
+  });
+
   test('db write fails once during apply gives error; retry applies the kept result without a new grade call', async () => {
     const { db, llm, deps, sid, failure } = await setup('2026-10-20', '2026-10-20', [ok(fullResult())]);
     failure.pending = /INTO spot_answer/;
@@ -443,9 +452,18 @@ describe('gradeSession', () => {
   test('a reported spelling error on a word already tested correctly in the session ends wrong', async () => {
     const r = fullResult({ spellingErrors: [{ word: 'necessary', hint: 'x' }] });
     const { db, deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(r)]);
-    await gradeSession(deps, sid, subm(), []);
+    // Spelled right in the spelling block, misspelled in a gap answer.
+    await gradeSession(deps, sid, subm({ items: { 2: 'an necesary' } }), []);
     expect(await rows(db, 'SELECT correct FROM spelling_attempt')).toEqual([{ correct: 0 }]);
     expect(await rows(db, 'SELECT * FROM spelling_word')).toHaveLength(1);
+  });
+
+  test('a wrong word reported as a spelling error (if → would) is not added to the spelling list', async () => {
+    const r = fullResult({ spellingErrors: [{ word: 'would', hint: 'In the second conditional, the main clause uses ___ plus an infinitive.' }] });
+    const { db, deps, sid } = await setup('2026-10-20', '2026-10-20', [ok(r)]);
+    await gradeSession(deps, sid, subm({ items: { 2: 'if' } }), []);
+    expect(await rows(db, "SELECT * FROM spelling_word WHERE word = 'would'")).toEqual([]);
+    expect(await rows(db, 'SELECT * FROM spelling_attempt')).toHaveLength(1); // only the code-graded spelling item
   });
 
   test('spot: 2 of 5 errors found and 1 extra gives block score 2/5 and one extra finding', async () => {

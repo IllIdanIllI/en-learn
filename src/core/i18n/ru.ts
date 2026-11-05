@@ -155,7 +155,7 @@ export const ru: Record<keyof typeof en, string> = {
   'today.readFirst': 'Прочитайте {section} перед блоком {n}',
   'today.check': 'Проверить ответы',
   'today.finish': 'Завершить урок',
-  'today.checking': 'Проверяю…',
+  'today.stopCheck': 'Остановить проверку',
   'today.close': 'Закрыть урок',
   'today.closed': 'Урок завершён',
   'today.showResults': 'Показать результаты',

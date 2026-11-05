@@ -20,10 +20,12 @@ export class ClaudeCli implements Llm {
         cwd: this.cwd,
         env,
         timeoutMs: req.timeoutMs,
+        ...(req.signal ? { signal: req.signal } : {}),
       });
     } catch (e) {
       return fail('spawn_failed', e instanceof Error ? e.message : String(e), '', started);
     }
+    if (res.cancelled) return fail('cancelled', 'Stopped by the learner', res.stdout, started);
     if (res.timedOut) return fail('timeout', `Timed out after ${req.timeoutMs} ms`, res.stdout, started);
     const failed = failedRun(res);
     if (failed) return fail(failed.code, failed.message, res.stdout, started);
@@ -34,6 +36,6 @@ export class ClaudeCli implements Llm {
   }
 }
 
-function fail(code: 'spawn_failed' | 'timeout' | 'cli_error' | 'not_signed_in', message: string, raw: string, started: number): LlmResult<unknown> {
+function fail(code: 'spawn_failed' | 'timeout' | 'cli_error' | 'not_signed_in' | 'cancelled', message: string, raw: string, started: number): LlmResult<unknown> {
   return { ok: false, code, message, costUsd: 0, durationMs: Date.now() - started, raw };
 }

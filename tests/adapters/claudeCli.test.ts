@@ -106,6 +106,14 @@ describe('ClaudeCli', () => {
     expect(runner.calls[0]!.scope).toBe('claude-homebrew-call');
   });
 
+  test('passes the signal to the runner; a cancelled run maps to cancelled', async () => {
+    const runner = new FakeRunner([{ code: null, stdout: '', stderr: '', timedOut: false, cancelled: true }]);
+    const signal = new AbortController().signal;
+    const r = await new ClaudeCli(runner, 'local', '/w', '/h').call({ ...req(null), signal });
+    expect(runner.calls[0]!.opts.signal).toBe(signal);
+    expect(r).toMatchObject({ ok: false, code: 'cancelled' });
+  });
+
   test('timedOut maps to timeout', async () => {
     const runner = new FakeRunner([{ code: null, stdout: '', stderr: '', timedOut: true }]);
     const r = await new ClaudeCli(runner, 'local', '/w', '/h').call(req(null));

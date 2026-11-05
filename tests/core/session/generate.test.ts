@@ -218,6 +218,21 @@ describe('generateSession', () => {
     expect(await count(db, 'session')).toBe(0);
   });
 
+  test('a try rejected after validation keeps its reasons on that validate_session row; ok stays 1', async () => {
+    const gen = taskDay();
+    const val = allOk(gen);
+    val.items[0] = { ref: 'b0.i0', ok: false, reason: 'TD-2' };
+    const { db, deps } = await setup('2026-10-20', {
+      generate_session: [ok(gen), ok(gen)], validate_session: [ok(val), ok(allOk(gen))],
+    });
+    const res = await generateSession(deps, { light: false });
+    expect(res.ok).toBe(true);
+    const rows = await db.select<{ kind: string; ok: number; error: string | null }>('SELECT kind, ok, error FROM llm_call ORDER BY id');
+    expect(rows.map((r) => [r.kind, r.ok])).toEqual([['generate_session', 1], ['validate_session', 1], ['generate_session', 1], ['validate_session', 1]]);
+    expect(rows[1]!.error).toMatch(/^rejected after validation: /);
+    expect(rows[3]!.error).toBeNull();
+  });
+
   test('due topic: context lists it, and a session without its check item fails', async () => {
     const noCheck = { blocks: [fixBlock('review'), fixBlock('task'), speaking] };
     const { db, llm, deps } = await setup('2026-10-20', { generate_session: [ok(noCheck), ok(noCheck), ok(noCheck), ok(noCheck)] });

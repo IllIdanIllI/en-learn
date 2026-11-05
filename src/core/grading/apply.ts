@@ -9,6 +9,7 @@ import {
 import { deleteDraftAnswers } from '@/core/db/repos/drafts';
 import { findTopicRule, insertWritingText, type OpenWritingBlock } from '@/core/db/repos/writing';
 import { findOrCreateSpellingWord } from '@/core/db/repos/spelling';
+import { wroteMisspelling } from './misspelling';
 import { buildRefs, matchingLine } from './input';
 
 /** Everything graded so far for a session; kept in memory until applied. */
@@ -129,7 +130,9 @@ export async function applyGraded(db: Db, clock: Clock, items: GradingItem[], g:
       baseVersion: it.ruleVersion,
     });
   }
-  for (const w of g.result.spellingErrors) {
+  // Only words the learner actually misspelled: a wrong word reported as a spelling error is dropped.
+  const learnerText = [...g.texts.values(), ...g.spot.values(), ...g.writing.map((w) => w.text)].join('\n');
+  for (const w of g.result.spellingErrors.filter((x) => wroteMisspelling(x.word, learnerText))) {
     const id = await findOrCreateSpellingWord(db, w.word, w.hint, clock.now());
     await upsertSpellingAttempt(db, id, g.sessionId, false);
   }

@@ -15,13 +15,15 @@ export interface RunResult {
   stdout: string;
   stderr: string;
   timedOut: boolean;
+  /** The run was stopped through `signal`. */
+  cancelled?: boolean;
 }
 
 export interface ProcessRunner {
   run(
     scope: string,
     args: string[],
-    opts: { stdin?: string; cwd?: string; env?: Record<string, string>; timeoutMs: number },
+    opts: { stdin?: string; cwd?: string; env?: Record<string, string>; timeoutMs: number; signal?: AbortSignal },
   ): Promise<RunResult>;
 }
 
@@ -38,6 +40,8 @@ export interface LlmRequest {
   resume?: string | null;
   /** Keep the CLI session on disk (omits --no-session-persistence). */
   persist?: boolean;
+  /** Aborting it stops the call: the result is `cancelled`. */
+  signal?: AbortSignal;
 }
 
 export type LlmErrorCode =
@@ -48,7 +52,8 @@ export type LlmErrorCode =
   | 'invalid_json'
   | 'schema'
   | 'check'
-  | 'spawn_failed';
+  | 'spawn_failed'
+  | 'cancelled';
 
 export type LlmResult<T> =
   | { ok: true; data: T; costUsd: number; durationMs: number; raw: string; sessionId?: string }

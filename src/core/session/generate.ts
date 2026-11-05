@@ -8,6 +8,7 @@ import {
   cleanupDrafts, deleteSession, getSessionByDate, getSessionChoice, insertDraftSession, setSessionStatus,
 } from '@/core/db/repos/sessions';
 import { listSpellingWords } from '@/core/db/repos/spelling';
+import { noteRejection } from '@/core/db/repos/llmCalls';
 import { latestWritingSource } from '@/core/db/repos/writing';
 import { getSpellingStates } from '@/core/progress/history';
 import { selectSpellingWords } from '@/core/schedule/spelling';
@@ -135,7 +136,11 @@ export async function produce(
     const { defects, remaining } = applyValidation(session, val.data);
     problems = violations(remaining, ctx);
     lastCode = undefined;
-    if (problems.length > 0) continue;
+    if (problems.length > 0) {
+      // Kept in the call log, so a retry can be explained later.
+      await noteRejection(deps.db, sessionId, 'validate_session', `rejected after validation: ${problems.join('; ')}`);
+      continue;
+    }
     onStage?.('saving', attempt);
     return { ok: true, gen: session, defects };
   }

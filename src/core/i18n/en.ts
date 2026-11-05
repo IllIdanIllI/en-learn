@@ -153,7 +153,7 @@ export const en = {
   'today.readFirst': 'Read {section} before block {n}',
   'today.check': 'Check answers',
   'today.finish': 'Finish lesson',
-  'today.checking': 'Checking…',
+  'today.stopCheck': 'Stop checking',
   'today.close': 'Close lesson',
   'today.closed': 'Lesson finished',
   'today.showResults': 'Show results',

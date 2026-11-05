@@ -21,6 +21,14 @@ export async function insertLlmCall(db: Db, r: LlmCallRecord): Promise<number> {
   return res.lastInsertId;
 }
 
+/** Notes on the latest call of a kind for a session why the app rejected its otherwise valid answer; `ok` stays 1. */
+export async function noteRejection(db: Db, sessionId: number, kind: LlmKind, reasons: string): Promise<void> {
+  await db.execute(
+    'UPDATE llm_call SET error = ? WHERE id = (SELECT MAX(id) FROM llm_call WHERE session_id = ? AND kind = ?)',
+    [reasons, sessionId, kind],
+  );
+}
+
 /** Durations of the latest successful calls of a kind, newest first. */
 export async function recentOkDurations(db: Db, kind: LlmKind, limit: number): Promise<number[]> {
   const rows = await db.select<{ duration_ms: number }>(

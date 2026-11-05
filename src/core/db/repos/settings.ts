@@ -16,6 +16,8 @@ export interface Settings {
   dayStartHour: number;
   /** Calendar date set by "Start a new day"; null when unset. */
   dayOverride: ISODate | null;
+  /** Extra new words the learner added for one date; ignored on other dates. */
+  wordsExtraNew: { date: ISODate; extra: number } | null;
 }
 
 const DEFAULT_MODEL = 'claude-sonnet-5-5';
@@ -52,6 +54,7 @@ export const DEFAULT_SETTINGS: Settings = {
   closedSessions: [],
   dayStartHour: 5,
   dayOverride: null,
+  wordsExtraNew: null,
 };
 
 export async function getSettings(db: Db): Promise<Settings> {

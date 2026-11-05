@@ -27,6 +27,7 @@ describe('settings repo', () => {
       closedSessions: [],
       dayStartHour: 5,
       dayOverride: null,
+      wordsExtraNew: null,
     });
   });
 

@@ -1,4 +1,5 @@
 import type { ISODate } from '@/core/domain';
+import type { Settings } from '@/core/db/repos/settings';
 import { NEW_PER_DAY, PRACTICE_SIZE } from './constants';
 import type { WordState } from './progress';
 import type { CardType, ExerciseType, Stage, Word, WordExercise } from './types';
@@ -69,14 +70,27 @@ export interface QueueWord {
   firstReviewDate: ISODate | null;
 }
 
+export function extraNewFor(stored: Settings['wordsExtraNew'], today: ISODate): number {
+  return stored && stored.date === today ? stored.extra : 0;
+}
+
+const startedOn = (words: QueueWord[], today: ISODate) => words.filter((w) => w.firstReviewDate === today).length;
+
+// True when today's new-word allowance is used up and a fresh ready word is waiting.
+export function canAddNew(words: QueueWord[], today: ISODate, extraNew: number): boolean {
+  return (
+    startedOn(words, today) >= NEW_PER_DAY + extraNew &&
+    words.some((w) => w.word.generation === 'ready' && !w.state.reviewed)
+  );
+}
+
 // Word ids for one practice: due words (most overdue first), then new words up to today's allowance.
-export function practiceQueue(words: QueueWord[], today: ISODate): number[] {
+export function practiceQueue(words: QueueWord[], today: ISODate, extraNew = 0): number[] {
   const ready = words.filter((w) => w.word.generation === 'ready');
   const due = ready
     .filter((w) => w.state.due !== null && w.state.due <= today)
     .sort((a, b) => (a.state.due ?? '').localeCompare(b.state.due ?? '') || a.word.id - b.word.id);
-  const startedToday = words.filter((w) => w.firstReviewDate === today).length;
-  const newLimit = Math.max(0, NEW_PER_DAY - startedToday);
+  const newLimit = Math.max(0, NEW_PER_DAY + extraNew - startedOn(words, today));
   const fresh = ready
     .filter((w) => !w.state.reviewed)
     .sort((a, b) => a.word.added.localeCompare(b.word.added) || a.word.id - b.word.id)

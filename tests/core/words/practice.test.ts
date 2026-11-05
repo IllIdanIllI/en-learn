@@ -4,7 +4,9 @@ import { FixedClock } from '@/adapters/test/fixedClock';
 import { FakeLlm } from '@/adapters/test/fakeLlm';
 import { bundledPrompts } from '@/core/llm/bundledPrompts';
 import { insertReview, insertWord, listReviews, listWordErrors, setGeneration } from '@/core/db/repos/words';
-import { buildPractice, checkUseIt, loadWordViews, recordAnswer, stageChanges, wordsOverview } from '@/core/words/practice';
+import { addExtraNew, buildPractice, checkUseIt, loadWordViews, recordAnswer, stageChanges, wordsOverview } from '@/core/words/practice';
+import { getSettings } from '@/core/db/repos/settings';
+import { extraNewFor } from '@/core/words/queue';
 import type { Deps, LlmResult } from '@/core/ports';
 import type { WordFields, WordReview } from '@/core/words/types';
 
@@ -129,6 +131,30 @@ describe('wordsOverview', () => {
     expect(o.dueToday).toBe(0);
     expect(o.nextDue).toBe(view.state.due);
     expect(o.nextDue! > '2026-11-04').toBe(true);
+  });
+});
+
+describe('started and extra new words', () => {
+  test('started counts reviewed words, including a failed-generation one', async () => {
+    const deps = await setup();
+    const a = await addReady(deps, 'a');
+    const f = await insertWord(deps.db, fields('f'), 't');
+    await setGeneration(deps.db, f, 'failed');
+    await addReady(deps, 'unreviewed');
+    await insertReview(deps.db, review(a, '2026-11-04'));
+    await insertReview(deps.db, review(f, '2026-11-03'));
+    const o = await wordsOverview(deps.db, '2026-11-04');
+    expect(o.started).toBe(2);
+    expect(o.canAddNew).toBe(false);
+  });
+
+  test('addExtraNew adds 10 each time and resets next day', async () => {
+    const deps = await setup();
+    await addExtraNew(deps.db, '2026-11-04');
+    await addExtraNew(deps.db, '2026-11-04');
+    const stored = (await getSettings(deps.db)).wordsExtraNew;
+    expect(extraNewFor(stored, '2026-11-04')).toBe(20);
+    expect(extraNewFor(stored, '2026-11-05')).toBe(0);
   });
 });
 

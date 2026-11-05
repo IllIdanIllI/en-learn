@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { availableTypes, pickCard, practiceQueue, type QueueWord } from '@/core/words/queue';
+import { availableTypes, canAddNew, extraNewFor, pickCard, practiceQueue, type QueueWord } from '@/core/words/queue';
 import type { WordState } from '@/core/words/progress';
 import type { Word, WordExercise, ExerciseType } from '@/core/words/types';
 
@@ -195,5 +195,36 @@ describe('practiceQueue', () => {
       { word: word(3), state: state({ reviewed: true, due: '2026-11-03' }), firstReviewDate: '2026-10-01' },
     ];
     expect(practiceQueue(words, TODAY)).toEqual([3]);
+  });
+});
+
+describe('extra new words', () => {
+  const started = (n: number): QueueWord[] =>
+    Array.from({ length: n }, (_, i) => ({
+      word: word(i + 1),
+      state: state({ reviewed: true, due: '2026-11-10' }),
+      firstReviewDate: TODAY,
+    }));
+  const fresh = (n: number, generation: Word['generation'] = 'ready'): QueueWord[] =>
+    Array.from({ length: n }, (_, i) => ({ word: word(100 + i, '2026-10-10', generation), state: state(), firstReviewDate: null }));
+
+  test('extraNew raises the limit', () => {
+    const words = [...started(10), ...fresh(3)];
+    expect(practiceQueue(words, TODAY, 0).filter((id) => id >= 100)).toEqual([]);
+    expect(practiceQueue(words, TODAY, 10).filter((id) => id >= 100)).toEqual([100, 101, 102]);
+  });
+
+  test('extraNewFor is 0 for null or another date', () => {
+    expect(extraNewFor(null, TODAY)).toBe(0);
+    expect(extraNewFor({ date: '2026-11-03', extra: 20 }, TODAY)).toBe(0);
+    expect(extraNewFor({ date: TODAY, extra: 20 }, TODAY)).toBe(20);
+  });
+
+  test('canAddNew needs the limit used up and a fresh ready word', () => {
+    expect(canAddNew([...started(10), ...fresh(1)], TODAY, 0)).toBe(true);
+    expect(canAddNew([...started(10), ...fresh(1, 'pending')], TODAY, 0)).toBe(false);
+    expect(canAddNew([...started(10), ...fresh(1, 'failed')], TODAY, 0)).toBe(false);
+    expect(canAddNew([...started(9), ...fresh(1)], TODAY, 0)).toBe(false);
+    expect(canAddNew([...started(10), ...fresh(1)], TODAY, 10)).toBe(false);
   });
 });

@@ -2,13 +2,15 @@ import type { ISODate } from '@/core/domain';
 import type { Db, Deps, LlmResult } from '@/core/ports';
 import type { WordCheckReply } from '@/core/llm/types';
 import { callStructured } from '@/core/llm/call';
+import { getSettings, setSetting } from '@/core/db/repos/settings';
 import { getTopics } from '@/core/db/repos/programme';
 import { findTopicRule } from '@/core/db/repos/writing';
 import { insertReview, insertWordErrors, listExercises, listReviews, listWords } from '@/core/db/repos/words';
 import { anagram, choiceOptions } from './check';
+import { EXTRA_NEW_STEP } from './constants';
 import { buildWordCheckPrompt, checkWordCheckReply } from './generated';
 import { replayWord, type WordState } from './progress';
-import { pickCard, practiceQueue, type Card, type QueueWord } from './queue';
+import { canAddNew, extraNewFor, pickCard, practiceQueue, type Card, type QueueWord } from './queue';
 import type { CardType, ReviewResult, Stage, Word, WordExercise, WordReview } from './types';
 
 export interface WordView {
@@ -73,7 +75,7 @@ export function cardFor(view: WordView, all: Word[], rand: () => number, only?: 
   return { wordId: view.word.id, word: view.word, card, options, letters, repeat: false };
 }
 
-export async function buildPractice(deps: Deps): Promise<PracticeCard[]> {
+export async function buildPractice(deps: Deps, extraNew = 0): Promise<PracticeCard[]> {
   const rand = deps.rand ?? Math.random;
   const views = await loadWordViews(deps.db);
   const queue: QueueWord[] = views.map((v) => ({
@@ -84,7 +86,7 @@ export async function buildPractice(deps: Deps): Promise<PracticeCard[]> {
   const all = views.map((v) => v.word);
   const byId = new Map(views.map((v) => [v.word.id, v]));
   const cards: PracticeCard[] = [];
-  for (const id of practiceQueue(queue, deps.clock.today())) {
+  for (const id of practiceQueue(queue, deps.clock.today(), extraNew)) {
     const view = byId.get(id);
     const card = view ? cardFor(view, all, rand) : null;
     if (card) cards.push(card);
@@ -155,9 +157,12 @@ export interface WordsOverview {
   dueToday: number;
   available: number;
   nextDue: ISODate | null;
+  /** Words with a counted review, over all words. */
+  started: number;
+  canAddNew: boolean;
 }
 
-export async function wordsOverview(db: Db, today: ISODate): Promise<WordsOverview> {
+export async function wordsOverview(db: Db, today: ISODate, extraNew = 0): Promise<WordsOverview> {
   const views = await loadWordViews(db);
   const counts: Record<Stage, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
   for (const v of views) counts[v.state.stage]++;
@@ -169,7 +174,19 @@ export async function wordsOverview(db: Db, today: ISODate): Promise<WordsOvervi
     firstReviewDate: v.reviews.find((r) => r.counted)?.date ?? null,
   }));
   const later = ready.flatMap((v) => (v.state.due !== null && v.state.due > today ? [v.state.due] : [])).sort();
-  return { counts, dueToday, available: practiceQueue(queue, today).length, nextDue: later[0] ?? null };
+  return {
+    counts,
+    dueToday,
+    available: practiceQueue(queue, today, extraNew).length,
+    nextDue: later[0] ?? null,
+    started: views.filter((v) => v.state.reviewed).length,
+    canAddNew: canAddNew(queue, today, extraNew),
+  };
+}
+
+export async function addExtraNew(db: Db, today: ISODate): Promise<void> {
+  const { wordsExtraNew } = await getSettings(db);
+  await setSetting(db, 'wordsExtraNew', { date: today, extra: extraNewFor(wordsExtraNew, today) + EXTRA_NEW_STEP });
 }
 
 export function stageChanges(

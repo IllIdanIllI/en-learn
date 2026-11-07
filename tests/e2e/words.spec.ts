@@ -260,11 +260,13 @@ test.describe('practice', () => {
     const header = page.locator('header span.tabular');
     await expect(header).toHaveText('2 / 15');
     // Ephemeral's own anagram comes before the extra card.
-    for (;;) {
+    let found = false;
+    for (let i = 0; i < 30 && !found; i++) {
       await card(page).waitFor();
-      if ((await cardType(page)) === 'anagram' && (await wordOfCard(page)) === 'ephemeral') break;
-      await answer(page);
+      found = (await cardType(page)) === 'anagram' && (await wordOfCard(page)) === 'ephemeral';
+      if (!found) await answer(page);
     }
+    expect(found, 'the ephemeral anagram card within 30 cards').toBe(true);
     await answer(page, false);
     await expect(header).toHaveText(/^\d+ \/ 15$/);
   });

@@ -3,7 +3,7 @@ import { availableTypes, EXERCISE_OF, pickExercise, type Card } from './queue';
 import type { CardType, WordExercise } from './types';
 
 // Marks an item as used just now, inside one plan, so the next card of its type takes another item.
-const USED_LAST = '9999-12-31T00:00:00Z';
+export const USED_LAST = '9999-12-31T00:00:00Z';
 
 // The card of a given type with no stage filter; null when the type needs an exercise and there is none.
 export function cardOfType(type: CardType, exercises: WordExercise[], lastUsed: Map<number, string>): Card | null {

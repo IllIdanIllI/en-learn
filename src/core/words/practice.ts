@@ -9,7 +9,7 @@ import { insertReview, insertWordErrors, listExercises, listReviews, listWords }
 import { anagram, choiceOptions } from './check';
 import { EXTRA_NEW_STEP } from './constants';
 import { buildWordCheckPrompt, checkWordCheckReply } from './generated';
-import { cardOfType, extraType, orderRounds, planCards } from './plan';
+import { cardOfType, extraType, orderRounds, planCards, USED_LAST } from './plan';
 import { replayWord, type WordState } from './progress';
 import { canAddNew, extraNewFor, practiceQueue, type Card, type QueueWord } from './queue';
 import type { CardType, ReviewResult, Stage, Word, WordExercise, WordReview } from './types';
@@ -73,8 +73,17 @@ export function toPracticeCard(view: WordView, card: Card, all: Word[], rand: ()
 }
 
 // The extra card after a mistake: the missed type again (a missed choice card becomes an anagram).
-export function extraCardFor(view: WordView, missed: CardType, all: Word[], rand: () => number): Omit<PracticeCard, 'round'> | null {
-  const card = cardOfType(extraType(missed), view.exercises, lastUsedOf(view));
+// queued: exercise ids of this word's cards still ahead in the practice; they count as just used, so the extra takes another item.
+export function extraCardFor(
+  view: WordView,
+  missed: CardType,
+  all: Word[],
+  rand: () => number,
+  queued: number[] = [],
+): Omit<PracticeCard, 'round'> | null {
+  const lastUsed = lastUsedOf(view);
+  for (const id of queued) lastUsed.set(id, USED_LAST);
+  const card = cardOfType(extraType(missed), view.exercises, lastUsed);
   return card ? toPracticeCard(view, card, all, rand) : null;
 }
 

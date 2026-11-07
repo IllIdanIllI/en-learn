@@ -136,6 +136,21 @@ describe('extraCardFor and swapForTranslation', () => {
     expect(card?.letters).not.toBeNull();
   });
 
+  test('the extra card takes another item than the word still has queued in this practice', async () => {
+    const deps = await setup();
+    const id = await addReady(deps, 'alpha', '2026-10-01', [
+      ex('gap', { answers: ['x'] }), ex('gap', { answers: ['y'] }), ex('gap', { answers: ['z'] }),
+    ]);
+    const { views, view } = await viewOf(deps, id);
+    const [g1, g2, g3] = view.exercises.map((e) => e.id).sort((a, b) => a - b) as [number, number, number];
+    await insertReview(deps.db, review(id, '2026-11-04', { cardType: 'gap', exerciseId: g1, result: 'wrong', answeredAt: '2026-11-04T10:00:00.000Z' }));
+    const after = await viewOf(deps, id);
+    const all = views.map((v) => v.word);
+    // Without the queued card g2 the never-used g2 would come first.
+    expect(extraCardFor(after.view, 'gap', all, () => 0.5)?.card.exercise?.id).toBe(g2);
+    expect(extraCardFor(after.view, 'gap', all, () => 0.5, [g2])?.card.exercise?.id).toBe(g3);
+  });
+
   test('swapForTranslation is null without translation exercises', async () => {
     const deps = await setup();
     const id = await addReady(deps, 'alpha', '2026-10-01', [ex('gap', { answers: ['x'] })]);

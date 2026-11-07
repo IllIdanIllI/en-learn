@@ -27,7 +27,7 @@ function Practice({ onContinue }: { onContinue: () => void }) {
   const [ended, setEnded] = useState<Ended | null>(null);
   const started = useRef(false);
   const before = useRef(new Map<number, Stage>());
-  // First answer of each word in this run (true = not wrong); repeats and later cards are not counted.
+  // First card of each word in this practice (true = not wrong); later cards are not counted.
   const first = useRef(new Map<number, boolean>());
   // Words that already got their extra card in this practice (one per word).
   const extraGiven = useRef(new Set<number>());
@@ -77,9 +77,13 @@ function Practice({ onContinue }: { onContinue: () => void }) {
     if (!first.current.has(pc.wordId)) first.current.set(pc.wordId, result !== 'wrong');
     if (result === 'wrong' && !extraGiven.current.has(pc.wordId)) {
       extraGiven.current.add(pc.wordId);
+      // This word's items still ahead in the practice: the extra card should not repeat one of them.
+      const queued = (cards ?? []).slice(at + 1)
+        .filter((c) => c.wordId === pc.wordId)
+        .flatMap((c) => (c.card.exercise ? [c.card.exercise.id] : []));
       const views = await loadWordViews(deps.db);
       const view = views.find((v) => v.word.id === pc.wordId);
-      const extra = view ? extraCardFor(view, pc.card.type, views.map((v) => v.word), deps.rand ?? Math.random) : null;
+      const extra = view ? extraCardFor(view, pc.card.type, views.map((v) => v.word), deps.rand ?? Math.random, queued) : null;
       if (extra) setCards((cur) => (cur ? insertExtra(cur, at, extra) : cur));
     }
   };
@@ -96,8 +100,12 @@ function Practice({ onContinue }: { onContinue: () => void }) {
       }
       // No translation card: the skipped card is dropped, so the total goes down by one.
       const rest = cards.filter((_, i) => i !== at);
+      // The last card went: finish without replacing the cards first, so no blank frame shows before the end screen.
+      if (at >= rest.length) {
+        void finish();
+        return;
+      }
       setCards(rest);
-      if (at >= rest.length) void finish();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -138,7 +146,7 @@ function Practice({ onContinue }: { onContinue: () => void }) {
       </header>
       <div className="mt-6">
         <CardView
-          key={`${index}:${pc.card.type}:${pc.card.exercise?.id ?? 0}`}
+          key={`${index}:${pc.wordId}:${pc.card.type}:${pc.card.exercise?.id ?? 0}`}
           pc={pc}
           onResult={async (r, text, recorded) => {
             setPending(true);

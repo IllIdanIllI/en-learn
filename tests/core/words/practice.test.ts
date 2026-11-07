@@ -3,12 +3,14 @@ import { createTestDb } from '@/adapters/test/sqliteDb';
 import { FixedClock } from '@/adapters/test/fixedClock';
 import { FakeLlm } from '@/adapters/test/fakeLlm';
 import { bundledPrompts } from '@/core/llm/bundledPrompts';
-import { insertReview, insertWord, listReviews, listWordErrors, setGeneration } from '@/core/db/repos/words';
-import { addExtraNew, buildPractice, checkUseIt, loadWordViews, recordAnswer, stageChanges, wordsOverview } from '@/core/words/practice';
+import { insertReview, insertWord, listReviews, listWordErrors, replaceExercises, setGeneration } from '@/core/db/repos/words';
+import {
+  addExtraNew, buildPractice, checkUseIt, extraCardFor, loadWordViews, recordAnswer, stageChanges, swapForTranslation, wordsOverview,
+} from '@/core/words/practice';
 import { getSettings } from '@/core/db/repos/settings';
 import { extraNewFor } from '@/core/words/queue';
 import type { Deps, LlmResult } from '@/core/ports';
-import type { WordFields, WordReview } from '@/core/words/types';
+import type { ExerciseType, WordExercise, WordFields, WordReview } from '@/core/words/types';
 
 const good = (data: unknown): LlmResult<unknown> => ({ ok: true, data, costUsd: 0, durationMs: 1, raw: '{}' });
 const fail: LlmResult<unknown> = { ok: false, code: 'not_signed_in', message: 'sign in', costUsd: 0, durationMs: 1, raw: '' };
@@ -23,11 +25,15 @@ async function setup(llm = new FakeLlm({}), today = '2026-11-04') {
   };
   return deps;
 }
-const addReady = async (deps: Deps, word: string, added = '2026-11-01') => {
+const addReady = async (deps: Deps, word: string, added = '2026-11-01', exercises: Omit<WordExercise, 'id' | 'wordId'>[] = []) => {
   const id = await insertWord(deps.db, fields(word, { added }), 't');
   await setGeneration(deps.db, id, 'ready');
+  if (exercises.length) await replaceExercises(deps.db, id, exercises);
   return id;
 };
+const ex = (type: ExerciseType, over: Partial<Omit<WordExercise, 'id' | 'wordId' | 'type'>> = {}): Omit<WordExercise, 'id' | 'wordId'> => ({
+  type, prompt: '', translation: null, cue: null, options: null, answers: [], note: null, ...over,
+});
 const review = (wordId: number, date: string, over: Partial<Omit<WordReview, 'id'>> = {}): Omit<WordReview, 'id'> => ({
   wordId, cardType: 'choice', exerciseId: null, answeredAt: `${date}T10:00:00.000Z`, date, result: 'correct', counted: true, text: '', ...over,
 });
@@ -44,18 +50,104 @@ describe('recordAnswer', () => {
 });
 
 describe('buildPractice', () => {
-  test('returns at most 20 cards and the first card of a new word is choice', async () => {
+  test('ten new words give 30 cards: 10 choice cards on distinct words first, then anagrams, no repeat field', async () => {
     const deps = await setup();
     for (let i = 0; i < 12; i++) await addReady(deps, `word${i}`);
     const cards = await buildPractice(deps);
-    expect(cards.length).toBeLessThanOrEqual(20);
-    expect(cards.length).toBe(10);
-    for (const c of cards) {
-      expect(c.card.type).toBe('choice');
+    expect(cards).toHaveLength(30);
+    expect(cards.slice(0, 10).every((c) => c.card.type === 'choice' && c.round === 1)).toBe(true);
+    expect(new Set(cards.slice(0, 10).map((c) => c.wordId)).size).toBe(10);
+    expect(cards.slice(10).map((c) => c.card.type)).toEqual(Array(20).fill('anagram'));
+    for (const c of cards.slice(0, 10)) {
       expect(c.options).toContain(c.word.word);
       expect(c.letters).toBeNull();
-      expect(c.repeat).toBe(false);
     }
+    for (const c of cards.slice(10)) expect(c.letters).not.toBeNull();
+    expect(cards.every((c) => !('repeat' in c))).toBe(true);
+  });
+
+  test('a new word leads each round; cards of a word stay in order; every card has a round', async () => {
+    const deps = await setup();
+    const stage2 = await addReady(deps, 'stage2', '2026-10-01', [ex('gap', { answers: ['x'] }), ex('form', { answers: ['y'] })]);
+    await insertReview(deps.db, review(stage2, '2026-01-01'));
+    await insertReview(deps.db, review(stage2, '2026-01-05'));
+    const fresh = await addReady(deps, 'fresh', '2026-11-01', [ex('gap', { answers: ['x'] })]);
+    const cards = await buildPractice(deps);
+    expect(cards.map((c) => [c.wordId, c.card.type, c.round])).toEqual([
+      [fresh, 'choice', 1],
+      [stage2, 'form', 1],
+      [fresh, 'anagram', 2],
+      [stage2, 'gap', 2],
+      [fresh, 'gap_hint', 3],
+    ]);
+  });
+
+  test('card counts by stage: new 3, stage 2 with gap and form 2, stage 4 1', async () => {
+    const deps = await setup();
+    const fresh = await addReady(deps, 'fresh', '2026-10-01');
+    const s2 = await addReady(deps, 's2', '2026-10-01', [ex('gap', { answers: ['x'] }), ex('form', { answers: ['y'] })]);
+    await insertReview(deps.db, review(s2, '2026-01-01'));
+    await insertReview(deps.db, review(s2, '2026-01-05'));
+    const s4 = await addReady(deps, 's4', '2025-03-01', [
+      ex('gap', { answers: ['x'] }), ex('form', { answers: ['y'] }), ex('translation', { translation: 't', answers: ['z'] }),
+    ]);
+    for (const d of ['2025-03-03', '2025-03-07', '2025-03-14', '2025-03-28', '2025-04-23', '2025-06-04']) {
+      await insertReview(deps.db, review(s4, d));
+    }
+    const cards = await buildPractice(deps);
+    const count = (id: number) => cards.filter((c) => c.wordId === id).length;
+    expect([count(fresh), count(s2), count(s4)]).toEqual([3, 2, 1]);
+  });
+
+  test('a word with an empty plan is left out', async () => {
+    const deps = await setup();
+    const noExercises = await addReady(deps, 'bare');
+    await insertReview(deps.db, review(noExercises, '2026-01-01'));
+    await insertReview(deps.db, review(noExercises, '2026-01-05'));
+    const cards = await buildPractice(deps);
+    expect(cards.some((c) => c.wordId === noExercises)).toBe(false);
+  });
+});
+
+describe('extraCardFor and swapForTranslation', () => {
+  const viewOf = async (deps: Deps, id: number) => {
+    const views = await loadWordViews(deps.db);
+    return { views, view: views.find((v) => v.word.id === id)! };
+  };
+
+  test('a wrong answer at stage 2 (stage now 1) with missed form gives a form card', async () => {
+    const deps = await setup();
+    const id = await addReady(deps, 'alpha', '2026-10-01', [ex('gap', { answers: ['x'] }), ex('form', { answers: ['y'] })]);
+    await insertReview(deps.db, review(id, '2026-01-01', { result: 'wrong' }));
+    const { views, view } = await viewOf(deps, id);
+    expect(view.state.stage).toBe(1);
+    const card = extraCardFor(view, 'form', views.map((v) => v.word), () => 0.5);
+    expect(card?.card.type).toBe('form');
+    expect(card?.card.exercise?.type).toBe('form');
+    expect(card?.wordId).toBe(id);
+  });
+
+  test('a missed choice card gives an anagram card with letters', async () => {
+    const deps = await setup();
+    const id = await addReady(deps, 'alpha');
+    const { views, view } = await viewOf(deps, id);
+    const card = extraCardFor(view, 'choice', views.map((v) => v.word), () => 0.5);
+    expect(card?.card.type).toBe('anagram');
+    expect(card?.letters).not.toBeNull();
+  });
+
+  test('swapForTranslation is null without translation exercises', async () => {
+    const deps = await setup();
+    const id = await addReady(deps, 'alpha', '2026-10-01', [ex('gap', { answers: ['x'] })]);
+    const { views, view } = await viewOf(deps, id);
+    expect(swapForTranslation(view, views.map((v) => v.word), () => 0.5)).toBeNull();
+  });
+
+  test('swapForTranslation gives a translation card when the word has one', async () => {
+    const deps = await setup();
+    const id = await addReady(deps, 'alpha', '2026-10-01', [ex('translation', { translation: 't', answers: ['z'] })]);
+    const { views, view } = await viewOf(deps, id);
+    expect(swapForTranslation(view, views.map((v) => v.word), () => 0.5)?.card.type).toBe('translation');
   });
 });
 

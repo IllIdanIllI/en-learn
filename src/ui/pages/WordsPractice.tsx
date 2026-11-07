@@ -4,7 +4,8 @@ import { getSettings } from '@/core/db/repos/settings';
 import { t } from '@/core/i18n';
 import { extraNewFor } from '@/core/words/queue';
 import {
-  addExtraNew, buildPractice, cardFor, loadWordViews, recordAnswer, stageChanges, wordsOverview, type PracticeCard,
+  addExtraNew, buildPractice, extraCardFor, loadWordViews, recordAnswer, stageChanges, swapForTranslation, wordsOverview,
+  type PracticeCard,
 } from '@/core/words/practice';
 import type { ReviewResult, Stage } from '@/core/words/types';
 import { useCore } from '@/ui/app/CoreProvider';
@@ -71,13 +72,13 @@ function Practice({ onContinue }: { onContinue: () => void }) {
 
   const onResult = async (pc: PracticeCard, result: ReviewResult, text: string, recorded: boolean) => {
     if (!recorded) await recordAnswer(deps, { wordId: pc.wordId, cardType: pc.card.type, exerciseId: pc.card.exercise?.id ?? null, result, text });
-    if (!pc.repeat && !first.current.has(pc.wordId)) first.current.set(pc.wordId, result !== 'wrong');
+    if (!first.current.has(pc.wordId)) first.current.set(pc.wordId, result !== 'wrong');
     if (result === 'wrong' && !repeated.current.has(pc.wordId)) {
       repeated.current.add(pc.wordId);
       const views = await loadWordViews(deps.db);
       const view = views.find((v) => v.word.id === pc.wordId);
-      const again = view ? cardFor(view, views.map((v) => v.word), deps.rand ?? Math.random) : null;
-      if (again) setCards((cur) => (cur ? [...cur, { ...again, repeat: true }] : cur));
+      const again = view ? extraCardFor(view, pc.card.type, views.map((v) => v.word), deps.rand ?? Math.random) : null;
+      if (again) setCards((cur) => (cur ? [...cur, { ...again, round: pc.round + 1 }] : cur));
     }
   };
 
@@ -85,8 +86,8 @@ function Practice({ onContinue }: { onContinue: () => void }) {
     try {
       const views = await loadWordViews(deps.db);
       const view = views.find((v) => v.word.id === pc.wordId);
-      const swap = view ? cardFor(view, views.map((v) => v.word), deps.rand ?? Math.random, ['translation']) : null;
-      if (swap && cards) setCards(cards.map((c, i) => (i === at ? { ...swap, repeat: pc.repeat } : c)));
+      const swap = view ? swapForTranslation(view, views.map((v) => v.word), deps.rand ?? Math.random) : null;
+      if (swap && cards) setCards(cards.map((c, i) => (i === at ? { ...swap, round: pc.round } : c)));
       else if (cards) advance(cards, at);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

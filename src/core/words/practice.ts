@@ -9,8 +9,9 @@ import { insertReview, insertWordErrors, listExercises, listReviews, listWords }
 import { anagram, choiceOptions } from './check';
 import { EXTRA_NEW_STEP } from './constants';
 import { buildWordCheckPrompt, checkWordCheckReply } from './generated';
+import { cardOfType, extraType, orderRounds, planCards } from './plan';
 import { replayWord, type WordState } from './progress';
-import { canAddNew, extraNewFor, pickCard, practiceQueue, type Card, type QueueWord } from './queue';
+import { canAddNew, extraNewFor, practiceQueue, type Card, type QueueWord } from './queue';
 import type { CardType, ReviewResult, Stage, Word, WordExercise, WordReview } from './types';
 
 export interface WordView {
@@ -46,25 +47,21 @@ export interface PracticeCard {
   card: Card;
   options: string[] | null;
   letters: string | null;
-  repeat: boolean;
+  round: number;
 }
 
-export function cardFor(view: WordView, all: Word[], rand: () => number, only?: CardType[]): PracticeCard | null {
+// The last answer time of each exercise of a word, for choosing the least recently used item.
+export function lastUsedOf(view: WordView): Map<number, string> {
   const lastUsed = new Map<number, string>();
   for (const r of view.reviews) {
     if (r.exerciseId === null) continue;
     const prev = lastUsed.get(r.exerciseId);
     if (prev === undefined || r.answeredAt > prev) lastUsed.set(r.exerciseId, r.answeredAt);
   }
-  const card = pickCard({
-    stage: view.state.stage,
-    firstCard: view.reviews.length === 0,
-    exercises: view.exercises,
-    lastUsed,
-    only,
-    rand,
-  });
-  if (!card) return null;
+  return lastUsed;
+}
+
+export function toPracticeCard(view: WordView, card: Card, all: Word[], rand: () => number): Omit<PracticeCard, 'round'> {
   const options =
     card.type === 'choice'
       ? choiceOptions(view.word, all.filter((w) => w.id !== view.word.id), rand)
@@ -72,7 +69,19 @@ export function cardFor(view: WordView, all: Word[], rand: () => number, only?: 
         ? (card.exercise?.options ?? null)
         : null;
   const letters = card.type === 'anagram' ? anagram(view.word.word, rand) : null;
-  return { wordId: view.word.id, word: view.word, card, options, letters, repeat: false };
+  return { wordId: view.word.id, word: view.word, card, options, letters };
+}
+
+// The extra card after a mistake: the missed type again (a missed choice card becomes an anagram).
+export function extraCardFor(view: WordView, missed: CardType, all: Word[], rand: () => number): Omit<PracticeCard, 'round'> | null {
+  const card = cardOfType(extraType(missed), view.exercises, lastUsedOf(view));
+  return card ? toPracticeCard(view, card, all, rand) : null;
+}
+
+// The translation card that replaces a card the learner skips; null when the word has no translation exercise.
+export function swapForTranslation(view: WordView, all: Word[], rand: () => number): Omit<PracticeCard, 'round'> | null {
+  const card = cardOfType('translation', view.exercises, lastUsedOf(view));
+  return card ? toPracticeCard(view, card, all, rand) : null;
 }
 
 export async function buildPractice(deps: Deps, extraNew = 0): Promise<PracticeCard[]> {
@@ -85,13 +94,15 @@ export async function buildPractice(deps: Deps, extraNew = 0): Promise<PracticeC
   }));
   const all = views.map((v) => v.word);
   const byId = new Map(views.map((v) => [v.word.id, v]));
-  const cards: PracticeCard[] = [];
+  const plans: Omit<PracticeCard, 'round'>[][] = [];
   for (const id of practiceQueue(queue, deps.clock.today(), extraNew)) {
     const view = byId.get(id);
-    const card = view ? cardFor(view, all, rand) : null;
-    if (card) cards.push(card);
+    if (!view) continue;
+    const cards = planCards({ state: view.state, exercises: view.exercises, lastUsed: lastUsedOf(view), rand });
+    const plan = cards.map((card) => toPracticeCard(view, card, all, rand));
+    if (plan.length > 0) plans.push(plan);
   }
-  return cards;
+  return orderRounds(plans);
 }
 
 export async function recordAnswer(

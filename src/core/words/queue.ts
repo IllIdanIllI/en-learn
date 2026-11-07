@@ -1,6 +1,6 @@
 import type { ISODate } from '@/core/domain';
 import type { Settings } from '@/core/db/repos/settings';
-import { NEW_PER_DAY, PRACTICE_SIZE } from './constants';
+import { NEW_PER_DAY, PRACTICE_WORDS } from './constants';
 import type { WordState } from './progress';
 import type { CardType, ExerciseType, Stage, Word, WordExercise } from './types';
 
@@ -99,5 +99,5 @@ export function practiceQueue(words: QueueWord[], today: ISODate, extraNew = 0):
     .filter((w) => !w.state.reviewed)
     .sort((a, b) => a.word.added.localeCompare(b.word.added) || a.word.id - b.word.id)
     .slice(0, newLimit);
-  return [...due, ...fresh].slice(0, PRACTICE_SIZE).map((w) => w.word.id);
+  return [...due, ...fresh].slice(0, PRACTICE_WORDS).map((w) => w.word.id);
 }

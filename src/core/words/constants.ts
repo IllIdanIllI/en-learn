@@ -1,4 +1,4 @@
-export const PRACTICE_SIZE = 20;
+export const PRACTICE_WORDS = 10;
 export const NEW_PER_DAY = 10;
 export const EXTRA_NEW_STEP = 10;
 export const LEARNED_INTERVAL_DAYS = 21;

@@ -168,15 +168,15 @@ describe('practiceQueue', () => {
     expect(practiceQueue([...today, fresh], TODAY)).toEqual([]);
   });
 
-  test('total is at most 20', () => {
+  test('total is at most 10 words', () => {
     const due: QueueWord[] = Array.from({ length: 25 }, (_, i) => ({
       word: word(i + 1),
       state: state({ reviewed: true, due: '2026-10-01' }),
       firstReviewDate: '2026-09-01',
     }));
     const queue = practiceQueue(due, TODAY);
-    expect(queue).toHaveLength(20);
-    expect(queue).toEqual(Array.from({ length: 20 }, (_, i) => i + 1));
+    expect(queue).toHaveLength(10);
+    expect(queue).toEqual(Array.from({ length: 10 }, (_, i) => i + 1));
   });
 
   test('skips words without ready exercises', () => {

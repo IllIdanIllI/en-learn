@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getSettings } from '@/core/db/repos/settings';
 import { t } from '@/core/i18n';
+import { insertExtra } from '@/core/words/plan';
 import { extraNewFor } from '@/core/words/queue';
 import {
   addExtraNew, buildPractice, extraCardFor, loadWordViews, recordAnswer, stageChanges, swapForTranslation, wordsOverview,
@@ -28,7 +29,8 @@ function Practice({ onContinue }: { onContinue: () => void }) {
   const before = useRef(new Map<number, Stage>());
   // First answer of each word in this run (true = not wrong); repeats and later cards are not counted.
   const first = useRef(new Map<number, boolean>());
-  const repeated = useRef(new Set<number>());
+  // Words that already got their extra card in this practice (one per word).
+  const extraGiven = useRef(new Set<number>());
 
   useEffect(() => {
     // Guarded by a ref: StrictMode mounts twice and the queue must be built once.
@@ -70,15 +72,15 @@ function Practice({ onContinue }: { onContinue: () => void }) {
     else setIndex(from + 1);
   };
 
-  const onResult = async (pc: PracticeCard, result: ReviewResult, text: string, recorded: boolean) => {
+  const onResult = async (pc: PracticeCard, at: number, result: ReviewResult, text: string, recorded: boolean) => {
     if (!recorded) await recordAnswer(deps, { wordId: pc.wordId, cardType: pc.card.type, exerciseId: pc.card.exercise?.id ?? null, result, text });
     if (!first.current.has(pc.wordId)) first.current.set(pc.wordId, result !== 'wrong');
-    if (result === 'wrong' && !repeated.current.has(pc.wordId)) {
-      repeated.current.add(pc.wordId);
+    if (result === 'wrong' && !extraGiven.current.has(pc.wordId)) {
+      extraGiven.current.add(pc.wordId);
       const views = await loadWordViews(deps.db);
       const view = views.find((v) => v.word.id === pc.wordId);
-      const again = view ? extraCardFor(view, pc.card.type, views.map((v) => v.word), deps.rand ?? Math.random) : null;
-      if (again) setCards((cur) => (cur ? [...cur, { ...again, round: pc.round + 1 }] : cur));
+      const extra = view ? extraCardFor(view, pc.card.type, views.map((v) => v.word), deps.rand ?? Math.random) : null;
+      if (extra) setCards((cur) => (cur ? insertExtra(cur, at, extra) : cur));
     }
   };
 
@@ -87,8 +89,15 @@ function Practice({ onContinue }: { onContinue: () => void }) {
       const views = await loadWordViews(deps.db);
       const view = views.find((v) => v.word.id === pc.wordId);
       const swap = view ? swapForTranslation(view, views.map((v) => v.word), deps.rand ?? Math.random) : null;
-      if (swap && cards) setCards(cards.map((c, i) => (i === at ? { ...swap, round: pc.round } : c)));
-      else if (cards) advance(cards, at);
+      if (!cards) return;
+      if (swap) {
+        setCards(cards.map((c, i) => (i === at ? { ...swap, round: pc.round } : c)));
+        return;
+      }
+      // No translation card: the skipped card is dropped, so the total goes down by one.
+      const rest = cards.filter((_, i) => i !== at);
+      setCards(rest);
+      if (at >= rest.length) void finish();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -134,7 +143,7 @@ function Practice({ onContinue }: { onContinue: () => void }) {
           onResult={async (r, text, recorded) => {
             setPending(true);
             try {
-              await onResult(pc, r, text, recorded);
+              await onResult(pc, index, r, text, recorded);
             } finally {
               setPending(false);
             }

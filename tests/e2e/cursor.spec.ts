@@ -87,12 +87,18 @@ test('pointer cursor: settings with a select list open', async ({ page }) => {
 test('pointer cursor: practice end screen with +10 new words', async ({ page }) => {
   await page.goto('/?state=words-limit#/words');
   await page.getByRole('button', { name: '+10 новых слов' }).click();
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 30; i++) {
     const card = page.locator('[data-card-type]');
     await card.waitFor();
+    const type = await card.getAttribute('data-card-type');
     const correct = LIMIT_WORD_ANSWERS[(await card.locator('p.reading').first().innerText()).trim()];
     expect(correct).toBeDefined();
-    await card.getByRole('button', { name: correct!, exact: true }).click();
+    if (type === 'choice') {
+      await card.getByRole('button', { name: correct!, exact: true }).click();
+    } else {
+      await card.getByRole('textbox').fill(correct!);
+      await card.getByRole('button', { name: 'Проверить' }).click();
+    }
     await page.getByRole('button', { name: 'Дальше' }).click();
   }
   await expect(page.getByTestId('practice-end').getByRole('button', { name: '+10 новых слов' })).toBeVisible();

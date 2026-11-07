@@ -488,7 +488,7 @@ export const en = {
   'words.up': 'Moved up',
   'words.down': 'Moved down',
   'words.back': 'Back to words',
-  'words.more': 'Continue · 20 more',
+  'words.more': 'Continue · 10 more words',
   'words.allDone': 'All done for today. Next review: {date}',
   'words.allDoneNoNext': 'All done for today.',
   'words.todayLink': 'Words: {n} to practise → Practise',

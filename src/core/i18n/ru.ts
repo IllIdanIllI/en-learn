@@ -490,7 +490,7 @@ export const ru: Record<keyof typeof en, string> = {
   'words.up': 'Повысились',
   'words.down': 'Понизились',
   'words.back': 'К словам',
-  'words.more': 'Продолжить · ещё 20',
+  'words.more': 'Продолжить · ещё 10 слов',
   'words.allDone': 'На сегодня всё. Следующее повторение: {date}',
   'words.allDoneNoNext': 'На сегодня всё.',
   'words.todayLink': 'Слова: {n} к практике → Практика',

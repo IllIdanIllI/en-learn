@@ -21,8 +21,9 @@ export interface PreviewWord {
 
 /**
  * Seven ready words (stages 4, 3, 3, 2, 1, 1 and one never reviewed); all but the never-reviewed one are due on TUESDAY.
- * With the seeded random of buildPreview the first practice shows confusable, translation, use, gap_hint, confusable, anagram, choice:
- * review dates and order set that sequence, so changing them changes which card types words.spec.ts meets.
+ * The first practice has 14 cards; the first card is ephemeral's choice card, its anagram and gap_hint cards come later.
+ * The seeded random of buildPreview picks the other card types (resilient's card is a use card) and review dates and stages
+ * set the order, so changing them changes which card types words.spec.ts meets.
  */
 export const PREVIEW_WORDS: PreviewWord[] = [
   {
@@ -137,8 +138,10 @@ const limitWord = (word: string, i: number, reviewed: boolean): PreviewWord => (
  */
 export const LIMIT_WORDS: PreviewWord[] = LIMIT_NAMES.map((w, i) => limitWord(w, i, i < 10));
 
-/** Like PREVIEW_WORD_ANSWERS, for the cards of LIMIT_WORDS. */
-export const LIMIT_WORD_ANSWERS: Record<string, string> = Object.fromEntries(LIMIT_WORDS.map((w) => [w.definition, w.word]));
+/** Like PREVIEW_WORD_ANSWERS, for the cards of LIMIT_WORDS: the definition (choice, anagram) and the gap sentences (gap_hint). */
+export const LIMIT_WORD_ANSWERS: Record<string, string> = Object.fromEntries(
+  LIMIT_WORDS.flatMap((w) => [[w.definition, w.word], ...w.gaps.map((g) => [g, w.word])]),
+);
 
 export function exercisesOf(w: PreviewWord): Omit<WordExercise, 'id' | 'wordId'>[] {
   const ex = (type: WordExercise['type'], prompt: string, answers: string[], more: Partial<WordExercise> = {}) => ({

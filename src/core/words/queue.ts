@@ -38,25 +38,6 @@ export const EXERCISE_OF: Partial<Record<CardType, ExerciseType>> = {
   translation: 'translation',
 };
 
-export function pickCard(i: {
-  stage: Stage;
-  firstCard: boolean;
-  exercises: WordExercise[];
-  lastUsed: Map<number, string>;
-  only?: CardType[];
-  rand: () => number;
-}): Card | null {
-  const candidates = availableTypes(i.stage, i.firstCard, i.exercises).filter((t) => !i.only || i.only.includes(t));
-  if (candidates.length === 0) return null;
-  const type = candidates[Math.floor(i.rand() * candidates.length)];
-  if (!type) return null;
-
-  const exerciseType = EXERCISE_OF[type];
-  if (!exerciseType) return { type, exercise: null };
-
-  return { type, exercise: pickExercise(i.exercises.filter((e) => e.type === exerciseType), i.lastUsed) };
-}
-
 // Never-used item with the lowest id first, else the least recently used (ties by id).
 export function pickExercise(pool: WordExercise[], lastUsed: Map<number, string>): WordExercise | null {
   const never = pool.filter((e) => !lastUsed.has(e.id)).sort((a, b) => a.id - b.id);

@@ -14,6 +14,7 @@ A new chat starts here: read this file, then `s1-decisions.md` (decisions and op
 - Words (2026-11-04):
   - Built: a Words page (import of an Obsidian paste, adding by hand, LLM-generated exercises in batches of 5, FSRS practice with the card types choice, anagram, gap hint, gap, collocation, form, confusable, translation and "use it" checked by the `word_check` call); "use it" errors go to the error bank (label Слова/Words); the opener plugin opens dictionary links (https only).
   - Docs: spec `specs/2026-11-04-words-design.md`, plan `plans/2026-11-04-words.md`, decisions in `s1-decisions.md` ("Words (2026-11-04)", D10 superseded), evals suite `words` (`evals/README.md`), Mac checks `../macos-checklist.md` S.
+  - Several cards per word (2026-11-07): spec `specs/2026-11-07-words-multi-card-design.md`, plan `plans/2026-11-07-words-multi-card.md` (replaces the one-repeat rule of V8).
   - Preview states: `words` and `words-done`.
   - Checks at the final commit: typecheck and lint clean, Vitest 827. Playwright words and cursor specs passed in Task 11 (not re-run in Task 12). `screenshots.spec.ts` has flaky environmental failures in this container (sql.js wasm / HMR) that also occur on the pre-feature baseline; `csp.spec.ts` is the known failure.
   - Open: Mac checks (an opener link opens, `cargo check` with the new plugin); the learner tries the Words page; the `words` eval has not been run (billed); rule-source links in RuleBody could use the opener.

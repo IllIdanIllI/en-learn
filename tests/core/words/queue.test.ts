@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { availableTypes, canAddNew, extraNewFor, pickCard, practiceQueue, type QueueWord } from '@/core/words/queue';
+import { availableTypes, canAddNew, extraNewFor, pickExercise, practiceQueue, type QueueWord } from '@/core/words/queue';
 import type { WordState } from '@/core/words/progress';
 import type { Word, WordExercise, ExerciseType } from '@/core/words/types';
 
@@ -64,29 +64,10 @@ describe('availableTypes', () => {
   });
 });
 
-describe('pickCard', () => {
-  test('first card returns a choice card without an exercise', () => {
-    const card = pickCard({ stage: 1, firstCard: true, exercises: [exercise(1, 'gap')], lastUsed: new Map(), rand: () => 0 });
-    expect(card).toEqual({ type: 'choice', exercise: null });
-  });
-
-  test('anagram and use cards have no exercise', () => {
-    const anagram = pickCard({ stage: 1, firstCard: false, exercises: [], lastUsed: new Map(), rand: () => 0 });
-    expect(anagram).toEqual({ type: 'anagram', exercise: null });
-    const use = pickCard({ stage: 3, firstCard: false, exercises: [], lastUsed: new Map(), only: ['use'], rand: () => 0 });
-    expect(use).toEqual({ type: 'use', exercise: null });
-  });
-
-  test('gap_hint at stage 1 uses a gap exercise', () => {
-    const gap = exercise(5, 'gap');
-    const card = pickCard({ stage: 1, firstCard: false, exercises: [gap], lastUsed: new Map(), only: ['gap_hint'], rand: () => 0 });
-    expect(card).toEqual({ type: 'gap_hint', exercise: gap });
-  });
-
-  test('prefers the never-used, then the least recently used exercise of the chosen type', () => {
-    const exercises = [exercise(1, 'gap'), exercise(2, 'gap'), exercise(3, 'gap'), exercise(4, 'form')];
-    const pick = (lastUsed: Map<number, string>) =>
-      pickCard({ stage: 2, firstCard: false, exercises, lastUsed, only: ['gap'], rand: () => 0 })?.exercise?.id;
+describe('pickExercise', () => {
+  test('prefers the never-used, then the least recently used exercise', () => {
+    const exercises = [exercise(1, 'gap'), exercise(2, 'gap'), exercise(3, 'gap')];
+    const pick = (lastUsed: Map<number, string>) => pickExercise(exercises, lastUsed)?.id;
 
     expect(pick(new Map([[1, '2026-11-01T10:00:00Z'], [2, '2026-11-02T10:00:00Z']]))).toBe(3);
     expect(
@@ -102,31 +83,11 @@ describe('pickCard', () => {
 
   test('among several never-used exercises the lowest id comes first', () => {
     const exercises = [exercise(7, 'form'), exercise(3, 'form'), exercise(5, 'form')];
-    const card = pickCard({ stage: 2, firstCard: false, exercises, lastUsed: new Map(), only: ['form'], rand: () => 0.9 });
-    expect(card?.exercise?.id).toBe(3);
+    expect(pickExercise(exercises, new Map())?.id).toBe(3);
   });
 
-  test('picks the card type uniformly with rand', () => {
-    const exercises = [exercise(1, 'translation')];
-    const low = pickCard({ stage: 3, firstCard: false, exercises, lastUsed: new Map(), rand: () => 0 });
-    const high = pickCard({ stage: 3, firstCard: false, exercises, lastUsed: new Map(), rand: () => 0.99 });
-    expect(low?.type).toBe('translation');
-    expect(high?.type).toBe('use');
-  });
-
-  test('only translation returns a translation card, also for a Learned word', () => {
-    const t = exercise(9, 'translation');
-    const card = pickCard({ stage: 4, firstCard: false, exercises: [t], lastUsed: new Map(), only: ['translation'], rand: () => 0 });
-    expect(card).toEqual({ type: 'translation', exercise: t });
-  });
-
-  test('only translation returns null when the word has no translation exercise', () => {
-    const card = pickCard({ stage: 4, firstCard: false, exercises: [exercise(1, 'gap')], lastUsed: new Map(), only: ['translation'], rand: () => 0 });
-    expect(card).toBeNull();
-  });
-
-  test('returns null when no candidate type remains', () => {
-    expect(pickCard({ stage: 2, firstCard: false, exercises: [], lastUsed: new Map(), rand: () => 0 })).toBeNull();
+  test('returns null for an empty pool', () => {
+    expect(pickExercise([], new Map())).toBeNull();
   });
 });
 

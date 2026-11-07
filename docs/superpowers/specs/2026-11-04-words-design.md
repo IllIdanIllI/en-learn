@@ -85,6 +85,7 @@ S2's vocabulary part: a word store, import from Obsidian, generated exercises, a
 ## V8. Practice
 - **Size:** 20 cards. At the end: "Продолжить · ещё 20" / "Continue · 20 more" if more cards are available.
 - **Queue:** due words first (FSRS due ≤ today, the most overdue first), then new words (never reviewed, oldest `added` first) up to **10 new words per day**. A word appears at most once in the 20, except for one repeat: a word answered wrong comes back once at the end of the same practice. The repeat is recorded but not counted (V5).
+- Replaced by `2026-11-07-words-multi-card-design.md`.
 - **One card at a time:** ↵ checks, and ↵ again goes to the next card.
 - **Feedback** after each card: ✓ / ✗ with the learner's answer, the word, the translation, the definition, the example and the link (opens in the browser), plus the `wordNote` and errors for "use it".
 - **Header:** "7 / 20" and a ghost "Закончить" / "End".

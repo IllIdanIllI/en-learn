@@ -30,7 +30,7 @@ The plan of each word is fixed when the practice starts, from its stage at that 
 ## M3. Order: rounds
 - Round 1 holds the first card of every word, round 2 the second cards, and so on.
 - Within a round, words with more cards come first (new, then in progress, then learned); equal counts keep the queue order (due first). This keeps a word's cards apart across round borders.
-- An extra card after a mistake goes to the end of the next round (a new round when the mistake was in the last one); if that would put it right after a card of the same word, it goes one place earlier.
+- An extra card after a mistake goes to the end of the next round (a new round when the mistake was in the last one); if that would put it next to a card of the same word, it goes one place earlier.
 - So a word's cards never come one after another, except when it is the only word left with cards.
 
 ## M4. Counting (unchanged)

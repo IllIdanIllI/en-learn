@@ -29,7 +29,7 @@ export function availableTypes(stage: Stage, firstCard: boolean, exercises: Word
   return [...stage2, ...stage3];
 }
 
-const EXERCISE_OF: Partial<Record<CardType, ExerciseType>> = {
+export const EXERCISE_OF: Partial<Record<CardType, ExerciseType>> = {
   gap_hint: 'gap',
   gap: 'gap',
   collocation: 'collocation',
@@ -54,14 +54,18 @@ export function pickCard(i: {
   const exerciseType = EXERCISE_OF[type];
   if (!exerciseType) return { type, exercise: null };
 
-  const pool = i.exercises.filter((e) => e.type === exerciseType);
-  const never = pool.filter((e) => !i.lastUsed.has(e.id)).sort((a, b) => a.id - b.id);
+  return { type, exercise: pickExercise(i.exercises.filter((e) => e.type === exerciseType), i.lastUsed) };
+}
+
+// Never-used item with the lowest id first, else the least recently used (ties by id).
+export function pickExercise(pool: WordExercise[], lastUsed: Map<number, string>): WordExercise | null {
+  const never = pool.filter((e) => !lastUsed.has(e.id)).sort((a, b) => a.id - b.id);
   const first = never[0];
-  if (first) return { type, exercise: first };
+  if (first) return first;
   const oldest = [...pool].sort(
-    (a, b) => Date.parse(i.lastUsed.get(a.id) ?? '') - Date.parse(i.lastUsed.get(b.id) ?? '') || a.id - b.id,
+    (a, b) => Date.parse(lastUsed.get(a.id) ?? '') - Date.parse(lastUsed.get(b.id) ?? '') || a.id - b.id,
   )[0];
-  return { type, exercise: oldest ?? null };
+  return oldest ?? null;
 }
 
 export interface QueueWord {

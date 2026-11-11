@@ -135,9 +135,14 @@ export function insertExtra<T extends { wordId: number; round: number }>(
   const end = cards.reduce((found, c, j) => (c.round === round ? j : found), -1);
   if (end < 0) return [...cards, { ...extra, round } as T];
 
+  // Slots inside the round, from just after its last card back to its first: the first one with no card of the extra's word beside it.
+  const start = cards.findIndex((c) => c.round === round);
   let pos = end + 1;
-  const sameWordNext = cards[end]?.wordId === extra.wordId || cards[pos]?.wordId === extra.wordId;
-  const roundHoldsOther = cards.some((c) => c.round === round && c.wordId !== extra.wordId);
-  if (sameWordNext && roundHoldsOther) pos = end;
+  for (let p = end + 1; p >= start; p--) {
+    if (cards[p - 1]?.wordId !== extra.wordId && cards[p]?.wordId !== extra.wordId) {
+      pos = p;
+      break;
+    }
+  }
   return [...cards.slice(0, pos), { ...extra, round } as T, ...cards.slice(pos)];
 }

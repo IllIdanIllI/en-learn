@@ -255,6 +255,13 @@ describe('insertExtra', () => {
     expect(out.map((c) => c.round)).toEqual([1, 1, 1, 2, 2, 2, 2, 3]);
   });
 
+  test('when the target round ends with the same word, the extra goes before that card, next to none of its word', () => {
+    const cards = [card(1, 'g1', 1), card(2, 'a1', 1), card(3, 'b1', 1), card(2, 'a2', 2), card(3, 'b2', 2), card(1, 'g2', 2)];
+    const out = insertExtra(cards, 0, { wordId: 1, name: 'gX' });
+    expect(names(out)).toEqual(['g1', 'a1', 'b1', 'a2', 'gX', 'b2', 'g2']);
+    expect(out.map((c) => c.round)).toEqual([1, 1, 1, 2, 2, 2, 2]);
+  });
+
   test('when the target round holds only the same word, it stays at the end of that round', () => {
     const cards = [card(1, 'g1', 1), card(2, 'a1', 1), card(1, 'g2', 2)];
     const out = insertExtra(cards, 0, { wordId: 1, name: 'gX' });

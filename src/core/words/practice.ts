@@ -87,12 +87,6 @@ export function extraCardFor(
   return card ? toPracticeCard(view, card, all, rand) : null;
 }
 
-// The translation card that replaces a card the learner skips; null when the word has no translation exercise.
-export function swapForTranslation(view: WordView, all: Word[], rand: () => number): Omit<PracticeCard, 'round'> | null {
-  const card = cardOfType('translation', view.exercises, lastUsedOf(view));
-  return card ? toPracticeCard(view, card, all, rand) : null;
-}
-
 export async function buildPractice(deps: Deps, extraNew = 0): Promise<PracticeCard[]> {
   const rand = deps.rand ?? Math.random;
   const views = await loadWordViews(deps.db);

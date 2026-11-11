@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { LIMIT_WORD_ANSWERS } from '../../src/adapters/preview/wordsSeed';
+import { tapTiles } from './helpers';
 
 // Learner's rule (CLAUDE.md): every interactive element shows the pointer cursor; disabled ones show `not-allowed`.
 // Each page is opened in a few preview states; open panels and expandable rows are opened too, then every interactive element is checked.
@@ -56,6 +57,28 @@ for (const [state, route] of CASES) {
   });
 }
 
+test('pointer cursor: anagram tiles, a placed letter and Skip', async ({ page }) => {
+  await page.goto('/?state=words-limit#/words');
+  await page.getByRole('button', { name: '+10 новых слов' }).click();
+  const card = page.locator('[data-card-type]');
+  await card.waitFor();
+  // Each new word starts with its choice card; the anagram cards come after the ten choice cards.
+  for (let i = 0; i < 30 && (await card.getAttribute('data-card-type')) !== 'anagram'; i++) {
+    const correct = LIMIT_WORD_ANSWERS[(await card.locator('p.reading').first().innerText()).trim()];
+    await card.getByRole('button', { name: correct!, exact: true }).click();
+    await page.getByRole('button', { name: 'Дальше' }).click();
+    await card.waitFor();
+  }
+  expect(await card.getAttribute('data-card-type')).toBe('anagram');
+  const cursor = (locator: ReturnType<typeof card.locator>) => locator.evaluate((el) => getComputedStyle(el).cursor);
+  await card.getByTestId('tile').first().click();
+  await expect(card.getByTestId('placed')).toHaveCount(1);
+  expect(await cursor(card.getByTestId('tile').first())).toBe('not-allowed');
+  expect(await cursor(card.getByTestId('placed').first())).toBe('pointer');
+  expect(await cursor(card.getByRole('button', { name: 'Пропустить' }))).toBe('pointer');
+  expect(await wrongCursors(page)).toEqual([]);
+});
+
 test('field titles (label[for]) keep the default cursor', async ({ page }) => {
   await page.goto('/?state=words#/words/1');
   await page.locator('label[for]').first().waitFor();
@@ -95,6 +118,9 @@ test('pointer cursor: practice end screen with +10 new words', async ({ page }) 
     expect(correct).toBeDefined();
     if (type === 'choice') {
       await card.getByRole('button', { name: correct!, exact: true }).click();
+    } else if (type === 'anagram') {
+      await tapTiles(card, correct!);
+      await card.getByRole('button', { name: 'Проверить' }).click();
     } else {
       await card.getByRole('textbox').fill(correct!);
       await card.getByRole('button', { name: 'Проверить' }).click();

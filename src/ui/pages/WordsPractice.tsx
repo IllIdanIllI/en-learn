@@ -5,7 +5,7 @@ import { t } from '@/core/i18n';
 import { insertExtra } from '@/core/words/plan';
 import { extraNewFor } from '@/core/words/queue';
 import {
-  addExtraNew, buildPractice, extraCardFor, loadWordViews, recordAnswer, stageChanges, swapForTranslation, wordsOverview,
+  addExtraNew, buildPractice, extraCardFor, loadWordViews, recordAnswer, stageChanges, wordsOverview,
   type PracticeCard,
 } from '@/core/words/practice';
 import type { ReviewResult, Stage } from '@/core/words/types';
@@ -88,29 +88,6 @@ function Practice({ onContinue }: { onContinue: () => void }) {
     }
   };
 
-  const skip = async (pc: PracticeCard, at: number) => {
-    try {
-      const views = await loadWordViews(deps.db);
-      const view = views.find((v) => v.word.id === pc.wordId);
-      const swap = view ? swapForTranslation(view, views.map((v) => v.word), deps.rand ?? Math.random) : null;
-      if (!cards) return;
-      if (swap) {
-        setCards(cards.map((c, i) => (i === at ? { ...swap, round: pc.round } : c)));
-        return;
-      }
-      // No translation card: the skipped card is dropped, so the total goes down by one.
-      const rest = cards.filter((_, i) => i !== at);
-      // The last card went: finish without replacing the cards first, so no blank frame shows before the end screen.
-      if (at >= rest.length) {
-        void finish();
-        return;
-      }
-      setCards(rest);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
-
   if (error !== null) return <Notice className="mt-6">{t(lang, 'words.loadError', { message: error })}</Notice>;
   if (ended) {
     return (
@@ -157,7 +134,6 @@ function Practice({ onContinue }: { onContinue: () => void }) {
             }
           }}
           onNext={() => advance(cards, index)}
-          onSkip={() => void skip(pc, index)}
         />
       </div>
     </>

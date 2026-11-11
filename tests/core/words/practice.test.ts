@@ -5,7 +5,7 @@ import { FakeLlm } from '@/adapters/test/fakeLlm';
 import { bundledPrompts } from '@/core/llm/bundledPrompts';
 import { insertReview, insertWord, listReviews, listWordErrors, replaceExercises, setGeneration } from '@/core/db/repos/words';
 import {
-  addExtraNew, buildPractice, checkUseIt, extraCardFor, loadWordViews, recordAnswer, stageChanges, swapForTranslation, wordsOverview,
+  addExtraNew, buildPractice, checkUseIt, extraCardFor, loadWordViews, recordAnswer, stageChanges, wordsOverview,
 } from '@/core/words/practice';
 import { getSettings } from '@/core/db/repos/settings';
 import { extraNewFor } from '@/core/words/queue';
@@ -135,7 +135,7 @@ describe('buildPractice', () => {
   });
 });
 
-describe('extraCardFor and swapForTranslation', () => {
+describe('extraCardFor', () => {
   const viewOf = async (deps: Deps, id: number) => {
     const views = await loadWordViews(deps.db);
     return { views, view: views.find((v) => v.word.id === id)! };
@@ -175,20 +175,6 @@ describe('extraCardFor and swapForTranslation', () => {
     // Without the queued card g2 the never-used g2 would come first.
     expect(extraCardFor(after.view, 'gap', all, () => 0.5)?.card.exercise?.id).toBe(g2);
     expect(extraCardFor(after.view, 'gap', all, () => 0.5, [g2])?.card.exercise?.id).toBe(g3);
-  });
-
-  test('swapForTranslation is null without translation exercises', async () => {
-    const deps = await setup();
-    const id = await addReady(deps, 'alpha', '2026-10-01', [ex('gap', { answers: ['x'] })]);
-    const { views, view } = await viewOf(deps, id);
-    expect(swapForTranslation(view, views.map((v) => v.word), () => 0.5)).toBeNull();
-  });
-
-  test('swapForTranslation gives a translation card when the word has one', async () => {
-    const deps = await setup();
-    const id = await addReady(deps, 'alpha', '2026-10-01', [ex('translation', { translation: 't', answers: ['z'] })]);
-    const { views, view } = await viewOf(deps, id);
-    expect(swapForTranslation(view, views.map((v) => v.word), () => 0.5)?.card.type).toBe('translation');
   });
 });
 

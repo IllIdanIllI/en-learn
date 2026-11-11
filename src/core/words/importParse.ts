@@ -1,4 +1,5 @@
 import type { WordFields } from './types';
+import { cleanWordName } from './name';
 
 export interface ParsedCard {
   index: number; // 1-based, in paste order
@@ -84,7 +85,7 @@ export function parseObsidian(text: string): { cards: ParsedCard[]; problems: Pa
 
   for (const block of splitBlocks(text)) {
     const field = readFields(block.lines);
-    const word = field.get('Word') ?? '';
+    const word = cleanWordName(field.get('Word') ?? '');
     if (!word) {
       problems.push({ index: block.index, reason: 'no_word' });
       continue;

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useEffect, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { generateWords } from '@/core/words/generate';
+import { fixSavedWordNames } from '@/core/words/name';
 import { useCore } from '@/ui/app/CoreProvider';
 import type { GenError } from '@/ui/today/StartSession';
 
@@ -37,6 +38,7 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
   const queue = useRef<number[]>([]);
   const looping = useRef(false);
   const current = useRef<number[]>([]);
+  const started = useRef(false);
 
   const loop = useCallback(async () => {
     looping.current = true;
@@ -86,6 +88,24 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
   const clearNotices = useCallback(() => {
     setBusy(false);
     setError(null);
+  }, []);
+
+  const runRef = useRef(run);
+  useEffect(() => {
+    runRef.current = run;
+  }, [run]);
+  // Saved words with a bracketed tail are renamed once, then regenerated; StrictMode's second mount sees the ref set.
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    void (async () => {
+      try {
+        const ids = await fixSavedWordNames(depsRef.current.db);
+        if (ids.length > 0) runRef.current(ids);
+      } catch (e) {
+        setError({ message: e instanceof Error ? e.message : String(e) });
+      }
+    })();
   }, []);
 
   const value = useMemo(

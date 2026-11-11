@@ -73,6 +73,26 @@ describe('parseObsidian', () => {
   });
 });
 
+describe('bracketed tail on the Word field', () => {
+  test('incentive (for) parses as incentive', () => {
+    const { cards } = parseObsidian('### a stimulus\n**Word:** incentive (for)\n');
+    expect(cards[0]?.fields.word).toBe('incentive');
+  });
+
+  test('a Word field that is only a bracket is a card with no word', () => {
+    const { cards, problems } = parseObsidian('### x\n**Word:** (for)\n');
+    expect(cards).toEqual([]);
+    expect(problems).toEqual([{ index: 1, reason: 'no_word' }]);
+  });
+
+  test('incentive (for) is a duplicate when incentive is stored', () => {
+    const parsed = parseObsidian('### a stimulus\n**Word:** incentive (for)\n');
+    const { toImport, duplicates } = importPreview(parsed, ['incentive']);
+    expect(toImport).toEqual([]);
+    expect(duplicates).toBe(1);
+  });
+});
+
 describe('importPreview', () => {
   const twoCards = parseObsidian(
     '### one\n**Word:** Alpha\n### two\n**Word:** beta\n### three\n**Word:** ALPHA\n### four\n**Word:** gamma\n',

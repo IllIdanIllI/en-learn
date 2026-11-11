@@ -143,6 +143,15 @@ test.describe('words page', () => {
     await expect(page.getByText('1 / 20')).toBeVisible();
   });
 
+  test('an imported card with a bracketed tail is saved as the bare word', async ({ page }) => {
+    await page.goto('/?state=words#/words');
+    await page.getByRole('button', { name: 'Импорт' }).click();
+    await page.getByLabel('Вставьте карточки из Obsidian').fill('### a stimulus\n**Word:** incentive (for)\n');
+    await page.getByRole('button', { name: /^Импортировать/ }).click();
+    await expect(row(page, 'incentive')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'incentive (for)', exact: true })).toHaveCount(0);
+  });
+
   test('add a word; a duplicate is refused', async ({ page }) => {
     await page.goto('/?state=words#/words');
     await page.getByRole('button', { name: 'Добавить слово' }).click();

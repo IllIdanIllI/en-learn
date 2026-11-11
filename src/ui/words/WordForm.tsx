@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { t } from '@/core/i18n';
 import { DuplicateWord, insertWord, updateWord } from '@/core/db/repos/words';
+import { cleanWordName } from '@/core/words/name';
 import { isHttpsLink } from '@/core/words/link';
 import type { Word, WordFields } from '@/core/words/types';
 import { useCore } from '@/ui/app/CoreProvider';
@@ -30,7 +31,7 @@ export function WordForm({ word, onSaved, onCancel }: { word?: Word; onSaved: ()
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    const name = text.trim();
+    const name = cleanWordName(text);
     if (name === '' || saving) return;
     const fields: WordFields = {
       word: name,
@@ -111,7 +112,7 @@ export function WordForm({ word, onSaved, onCancel }: { word?: Word; onSaved: ()
       {word && field('added', t(lang, 'words.field.added'), added, setAdded, { type: 'date' })}
       {error !== null && <Notice className="sm:col-span-2">{t(lang, 'words.saveError', { message: error })}</Notice>}
       <div className="flex gap-2 sm:col-span-2">
-        <Button type="submit" disabled={text.trim() === '' || saving}>{t(lang, 'words.save')}</Button>
+        <Button type="submit" disabled={cleanWordName(text) === '' || saving}>{t(lang, 'words.save')}</Button>
         {onCancel && <Button type="button" variant="ghost" onClick={onCancel}>{t(lang, 'words.cancel')}</Button>}
       </div>
     </form>

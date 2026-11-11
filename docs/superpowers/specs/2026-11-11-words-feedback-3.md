@@ -13,7 +13,7 @@ Agreed with the learner in chat on 2026-11-11 after trying several cards per wor
 - A typed answer (and the tile answer) is "Almost" when it is one edit away from an accepted answer, where an edit is one wrong letter, one missing or extra letter, **or two neighbouring letters swapped** ("recieve" for "receive"). Rules of V6 otherwise unchanged (one retry, a correct retry rates Hard).
 
 ## H3. One Skip on every card
-- Every card shows one "Пропустить" / "Skip" button (ghost) while unanswered. It counts as **wrong**: the review is recorded with result `wrong` and empty text, the word gets its extra card (M1, once per practice), and the feedback shows the right answer (the word, or the accepted answers of the exercise) with the word details as after a wrong answer, then "Дальше" / "Next".
+- Every card shows one "Пропустить" / "Skip" button (ghost) while unanswered. It counts as **wrong**: the review is recorded with result `wrong` and empty text, the word gets its extra card (M1, once per practice), and the feedback shows the right answer (the word, plus "Правильный ответ" / "Right answer" with the accepted answers for exercise cards) with the word details as after a wrong answer, then "Дальше" / "Next".
 - On "use it" there is no single answer: the feedback shows the word's example sentence (or the definition when the example is empty).
 - The old "use it" Skip (swap to a translation card, nothing recorded) is removed, with `swapForTranslation` and its tests.
 - Skip is disabled (`not-allowed`) while a check is running.

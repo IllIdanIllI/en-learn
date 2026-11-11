@@ -56,72 +56,73 @@ export function planCards(i: {
   return type ? plan([type]) : [];
 }
 
-type Pos = [round: number, index: number];
+type Ends = { first: number; last: number };
 
-// The card before and after a position, looking across the borders of neighbouring rounds.
-function clashesAt<T extends { wordId: number }>(rounds: T[][], [k, i]: Pos): boolean {
-  const cur = rounds[k] ?? [];
-  const card = cur[i];
-  if (!card) return false;
-  const before = i > 0 ? cur[i - 1] : (rounds[k - 1] ?? []).at(-1);
-  const after = i < cur.length - 1 ? cur[i + 1] : rounds[k + 1]?.[0];
-  return before?.wordId === card.wordId || after?.wordId === card.wordId;
-}
-
-// Swaps two cards when neither ends up back to back with its word; otherwise leaves the rounds as they were.
-function swapIfClean<T extends { wordId: number }>(rounds: T[][], p: Pos, q: Pos): boolean {
-  const a = rounds[p[0]]?.[p[1]];
-  const b = rounds[q[0]]?.[q[1]];
-  if (!a || !b) return false;
-  rounds[p[0]]![p[1]] = b;
-  rounds[q[0]]![q[1]] = a;
-  if (!clashesAt(rounds, p) && !clashesAt(rounds, q)) return true;
-  rounds[p[0]]![p[1]] = a;
-  rounds[q[0]]![q[1]] = b;
-  return false;
-}
-
-// When round k starts with the word that ended round k-1, moves that word's card off the front of round k,
-// or, when round k holds only that word, pulls the last card of round k-1 back to an earlier card of another word.
-function breakBackToBack<T extends { wordId: number }>(rounds: T[][], k: number): void {
-  const prev = rounds[k - 1] ?? [];
-  const cur = rounds[k] ?? [];
-  const first = cur[0];
-  if (!first || prev.at(-1)?.wordId !== first.wordId) return;
-  for (let j = 1; j < cur.length; j++) {
-    if (cur[j]?.wordId !== first.wordId && swapIfClean(rounds, [k, 0], [k, j])) return;
+// Candidate first and last cards of a round, most preferred first (the shuffled ends before any change).
+function endOptions(n: number): Ends[] {
+  if (n === 1) return [{ first: 0, last: 0 }];
+  const out: Ends[] = [];
+  for (let first = 0; first < n; first++) {
+    for (let last = n - 1; last >= 0; last--) if (first !== last) out.push({ first, last });
   }
-  for (let c = prev.length - 2; c >= 0; c--) {
-    if (prev[c]?.wordId !== first.wordId && swapIfClean(rounds, [k - 1, c], [k - 1, prev.length - 1])) return;
-  }
+  return out;
 }
 
-// The local swaps cannot always clear a border (a swap can land a word next to its twin on the far side),
-// so a border that still clashes is retried with a fresh shuffle a few times.
-const SHUFFLE_ATTEMPTS = 20;
+// Picks each round's first and last card so that no round starts with the word that ended the round before,
+// and no round ends with the word that starts the round after. Layer k is keyed by the word of round k's last card.
+// A layer with no valid choice (the border is between one word and itself) keeps the shuffled ends.
+function chooseEnds<T extends { wordId: number }>(rounds: T[][]): Ends[] {
+  type Entry = { ends: Ends; prev: number | null };
+  const layers: Map<number, Entry>[] = [];
+  let prevKeys: (number | null)[] = [null];
+  rounds.forEach((cards) => {
+    const layer = new Map<number, Entry>();
+    for (const ends of endOptions(cards.length)) {
+      const first = cards[ends.first]?.wordId;
+      const last = cards[ends.last]?.wordId;
+      if (first === undefined || last === undefined || layer.has(last)) continue;
+      const prev = prevKeys.find((pk) => pk === null || pk !== first);
+      if (prev !== undefined) layer.set(last, { ends, prev });
+    }
+    if (layer.size === 0) {
+      for (const ends of endOptions(cards.length)) {
+        const last = cards[ends.last]?.wordId;
+        if (last !== undefined && !layer.has(last)) layer.set(last, { ends, prev: prevKeys[0] ?? null });
+      }
+    }
+    layers.push(layer);
+    prevKeys = [...layer.keys()];
+  });
 
-function shuffledRounds<T extends { wordId: number }>(plans: T[][], rand: () => number): T[][] {
+  const ends = rounds.map((cards) => ({ first: 0, last: cards.length - 1 }));
+  let key: number | null = [...(layers[layers.length - 1]?.keys() ?? [])][0] ?? null;
+  for (let k = layers.length - 1; k >= 0; k--) {
+    const entry = key === null ? undefined : layers[k]?.get(key);
+    if (entry) ends[k] = entry.ends;
+    key = entry?.prev ?? null;
+  }
+  return ends;
+}
+
+// The round in the chosen order: first card, the rest in shuffled order, last card.
+function arrange<T>(cards: T[], ends: Ends): T[] {
+  const head = cards[ends.first];
+  const tail = cards[ends.last];
+  if (cards.length === 1 || head === undefined || tail === undefined) return cards;
+  return [head, ...cards.filter((_, i) => i !== ends.first && i !== ends.last), tail];
+}
+
+// Round k holds the k-th card of every word. Each round is shuffled with the practice's random source,
+// then its ends are chosen so that no word's cards sit back to back across a round border.
+export function orderRounds<T extends { wordId: number }>(plans: T[][], rand: () => number): (T & { round: number })[] {
   const longest = Math.max(0, ...plans.map((p) => p.length));
   const rounds: T[][] = [];
   for (let k = 0; k < longest; k++) {
     const cards = plans.map((p) => p[k]).filter((c): c is T => c !== undefined);
     rounds.push(shuffle(cards, rand));
   }
-  for (let k = 1; k < rounds.length; k++) breakBackToBack(rounds, k);
-  return rounds;
-}
-
-function hasBorderClash<T extends { wordId: number }>(rounds: T[][]): boolean {
-  return rounds.some((cur, k) => k > 0 && (rounds[k - 1] ?? []).at(-1)?.wordId === cur[0]?.wordId);
-}
-
-// Round k holds the k-th card of every word, shuffled with the practice's random source.
-export function orderRounds<T extends { wordId: number }>(plans: T[][], rand: () => number): (T & { round: number })[] {
-  let rounds = shuffledRounds(plans, rand);
-  for (let attempt = 1; attempt < SHUFFLE_ATTEMPTS && hasBorderClash(rounds); attempt++) {
-    rounds = shuffledRounds(plans, rand);
-  }
-  return rounds.flatMap((cards, k) => cards.map((c) => ({ ...c, round: k + 1 })));
+  const ends = chooseEnds(rounds);
+  return rounds.flatMap((cards, k) => arrange(cards, ends[k] ?? { first: 0, last: cards.length - 1 }).map((c) => ({ ...c, round: k + 1 })));
 }
 
 // Puts an extra card after a mistake at the end of the next round (a new round after the last one).

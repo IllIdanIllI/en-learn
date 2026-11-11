@@ -109,11 +109,6 @@ describe('planCards', () => {
 
 });
 
-describe('extraType for spell', () => {
-  test('a missed spell card gives a spell card', () => {
-    expect(extraType('spell')).toBe('spell');
-  });
-});
 
 describe('cardOfType', () => {
   test('gap returns a gap card regardless of stage', () => {
@@ -134,6 +129,10 @@ describe('extraType', () => {
   test('a missed choice card gets an anagram, other types stay the same', () => {
     expect(extraType('choice')).toBe('anagram');
     expect(extraType('form')).toBe('form');
+  });
+
+  test('a missed spell card gives a spell card', () => {
+    expect(extraType('spell')).toBe('spell');
   });
 });
 
@@ -199,6 +198,20 @@ describe('orderRounds', () => {
 
   test('no plans: no cards', () => {
     expect(orderRounds([], () => 0.5)).toEqual([]);
+  });
+
+  test('F=[F1,F2,F3], S=[S1,S2]: no two neighbours share a word, for 50 seeds and constant rand', () => {
+    const F = [card(1, 'F1'), card(1, 'F2'), card(1, 'F3')];
+    const S = [card(2, 'S1'), card(2, 'S2')];
+    const sources = [...Array.from({ length: 50 }, (_, i) => mulberry32(i + 1)), () => 0, () => 0.99];
+    for (const rand of sources) {
+      const ordered = orderRounds([F, S], rand);
+      expect(ordered).toHaveLength(5);
+      for (let i = 1; i < ordered.length; i++) {
+        expect(ordered[i]?.wordId).not.toBe(ordered[i - 1]?.wordId);
+      }
+      expect(ordered.filter((c) => c.round === 3).map((c) => c.name)).toEqual(['F3']);
+    }
   });
 });
 

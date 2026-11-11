@@ -360,6 +360,16 @@ test.describe('practice', () => {
     await expect(page.getByText('Верно')).toBeVisible();
   });
 
+  test('anagram keyboard on a Russian layout: the key position places the Latin letter', async ({ page }) => {
+    await openPractice(page);
+    await advanceTo(page, 'anagram');
+    const c = card(page);
+    const letter = PREVIEW_WORD_ANSWERS[await promptOf(page)]![0]!;
+    await page.evaluate((l) => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ф', code: `Key${l.toUpperCase()}` })), letter);
+    await expect(c.getByTestId('placed')).toHaveCount(1);
+    await expect(c.getByTestId('placed')).toHaveText(letter);
+  });
+
   test('Almost, then retry: two neighbouring letters swapped get one more try', async ({ page }) => {
     await openPractice(page);
     await advanceTo(page, 'anagram');

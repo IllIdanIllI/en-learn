@@ -37,6 +37,11 @@ export function checkTyped(answer: string, accepted: string[]): 'correct' | 'alm
   return almost ? 'almost' : 'wrong';
 }
 
+// A spelled word is accepted as written and without spaces, because the letters shown have no spaces.
+export function spellingsOf(word: string): string[] {
+  return [...new Set([word, word.replace(/ /g, '')])];
+}
+
 export function checkTranslation(answer: string, accepted: string[]): boolean {
   const strip = (s: string) => normalise(s).replace(/\s*[.!?]+$/, '');
   const given = strip(answer);

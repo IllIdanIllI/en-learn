@@ -3,7 +3,7 @@ import { createTestDb } from '@/adapters/test/sqliteDb';
 import { FixedClock } from '@/adapters/test/fixedClock';
 import { FakeLlm } from '@/adapters/test/fakeLlm';
 import { bundledPrompts } from '@/core/llm/bundledPrompts';
-import { insertReview, insertWord, listReviews, listWordErrors, replaceExercises, setGeneration } from '@/core/db/repos/words';
+import { insertReview, insertWord, listExercises, listReviews, listWordErrors, replaceExercises, setGeneration } from '@/core/db/repos/words';
 import {
   addExtraNew, buildPractice, checkUseIt, extraCardFor, loadWordViews, recordAnswer, stageChanges, wordsOverview,
 } from '@/core/words/practice';
@@ -46,6 +46,18 @@ describe('recordAnswer', () => {
     expect((await recordAnswer(deps, a)).counted).toBe(true);
     expect((await recordAnswer(deps, a)).counted).toBe(false);
     expect((await listReviews(deps.db)).map((r) => r.counted)).toEqual([true, false]);
+  });
+
+  test('an exercise regenerated away mid-practice: the answer is saved with no exercise', async () => {
+    const deps = await setup();
+    const id = await addReady(deps, 'alpha', '2026-11-01', [ex('gap', { answers: ['x'] })]);
+    const [exercise] = await listExercises(deps.db);
+    await replaceExercises(deps.db, id, []);
+    const { reviewId, counted } = await recordAnswer(deps, {
+      wordId: id, cardType: 'gap', exerciseId: exercise!.id, result: 'correct', text: 'x',
+    });
+    expect(counted).toBe(true);
+    expect(await listReviews(deps.db)).toEqual([expect.objectContaining({ id: reviewId, exerciseId: null, cardType: 'gap', counted: true })]);
   });
 });
 

@@ -29,13 +29,16 @@ describe('fixSavedWordNames', () => {
     expect((await listWords(db)).map((w) => w.word)).toEqual(['incentive']);
   });
 
-  test('keeps the other fields and the generation of the renamed word', async () => {
+  test('keeps the other fields of the renamed word and makes it pending; an unchanged word keeps its generation', async () => {
     const db = await createTestDb();
     const id = await insertWord(db, { ...fields('rely (on)'), definition: 'to depend', synonyms: ['trust'] }, 't');
     await setGeneration(db, id, 'ready');
+    const plainId = await insertWord(db, fields('plain'), 't');
+    await setGeneration(db, plainId, 'ready');
     await fixSavedWordNames(db);
-    const [word] = await listWords(db);
-    expect(word).toMatchObject({ word: 'rely', definition: 'to depend', synonyms: ['trust'], generation: 'ready', added: '2026-11-01' });
+    const words = await listWords(db);
+    expect(words.find((w) => w.id === id)).toMatchObject({ word: 'rely', definition: 'to depend', synonyms: ['trust'], generation: 'pending', added: '2026-11-01' });
+    expect(words.find((w) => w.id === plainId)?.generation).toBe('ready');
   });
 
   test('leaves a word whose cleaned name another saved word has (case-insensitive)', async () => {

@@ -109,7 +109,6 @@ describe('planCards', () => {
 
 });
 
-
 describe('cardOfType', () => {
   test('gap returns a gap card regardless of stage', () => {
     const gap = exercise(5, 'gap');
@@ -211,6 +210,25 @@ describe('orderRounds', () => {
         expect(ordered[i]?.wordId).not.toBe(ordered[i - 1]?.wordId);
       }
       expect(ordered.filter((c) => c.round === 3).map((c) => c.name)).toEqual(['F3']);
+    }
+  });
+
+  test('A=4, B=2, C=1 cards: no neighbours share a word, except in rounds 3 and 4 that hold only A', () => {
+    const A = [card(1, 'a1'), card(1, 'a2'), card(1, 'a3'), card(1, 'a4')];
+    const B = [card(2, 'b1'), card(2, 'b2')];
+    const C = [card(3, 'c1')];
+    const sources = [...Array.from({ length: 50 }, (_, i) => mulberry32(i + 1)), () => 0, () => 0.99];
+    for (const rand of sources) {
+      const ordered = orderRounds([A, B, C], rand);
+      expect(ordered).toHaveLength(7);
+      expect(ordered.filter((c) => c.round === 3).map((c) => c.name)).toEqual(['a3']);
+      expect(ordered.filter((c) => c.round === 4).map((c) => c.name)).toEqual(['a4']);
+      for (let i = 1; i < ordered.length; i++) {
+        if (ordered[i]?.wordId === ordered[i - 1]?.wordId) {
+          expect(ordered[i - 1]?.round).toBeGreaterThanOrEqual(3);
+          expect(ordered[i]?.round).toBeGreaterThanOrEqual(3);
+        }
+      }
     }
   });
 });

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, LoaderCircle, X } from 'lucide-react';
 import { t } from '@/core/i18n';
 import type { WordCheckReply } from '@/core/llm/types';
-import { checkTranslation, checkTyped, normalise, resultFor } from '@/core/words/check';
+import { checkTranslation, checkTyped, normalise, resultFor, spellingsOf } from '@/core/words/check';
 import { wordLink } from '@/core/words/link';
 import { checkUseIt, type PracticeCard } from '@/core/words/practice';
 import type { ReviewResult } from '@/core/words/types';
@@ -31,6 +31,14 @@ function enterKey(e: React.KeyboardEvent, submit: () => void) {
     e.preventDefault();
     submit();
   }
+}
+
+// The character a key press types. On a Russian layout e.key is the Cyrillic letter, so a Latin letter comes from the key's position (e.code).
+function typedChar(e: KeyboardEvent): string | null {
+  if (/^[a-z]$/i.test(e.key)) return e.key.toLowerCase();
+  const letter = /^Key([A-Z])$/.exec(e.code)?.[1];
+  if (letter) return letter.toLowerCase();
+  return e.key.length === 1 ? e.key.toLowerCase() : null;
 }
 
 function Sentence({ text }: { text: string }) {
@@ -124,7 +132,7 @@ export function CardView({ pc, onResult, onNext }: CardProps) {
   // Tiles have no spaces, so a multi-word anagram is compared without them.
   const letters = Array.from(pc.letters ?? '');
   const typedAnswer = type === 'anagram' ? placed.map((i) => letters[i]).join('') : text;
-  const accepted = type === 'anagram' ? [word.word.replace(/ /g, '')] : type === 'spell' ? [word.word] : (ex?.answers ?? []);
+  const accepted = type === 'anagram' ? [word.word.replace(/ /g, '')] : type === 'spell' ? spellingsOf(word.word) : (ex?.answers ?? []);
   const correctOption = type === 'choice' ? [word.word] : (ex?.answers ?? []);
 
   const checkTypedAnswer = () => {
@@ -163,8 +171,9 @@ export function CardView({ pc, onResult, onNext }: CardProps) {
         if (e.target instanceof HTMLButtonElement) return;
         e.preventDefault();
         checkTypedAnswer();
-      } else if (e.key.length === 1) {
-        const ch = e.key.toLowerCase();
+      } else {
+        const ch = typedChar(e);
+        if (ch === null) return;
         const tiles = Array.from(pc.letters ?? '');
         setPlaced((p) => {
           const i = tiles.findIndex((l, j) => !p.includes(j) && l.toLowerCase() === ch);

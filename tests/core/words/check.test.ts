@@ -6,6 +6,7 @@ import {
   choiceOptions,
   normalise,
   resultFor,
+  spellingsOf,
 } from '@/core/words/check';
 import type { Word } from '@/core/words/types';
 
@@ -161,5 +162,17 @@ describe('choiceOptions', () => {
     expect(options).toHaveLength(3);
     expect(options.filter((o) => o.toLowerCase() === 'coherence')).toHaveLength(1);
     expect(options.filter((o) => o.toLowerCase() === 'unity')).toHaveLength(1);
+  });
+});
+
+describe('spellingsOf', () => {
+  test('a single word is accepted once', () => {
+    expect(spellingsOf('resilient')).toEqual(['resilient']);
+  });
+
+  test('a multi-word spelling is accepted as written and without spaces', () => {
+    expect(spellingsOf('take off')).toEqual(['take off', 'takeoff']);
+    expect(checkTyped('takeoff', spellingsOf('take off'))).toBe('correct');
+    expect(checkTyped('take off', spellingsOf('take off'))).toBe('correct');
   });
 });

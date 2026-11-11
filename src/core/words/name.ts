@@ -1,5 +1,5 @@
 import type { Db } from '@/core/ports';
-import { DuplicateWord, listWords, updateWord } from '@/core/db/repos/words';
+import { DuplicateWord, listWords, setGeneration, updateWord } from '@/core/db/repos/words';
 
 const TRAILING_TAIL = /\s*\([^)]*\)\s*$/;
 
@@ -29,6 +29,8 @@ export async function fixSavedWordNames(db: Db): Promise<number[]> {
         link: w.link,
         added: w.added,
       });
+      // The exercises were made from the old name: the word is pending until it is generated again.
+      await setGeneration(db, w.id, 'pending');
     } catch (e) {
       if (e instanceof DuplicateWord) continue;
       throw e;

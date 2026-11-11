@@ -115,16 +115,23 @@ export async function recordAnswer(
   const today = deps.clock.today();
   const same = await deps.db.select('SELECT 1 FROM word_review WHERE word_id = ? AND date = ? LIMIT 1', [a.wordId, today]);
   const counted = same.length === 0;
-  const reviewId = await insertReview(deps.db, {
+  const review = {
     wordId: a.wordId,
     cardType: a.cardType,
-    exerciseId: a.exerciseId,
     answeredAt: deps.clock.now(),
     date: today,
     result: a.result,
     counted,
     text: a.text,
-  });
+  };
+  // Exercises can be regenerated while a practice runs; if this one is gone, the answer is kept without it.
+  let reviewId: number;
+  try {
+    reviewId = await insertReview(deps.db, { ...review, exerciseId: a.exerciseId });
+  } catch (e) {
+    if (a.exerciseId === null) throw e;
+    reviewId = await insertReview(deps.db, { ...review, exerciseId: null });
+  }
   return { reviewId, counted };
 }
 

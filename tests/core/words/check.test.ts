@@ -54,6 +54,21 @@ describe('checkTyped', () => {
     expect(checkTyped('cohxrxnce', ['coherence'])).toBe('wrong');
   });
 
+  test('one wrong letter → almost, and the exact word → correct', () => {
+    expect(checkTyped('recxive', ['receive'])).toBe('almost');
+    expect(checkTyped('receive', ['receive'])).toBe('correct');
+  });
+
+  test('one swap of neighbouring letters → almost', () => {
+    expect(checkTyped('recieve', ['receive'])).toBe('almost');
+    expect(checkTyped('erceive', ['receive'])).toBe('almost');
+    expect(checkTyped('receiev', ['receive'])).toBe('almost');
+  });
+
+  test('two swaps → wrong', () => {
+    expect(checkTyped('rceieve', ['receive'])).toBe('wrong');
+  });
+
   test('empty answer → wrong (never almost)', () => {
     expect(checkTyped('', ['a'])).toBe('wrong');
     expect(checkTyped('   ', ['a'])).toBe('wrong');

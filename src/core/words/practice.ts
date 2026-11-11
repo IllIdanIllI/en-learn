@@ -68,7 +68,7 @@ export function toPracticeCard(view: WordView, card: Card, all: Word[], rand: ()
       : card.type === 'confusable'
         ? (card.exercise?.options ?? null)
         : null;
-  const letters = card.type === 'anagram' ? anagram(view.word.word, rand) : null;
+  const letters = card.type === 'anagram' || card.type === 'spell' ? anagram(view.word.word, rand) : null;
   return { wordId: view.word.id, word: view.word, card, options, letters };
 }
 
@@ -111,7 +111,7 @@ export async function buildPractice(deps: Deps, extraNew = 0): Promise<PracticeC
     const plan = cards.map((card) => toPracticeCard(view, card, all, rand));
     if (plan.length > 0) plans.push(plan);
   }
-  return orderRounds(plans);
+  return orderRounds(plans, rand);
 }
 
 export async function recordAnswer(

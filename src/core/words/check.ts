@@ -9,17 +9,21 @@ export function normalise(s: string): string {
     .replace(/\s+/g, ' ');
 }
 
-function levenshtein(a: string, b: string): number {
-  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+// Optimal string alignment distance: insert, delete, substitute, or swap two neighbouring letters, each one edit.
+function editDistance(a: string, b: string): number {
+  const d: number[][] = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0]![j] = j;
   for (let i = 1; i <= a.length; i++) {
-    const curr = [i];
     for (let j = 1; j <= b.length; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      curr[j] = Math.min((prev[j] ?? 0) + 1, (curr[j - 1] ?? 0) + 1, (prev[j - 1] ?? 0) + cost);
+      let best = Math.min((d[i - 1]![j] ?? 0) + 1, (d[i]![j - 1] ?? 0) + 1, (d[i - 1]![j - 1] ?? 0) + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        best = Math.min(best, (d[i - 2]![j - 2] ?? 0) + 1);
+      }
+      d[i]![j] = best;
     }
-    prev = curr;
   }
-  return prev[b.length] ?? 0;
+  return d[a.length]![b.length] ?? 0;
 }
 
 export function checkTyped(answer: string, accepted: string[]): 'correct' | 'almost' | 'wrong' {
@@ -28,7 +32,7 @@ export function checkTyped(answer: string, accepted: string[]): 'correct' | 'alm
   const targets = accepted.map(normalise);
   if (targets.includes(given)) return 'correct';
   const almost = targets.some(
-    (t) => Math.abs(t.length - given.length) <= 1 && levenshtein(given, t) === 1,
+    (t) => Math.abs(t.length - given.length) <= 1 && editDistance(given, t) === 1,
   );
   return almost ? 'almost' : 'wrong';
 }
@@ -45,7 +49,7 @@ export function resultFor(o: { correct: boolean; hinted: boolean; retried: boole
   return o.hinted || o.retried ? 'hard' : 'correct';
 }
 
-function shuffle<T>(items: T[], rand: () => number): T[] {
+export function shuffle<T>(items: T[], rand: () => number): T[] {
   for (let i = items.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1));
     [items[i], items[j]] = [items[j] as T, items[i] as T];

@@ -39,9 +39,9 @@ describe('availableTypes', () => {
     expect(availableTypes(1, false, [exercise(1, 'gap')])).toEqual(['anagram', 'gap_hint']);
   });
 
-  test('stage 2 is only the types that have exercises', () => {
-    expect(availableTypes(2, false, [])).toEqual([]);
-    expect(availableTypes(2, false, [exercise(1, 'gap'), exercise(2, 'form')])).toEqual(['gap', 'form']);
+  test('stage 2 is the types that have exercises, then spell', () => {
+    expect(availableTypes(2, false, [])).toEqual(['spell']);
+    expect(availableTypes(2, false, [exercise(1, 'gap'), exercise(2, 'form')])).toEqual(['gap', 'form', 'spell']);
     expect(
       availableTypes(2, false, [
         exercise(1, 'gap'),
@@ -49,7 +49,7 @@ describe('availableTypes', () => {
         exercise(3, 'form'),
         exercise(4, 'confusable'),
       ]),
-    ).toEqual(['gap', 'collocation', 'form', 'confusable']);
+    ).toEqual(['gap', 'collocation', 'form', 'confusable', 'spell']);
   });
 
   test('stage 3 is translation when it exists, and use', () => {
@@ -60,7 +60,7 @@ describe('availableTypes', () => {
   test('stage 4 is the union of stages 2 and 3', () => {
     const ex = [exercise(1, 'gap'), exercise(2, 'translation')];
     expect(availableTypes(4, false, ex)).toEqual([...availableTypes(2, false, ex), ...availableTypes(3, false, ex)]);
-    expect(availableTypes(4, false, ex)).toEqual(['gap', 'translation', 'use']);
+    expect(availableTypes(4, false, ex)).toEqual(['gap', 'spell', 'translation', 'use']);
   });
 });
 

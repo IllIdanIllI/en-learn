@@ -1,4 +1,5 @@
 import type { WordState } from './progress';
+import { shuffle } from './check';
 import { availableTypes, EXERCISE_OF, pickExercise, type Card } from './queue';
 import type { CardType, WordExercise } from './types';
 
@@ -55,18 +56,72 @@ export function planCards(i: {
   return type ? plan([type]) : [];
 }
 
-// Interleaves the words' cards into rounds: round k holds the k-th card of every word.
-export function orderRounds<T extends { wordId: number }>(plans: T[][]): (T & { round: number })[] {
-  const sorted = [...plans].sort((a, b) => b.length - a.length);
-  const longest = sorted[0]?.length ?? 0;
-  const out: (T & { round: number })[] = [];
-  for (let k = 0; k < longest; k++) {
-    for (const plan of sorted) {
-      const card = plan[k];
-      if (card) out.push({ ...card, round: k + 1 });
-    }
+type Pos = [round: number, index: number];
+
+// The card before and after a position, looking across the borders of neighbouring rounds.
+function clashesAt<T extends { wordId: number }>(rounds: T[][], [k, i]: Pos): boolean {
+  const cur = rounds[k] ?? [];
+  const card = cur[i];
+  if (!card) return false;
+  const before = i > 0 ? cur[i - 1] : (rounds[k - 1] ?? []).at(-1);
+  const after = i < cur.length - 1 ? cur[i + 1] : rounds[k + 1]?.[0];
+  return before?.wordId === card.wordId || after?.wordId === card.wordId;
+}
+
+// Swaps two cards when neither ends up back to back with its word; otherwise leaves the rounds as they were.
+function swapIfClean<T extends { wordId: number }>(rounds: T[][], p: Pos, q: Pos): boolean {
+  const a = rounds[p[0]]?.[p[1]];
+  const b = rounds[q[0]]?.[q[1]];
+  if (!a || !b) return false;
+  rounds[p[0]]![p[1]] = b;
+  rounds[q[0]]![q[1]] = a;
+  if (!clashesAt(rounds, p) && !clashesAt(rounds, q)) return true;
+  rounds[p[0]]![p[1]] = a;
+  rounds[q[0]]![q[1]] = b;
+  return false;
+}
+
+// When round k starts with the word that ended round k-1, moves that word's card off the front of round k,
+// or, when round k holds only that word, pulls the last card of round k-1 back to an earlier card of another word.
+function breakBackToBack<T extends { wordId: number }>(rounds: T[][], k: number): void {
+  const prev = rounds[k - 1] ?? [];
+  const cur = rounds[k] ?? [];
+  const first = cur[0];
+  if (!first || prev.at(-1)?.wordId !== first.wordId) return;
+  for (let j = 1; j < cur.length; j++) {
+    if (cur[j]?.wordId !== first.wordId && swapIfClean(rounds, [k, 0], [k, j])) return;
   }
-  return out;
+  for (let c = prev.length - 2; c >= 0; c--) {
+    if (prev[c]?.wordId !== first.wordId && swapIfClean(rounds, [k - 1, c], [k - 1, prev.length - 1])) return;
+  }
+}
+
+// The local swaps cannot always clear a border (a swap can land a word next to its twin on the far side),
+// so a border that still clashes is retried with a fresh shuffle a few times.
+const SHUFFLE_ATTEMPTS = 20;
+
+function shuffledRounds<T extends { wordId: number }>(plans: T[][], rand: () => number): T[][] {
+  const longest = Math.max(0, ...plans.map((p) => p.length));
+  const rounds: T[][] = [];
+  for (let k = 0; k < longest; k++) {
+    const cards = plans.map((p) => p[k]).filter((c): c is T => c !== undefined);
+    rounds.push(shuffle(cards, rand));
+  }
+  for (let k = 1; k < rounds.length; k++) breakBackToBack(rounds, k);
+  return rounds;
+}
+
+function hasBorderClash<T extends { wordId: number }>(rounds: T[][]): boolean {
+  return rounds.some((cur, k) => k > 0 && (rounds[k - 1] ?? []).at(-1)?.wordId === cur[0]?.wordId);
+}
+
+// Round k holds the k-th card of every word, shuffled with the practice's random source.
+export function orderRounds<T extends { wordId: number }>(plans: T[][], rand: () => number): (T & { round: number })[] {
+  let rounds = shuffledRounds(plans, rand);
+  for (let attempt = 1; attempt < SHUFFLE_ATTEMPTS && hasBorderClash(rounds); attempt++) {
+    rounds = shuffledRounds(plans, rand);
+  }
+  return rounds.flatMap((cards, k) => cards.map((c) => ({ ...c, round: k + 1 })));
 }
 
 // Puts an extra card after a mistake at the end of the next round (a new round after the last one).

@@ -24,9 +24,9 @@ export function availableTypes(stage: Stage, firstCard: boolean, exercises: Word
   const stage2 = STAGE2.filter((s) => has(exercises, s.exercise)).map((s) => s.type);
   const stage3: CardType[] = has(exercises, 'translation') ? ['translation', 'use'] : ['use'];
   if (stage === 1) return has(exercises, 'gap') ? ['anagram', 'gap_hint'] : ['anagram'];
-  if (stage === 2) return stage2;
+  if (stage === 2) return [...stage2, 'spell'];
   if (stage === 3) return stage3;
-  return [...stage2, ...stage3];
+  return [...stage2, 'spell', ...stage3];
 }
 
 export const EXERCISE_OF: Partial<Record<CardType, ExerciseType>> = {

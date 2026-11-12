@@ -14,12 +14,20 @@ import { ExternalLink } from '@/ui/components/ExternalLink';
 import { Input } from '@/ui/components/ui/input';
 import { Textarea } from '@/ui/components/ui/textarea';
 import { Notice } from '@/ui/today/chips';
+import { WordCard } from './WordCard';
+import type { SpellingVariant } from './speech';
 
 export interface CardProps {
   pc: PracticeCard;
+  spelling: SpellingVariant;
   /** Records the result; `recorded` is true when the service already saved it (use it). Resolves once saved. */
   onResult: (result: ReviewResult, text: string, recorded: boolean) => Promise<void>;
   onNext: () => void;
+  /** The word card's buttons (only the word card has them). */
+  onKnown?: () => void;
+  onRemove?: () => void;
+  /** A result or a removal is being saved: the word card's buttons are off. */
+  busy?: boolean;
 }
 
 type Feedback = { result: ReviewResult; text: string; use?: WordCheckReply; skipped?: boolean };
@@ -50,75 +58,75 @@ function Sentence({ text }: { text: string }) {
   return <p className="reading mt-3">{text}</p>;
 }
 
-function FeedbackView({ pc, fb }: { pc: PracticeCard; fb: Feedback }) {
+function FeedbackView({ pc, fb, spelling }: { pc: PracticeCard; fb: Feedback; spelling: SpellingVariant }) {
   const { lang } = useCore();
   const ok = fb.result !== 'wrong';
   const { word } = pc;
   return (
-    <div className="mt-4 grid gap-1.5 rounded-md bg-card p-4" aria-live="polite">
-      <p className={cn('flex items-center gap-2 font-semibold', ok ? 'text-success' : 'text-destructive')}>
-        {ok ? <Check className="size-4" aria-hidden /> : <X className="size-4" aria-hidden />}
-        {t(lang, ok ? 'words.correct' : 'words.incorrect')}
-      </p>
-      {fb.text.trim() !== '' && <p className="text-muted-foreground">{t(lang, 'words.yourAnswer', { text: fb.text })}</p>}
-      <p><span className="answer font-semibold">{word.word}</span>{word.translation !== '' && <span className="text-muted-foreground"> · {word.translation}</span>}</p>
-      {word.definition !== '' && <p>{word.definition}</p>}
-      {word.example !== '' && <p className="text-muted-foreground">{word.example}</p>}
-      {fb.skipped && (pc.card.exercise?.answers.length ?? 0) > 0 && (
-        <p>{t(lang, 'words.rightAnswer', { text: (pc.card.exercise?.answers ?? []).join(' / ') })}</p>
-      )}
-      {fb.use && fb.use.wordNote !== '' && <p>{fb.use.wordNote}</p>}
-      {fb.use && fb.use.errors.length > 0 && (
-        <ul className="grid gap-1">
-          {fb.use.errors.map((e, i) => (
-            <li key={i}>
-              <span className="answer">{e.fragment}</span> → <span className="answer font-semibold text-success">{e.fix}</span>
-              {e.explanation !== '' && <span className="text-muted-foreground"> · {e.explanation}</span>}
-            </li>
-          ))}
-        </ul>
-      )}
+    <div className="mt-4 grid gap-4 rounded-md bg-card p-4" aria-live="polite">
+      <div className="grid gap-1.5">
+        <p className={cn('flex items-center gap-2 font-semibold', ok ? 'text-success' : 'text-destructive')}>
+          {ok ? <Check className="size-4" aria-hidden /> : <X className="size-4" aria-hidden />}
+          {t(lang, ok ? 'words.correct' : 'words.incorrect')}
+        </p>
+        {fb.text.trim() !== '' && <p className="text-muted-foreground">{t(lang, 'words.yourAnswer', { text: fb.text })}</p>}
+      </div>
+      <WordCard word={word} lang={lang} spelling={spelling} />
+      <div className="grid gap-1.5">
+        {fb.skipped && (pc.card.exercise?.answers.length ?? 0) > 0 && (
+          <p>{t(lang, 'words.rightAnswer', { text: (pc.card.exercise?.answers ?? []).join(' / ') })}</p>
+        )}
+        {fb.use && fb.use.wordNote !== '' && <p>{fb.use.wordNote}</p>}
+        {fb.use && fb.use.errors.length > 0 && (
+          <ul className="grid gap-1">
+            {fb.use.errors.map((e, i) => (
+              <li key={i}>
+                <span className="answer">{e.fragment}</span> → <span className="answer font-semibold text-success">{e.fix}</span>
+                {e.explanation !== '' && <span className="text-muted-foreground"> · {e.explanation}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+        <p>
+          <ExternalLink href={wordLink(word.word, word.link)} className="text-primary underline underline-offset-2">
+            {t(lang, 'words.openLink')}
+          </ExternalLink>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** The word card of a new word: not a test, so it has no result, no Skip and no Check; Дальше moves on. */
+function IntroView({ pc, spelling, busy, onNext, onKnown, onRemove }: {
+  pc: PracticeCard; spelling: SpellingVariant; busy: boolean; onNext: () => void; onKnown?: () => void; onRemove?: () => void;
+}) {
+  const { lang } = useCore();
+  const { word } = pc;
+  const nextRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    nextRef.current?.focus();
+  }, []);
+  return (
+    <div data-card-type="intro" className="grid gap-5">
+      <WordCard word={word} lang={lang} spelling={spelling} busy={busy} onKnown={onKnown} onRemove={onRemove} />
       <p>
         <ExternalLink href={wordLink(word.word, word.link)} className="text-primary underline underline-offset-2">
           {t(lang, 'words.openLink')}
         </ExternalLink>
       </p>
-    </div>
-  );
-}
-
-/** The intro of a new word: not a test, so it has no result, no Skip and no Check; Понятно moves on. */
-function IntroView({ pc, onNext }: { pc: PracticeCard; onNext: () => void }) {
-  const { lang } = useCore();
-  const { word } = pc;
-  const gotIt = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    gotIt.current?.focus();
-  }, []);
-  return (
-    <div data-card-type="intro">
-      <p className="text-sm text-muted-foreground">{t(lang, 'words.instr.intro')}</p>
-      <p className="answer mt-3 text-2xl font-semibold">{word.word}</p>
-      {word.translation !== '' && <p className="mt-1 text-muted-foreground">{word.translation}</p>}
-      {word.definition !== '' && <p className="reading mt-3">{word.definition}</p>}
-      {word.example !== '' && <p className="mt-3 text-muted-foreground">{word.example}</p>}
-      <p className="mt-3">
-        <ExternalLink href={wordLink(word.word, word.link)} className="text-primary underline underline-offset-2">
-          {t(lang, 'words.openLink')}
-        </ExternalLink>
-      </p>
-      <div className="mt-4">
-        <Button
-          ref={gotIt}
-          // Holding Enter must not press Понятно again and again.
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && e.repeat) e.preventDefault();
-          }}
-          onClick={onNext}
-        >
-          {t(lang, 'words.gotIt')}
-        </Button>
-      </div>
+      <Button
+        ref={nextRef}
+        className="w-full"
+        disabled={busy}
+        // Holding Enter must not press Дальше again and again.
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && e.repeat) e.preventDefault();
+        }}
+        onClick={onNext}
+      >
+        {t(lang, 'words.next')}
+      </Button>
     </div>
   );
 }
@@ -156,7 +164,7 @@ function Slots({ word, letters, locked, onReturn }: { word: string; letters: str
   );
 }
 
-export function CardView({ pc, onResult, onNext }: CardProps) {
+export function CardView({ pc, spelling, onResult, onNext, onKnown, onRemove, busy = false }: CardProps) {
   const { deps, lang } = useCore();
   const { card, word } = pc;
   const type = card.type;
@@ -369,7 +377,9 @@ export function CardView({ pc, onResult, onNext }: CardProps) {
   );
 
   // No hooks below this line: the intro card has no answer of its own.
-  if (type === 'intro') return <IntroView pc={pc} onNext={onNext} />;
+  if (type === 'intro') {
+    return <IntroView pc={pc} spelling={spelling} busy={busy} onNext={onNext} onKnown={onKnown} onRemove={onRemove} />;
+  }
 
   const clue = clueOf(word, lang);
   const instruction =
@@ -534,7 +544,7 @@ export function CardView({ pc, onResult, onNext }: CardProps) {
       {SKIP_ALONE.includes(type) && !locked && (
         <div className="mt-4">{skipButton}</div>
       )}
-      {feedback && <FeedbackView pc={pc} fb={feedback} />}
+      {feedback && <FeedbackView pc={pc} fb={feedback} spelling={spelling} />}
       {saveError !== null && <Notice className="mt-3">{t(lang, 'words.saveError', { message: saveError })}</Notice>}
       {feedback && (
         <div className="mt-4">

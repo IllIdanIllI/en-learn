@@ -43,7 +43,7 @@ const CASES: [string, string][] = [
   ['spot', 'today'], ['spot-graded', 'today'], ['writing', 'today'], ['writing-graded', 'today'], ['rewrite', 'today'],
   ['progress', 'progress'], ['writing-graded', 'progress'], ['graded', 'rules'], ['graded', 'errors'],
   ['writing-graded', 'errors'], ['writing-graded', 'writing'], ['graded', 'settings'], ['prereq_missing', 'prerequisites'],
-  ['words', 'words'], ['words', 'words/practice'], ['words-done', 'words/practice'], ['words-limit', 'words'],
+  ['words', 'words'], ['words', 'words/practice?mode=new'], ['words', 'words/practice?mode=review'], ['words-done', 'words/practice'], ['words-limit', 'words'],
   ['words', 'words/1'], ['words', 'words/abc'],
 ];
 
@@ -58,13 +58,13 @@ for (const [state, route] of CASES) {
 }
 
 test('pointer cursor: anagram tiles, a placed letter and Skip', async ({ page }) => {
-  await page.goto('/?state=words#/words/practice');
+  await page.goto('/?state=words#/words/practice?mode=review');
   const card = page.locator('[data-card-type]');
   await card.waitFor();
-  // Skip every card until an anagram shows (the stage-1 words have one); the intro is left with Понятно.
+  // Skip every card until an anagram shows (the stage-1 words have one); a word card is left with Дальше.
   for (let i = 0; i < 30 && (await card.getAttribute('data-card-type')) !== 'anagram'; i++) {
     if ((await card.getAttribute('data-card-type')) === 'intro') {
-      await page.getByRole('button', { name: 'Понятно' }).click();
+      await page.getByRole('button', { name: 'Дальше' }).click();
     } else {
       await card.getByRole('button', { name: 'Пропустить' }).click();
       await page.getByRole('button', { name: 'Дальше' }).click();
@@ -88,11 +88,11 @@ test('pointer cursor: intro and build tiles, a placed tile is not-allowed, slots
   await card.waitFor();
   expect(await card.getAttribute('data-card-type')).toBe('intro');
   const cursor = (locator: ReturnType<typeof card.locator>) => locator.evaluate((el) => getComputedStyle(el).cursor);
-  expect(await cursor(card.getByRole('button', { name: 'Понятно' }))).toBe('pointer');
+  expect(await cursor(card.getByRole('button', { name: 'Дальше' }))).toBe('pointer');
   // Ten intros come first, then the choice cards, then the build cards: answer the choices right until a build shows.
   for (let i = 0; i < 40 && (await card.getAttribute('data-card-type')) !== 'build'; i++) {
     if ((await card.getAttribute('data-card-type')) === 'intro') {
-      await card.getByRole('button', { name: 'Понятно' }).click();
+      await card.getByRole('button', { name: 'Дальше' }).click();
     } else {
       const correct = LIMIT_WORD_ANSWERS[(await card.locator('p.reading').first().innerText()).trim()];
       await card.getByRole('button', { name: correct!, exact: true }).click();
@@ -104,7 +104,9 @@ test('pointer cursor: intro and build tiles, a placed tile is not-allowed, slots
   await expect(card.getByTestId('slot').first()).toBeVisible();
   expect(await card.getByTestId('slot').first().evaluate((el) => el.tagName)).not.toBe('BUTTON');
   expect(await cursor(card.getByTestId('tile').first())).toBe('pointer');
-  await card.getByTestId('tile').first().click();
+  // The first letter of the word, so the tile is placed (a wrong tile would only flash).
+  const first = LIMIT_WORD_ANSWERS[(await card.locator('p.reading').first().innerText()).trim()]![0]!;
+  await card.locator('[data-testid="tile"]:enabled').filter({ hasText: first }).first().click();
   await expect(card.locator('[data-testid="tile"]:disabled')).toHaveCount(1);
   expect(await cursor(card.locator('[data-testid="tile"]:disabled').first())).toBe('not-allowed');
   expect(await cursor(card.getByRole('button', { name: 'Пропустить' }))).toBe('pointer');
@@ -147,7 +149,7 @@ test('pointer cursor: practice end screen with +10 new words', async ({ page }) 
     await card.waitFor();
     const type = await card.getAttribute('data-card-type');
     if (type === 'intro') {
-      await card.getByRole('button', { name: 'Понятно' }).click();
+      await card.getByRole('button', { name: 'Дальше' }).click();
       continue;
     }
     const correct = LIMIT_WORD_ANSWERS[(await card.locator('p.reading').first().innerText()).trim()];
@@ -166,5 +168,23 @@ test('pointer cursor: practice end screen with +10 new words', async ({ page }) 
     await page.getByRole('button', { name: 'Дальше' }).click();
   }
   await expect(page.getByTestId('practice-end').getByRole('button', { name: '+10 новых слов' })).toBeVisible();
+  expect(await wrongCursors(page)).toEqual([]);
+});
+
+test('pointer cursor: word card buttons, the Remove confirmation, and a training with nothing to do', async ({ page }) => {
+  await page.goto('/?state=words-limit#/words');
+  const cursor = (locator: ReturnType<typeof page.locator>) => locator.evaluate((el) => getComputedStyle(el).cursor);
+  expect(await cursor(page.getByText('Новые слова · 0'))).toBe('not-allowed');
+  expect(await cursor(page.getByText('Повторение · 0'))).toBe('not-allowed');
+  await page.getByRole('button', { name: '+10 новых слов' }).click();
+  const card = page.locator('[data-card-type]');
+  await card.waitFor();
+  expect(await cursor(card.getByRole('button', { name: 'Уже знаю это слово' }))).toBe('pointer');
+  expect(await cursor(card.getByRole('button', { name: 'Удалить из словаря' }))).toBe('pointer');
+  expect(await cursor(card.getByRole('button', { name: 'Произнести' }).first())).toBe('pointer');
+  await card.getByRole('button', { name: 'Удалить из словаря' }).click();
+  await expect(page.getByRole('button', { name: 'Да', exact: true })).toBeVisible();
+  expect(await cursor(page.getByRole('button', { name: 'Да', exact: true }))).toBe('pointer');
+  expect(await cursor(page.getByRole('button', { name: 'Нет', exact: true }))).toBe('pointer');
   expect(await wrongCursors(page)).toEqual([]);
 });

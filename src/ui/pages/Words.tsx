@@ -61,15 +61,18 @@ export function Words() {
       {job.error && <Notice className="mt-6">{job.error.message}</Notice>}
       {loaded && 'data' in loaded && (() => {
         const { overview } = loaded.data;
-        const { available, canAddNew } = overview;
+        const { newAvailable, reviewAvailable, canAddNew } = overview;
+        const training = (mode: 'new' | 'review', count: number, label: string) =>
+          count > 0 ? (
+            <Link to={`/words/practice?mode=${mode}`} className={buttonVariants()}>{label}</Link>
+          ) : (
+            <a aria-disabled="true" className={cn(buttonVariants(), 'cursor-not-allowed opacity-50')}>{label}</a>
+          );
         return (
           <div className="mt-6">
             <div className="flex flex-wrap items-center gap-3">
-              {available > 0 ? (
-                <Link to="/words/practice" className={buttonVariants()}>{t(lang, 'words.start')}</Link>
-              ) : (
-                <a aria-disabled="true" className={cn(buttonVariants(), 'cursor-not-allowed opacity-50')}>{t(lang, 'words.start')}</a>
-              )}
+              {training('new', newAvailable, t(lang, 'words.startNew', { n: newAvailable }))}
+              {training('review', reviewAvailable, t(lang, 'words.startReview', { n: reviewAvailable }))}
               {canAddNew && (
                 <Button
                   variant="secondary"
@@ -78,7 +81,7 @@ export function Words() {
                     setAdding(true);
                     setAddError(null);
                     addExtraNew(deps.db, today).then(
-                      () => navigate('/words/practice'),
+                      () => navigate('/words/practice?mode=new'),
                       (e: unknown) => {
                         setAddError(e instanceof Error ? e.message : String(e));
                         setAdding(false);

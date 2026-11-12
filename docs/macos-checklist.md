@@ -177,3 +177,12 @@ T. **Night Dock icon, Light restore, day start.**
    - Action 3: leave the app open across the day start hour; then, before 05:00, press "Start a new day".
    - Expected: the date changes at the start hour with the app open; "Start a new day" moves the date to today.
    - If it fails: record the step, the macOS version and the Rust console output.
+
+## Words: sound (2026-11-12)
+
+U. **Speaker buttons on the word card.**
+   - Action 1: Words → Новые слова (New words) → a word card. Press the speaker next to the word, then the one next to the example.
+   - Expected: the system English voice says the word, then the example, in the spelling variant set in Settings (British or American).
+   - Action 2: press a speaker while another is speaking.
+   - Expected: the first speech stops and the new text is spoken.
+   - If it is silent: note the macOS version and the voices installed; the macOS `say` command is the fallback to consider.

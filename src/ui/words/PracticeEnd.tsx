@@ -25,8 +25,9 @@ function Changes({ title, list }: { title: string; list: Change[] }) {
   );
 }
 
-export function PracticeEnd({ correct, total, up, down, canContinue, canAddNew, onContinue, onAddNew }: {
-  correct: number; total: number; up: Change[]; down: Change[]; canContinue: boolean; canAddNew: boolean;
+/** The end screen: `more` is the number of words Continue offers (0 hides it); Continue keeps the training's mode. */
+export function PracticeEnd({ correct, total, up, down, more, canAddNew, onContinue, onAddNew }: {
+  correct: number; total: number; up: Change[]; down: Change[]; more: number; canAddNew: boolean;
   onContinue: () => void; onAddNew: () => Promise<void>;
 }) {
   const { lang } = useCore();
@@ -40,7 +41,7 @@ export function PracticeEnd({ correct, total, up, down, canContinue, canAddNew, 
       {error && <Notice className="mt-6">{t(lang, 'words.saveError', { message: error })}</Notice>}
       <div className="mt-8 flex flex-wrap gap-3">
         <Link to="/words" className={buttonVariants({ variant: 'secondary' })}>{t(lang, 'words.back')}</Link>
-        {canContinue && <Button onClick={onContinue}>{t(lang, 'words.more')}</Button>}
+        {more > 0 && <Button onClick={onContinue}>{t(lang, 'words.more', { n: more })}</Button>}
         {canAddNew && (
           <Button
             variant="secondary"

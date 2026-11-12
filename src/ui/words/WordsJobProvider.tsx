@@ -49,10 +49,10 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
     try {
       while (queue.current.length > 0 || phonetics.current.length > 0) {
         if (queue.current.length === 0) {
+          // Silent: no progress, so the Words page does not show "Creating exercises" or lock Regenerate.
           const ids = phonetics.current.splice(0);
-          setProgress({ done: 0, total: ids.length });
           try {
-            await generatePhonetics(depsRef.current, ids, (done, total) => setProgress({ done, total }));
+            await generatePhonetics(depsRef.current, ids);
           } catch {
             // The words keep what they have; the next start runs them once more.
           }

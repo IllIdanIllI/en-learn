@@ -701,8 +701,6 @@ test.describe('practice', () => {
 
   test('ending early offers Continue, which starts a practice with the cards left', async ({ page }) => {
     await openPractice(page, 'words', 'review');
-    // Intro cards are not answers: answer up to the first card that is.
-    while ((await cardType(page)) === 'intro') await answer(page);
     await answer(page);
     await page.getByRole('button', { name: 'Закончить' }).click();
     const end = page.getByTestId('practice-end');
@@ -755,6 +753,10 @@ test.describe('two trainings, the word card and its buttons', () => {
       expect(intros.map((c) => c.type)).toEqual(Array(size).fill('intro'));
       expect(tests.some((c) => c.type === 'intro')).toBe(false);
       expect(new Set(tests.map((c) => c.word))).toEqual(new Set(intros.map((c) => c.word)));
+      // No two neighbouring tests share a word, unless only that word's tests are left in the group.
+      for (let j = 1; j < tests.length; j++) {
+        if (tests[j]!.word === tests[j - 1]!.word) expect(tests.slice(j - 1).every((c) => c.word === tests[j]!.word), `test ${j + 1} of group ${size}`).toBe(true);
+      }
       at += size + 3 * size;
     }
   });
@@ -771,6 +773,7 @@ test.describe('two trainings, the word card and its buttons', () => {
     // The next card is a test of another word; the header counts the one extra test.
     await expect(header).toHaveText(`${k! + 1} / ${n! + 1}`);
     const rest = await runToEnd(page);
+    // The extra is never directly after the missed card: it comes after the next test of another word.
     expect(rest[0]!.word).not.toBe(word);
     expect(rest[1]).toEqual({ type: 'build', word });
     expect(rest.filter((c) => c.word === word).map((c) => c.type)).toEqual(['build', 'build', 'gap_hint']);

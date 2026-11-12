@@ -11,7 +11,9 @@ export function speak(text: string, variant: SpellingVariant): void {
   synth.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = variant;
-  const voice = synth.getVoices().find((v) => v.lang.startsWith(variant));
+  // Tags are compared normalised: `en_GB` (macOS) matches `en-GB`, and the case does not matter.
+  const tag = (lang: string) => lang.replace('_', '-').toLowerCase();
+  const voice = synth.getVoices().find((v) => tag(v.lang).startsWith(tag(variant)));
   if (voice) utterance.voice = voice;
   synth.speak(utterance);
 }

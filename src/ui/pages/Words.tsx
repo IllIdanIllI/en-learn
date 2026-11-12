@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { t } from '@/core/i18n';
 import { extraNewFor } from '@/core/words/queue';
@@ -28,7 +28,10 @@ function StageChip({ stage, label }: { stage: Stage; label: string }) {
 export function Words() {
   const { deps, lang } = useCore();
   const job = useWordsJob();
+  const { startPhonetics } = job;
   const today = deps.clock.today();
+  // Silent phonetics run for words without a transcription; once per app run (the provider guards it).
+  useEffect(() => startPhonetics(), [startPhonetics]);
   const [reload, setReload] = useState(0);
   const [panel, setPanel] = useState<Panel>(null);
   const [params, setParams] = useSearchParams();

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Check, Volume2, X } from 'lucide-react';
 import { t, type Lang } from '@/core/i18n';
 import type { Word } from '@/core/words/types';
@@ -27,6 +27,10 @@ function Example({ text, word }: { text: string; word: string }) {
 export function WordCard({ word, lang, spelling, onKnown, onRemove, busy = false }: WordCardProps) {
   const [confirming, setConfirming] = useState(false);
   const speech = canSpeak();
+  // A card that goes away stops its speech, so the word is not read over the next card.
+  useEffect(() => () => {
+    if (canSpeak()) window.speechSynthesis.cancel();
+  }, []);
   const meta = [word.transcription, word.partOfSpeech].filter((p) => p !== '').join(' · ');
   const speaker = (text: string) => (
     <Button

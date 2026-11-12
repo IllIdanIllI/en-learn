@@ -21,6 +21,8 @@ interface WordsJobValue {
   clearNotices(): void;
   /** Increments when a job ends, so a page reads its state again. */
   version: number;
+  /** Silent phonetics run for ready words without a transcription; once per app run, after the name fix. */
+  startPhonetics(): void;
 }
 
 const Context = createContext<WordsJobValue | null>(null);
@@ -38,11 +40,13 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState<ReadonlySet<number>>(new Set());
   const [version, setVersion] = useState(0);
   const queue = useRef<number[]>([]);
-  // Start-up phonetics run: runs after the queue is empty, never shown in `active` (its words stay ready).
+  // Phonetics run: runs after the queue is empty, never shown in `active` (its words stay ready).
   const phonetics = useRef<number[]>([]);
   const looping = useRef(false);
   const current = useRef<number[]>([]);
-  const started = useRef(false);
+  const phoneticsStarted = useRef(false);
+  // The name fix runs once per app start; the phonetics run waits for it so its queue goes first.
+  const nameFix = useRef<Promise<void> | null>(null);
 
   const loop = useCallback(async () => {
     looping.current = true;
@@ -111,39 +115,46 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
     },
     [loop],
   );
+  const fixNames = useCallback(() => {
+    if (nameFix.current === null) {
+      nameFix.current = (async () => {
+        try {
+          const ids = await fixSavedWordNames(depsRef.current.db);
+          if (ids.length > 0) run(ids);
+        } catch (e) {
+          setError({ message: e instanceof Error ? e.message : String(e) });
+        }
+      })();
+    }
+    return nameFix.current;
+  }, [run]);
+  const startPhonetics = useCallback(() => {
+    // Once per app run: a second call (StrictMode, or a later visit of the Words page) does nothing.
+    if (phoneticsStarted.current) return;
+    phoneticsStarted.current = true;
+    void (async () => {
+      try {
+        await fixNames();
+        runPhonetics(wordsMissingPhonetics(await listWords(depsRef.current.db)));
+      } catch {
+        // The words keep what they have; the next visit of the Words page in a later app run runs them once more.
+      }
+    })();
+  }, [fixNames, runPhonetics]);
   const clearNotices = useCallback(() => {
     setBusy(false);
     setError(null);
   }, []);
 
-  const runRef = useRef(run);
+  // Saved words with a bracketed tail are renamed once per app start, then regenerated. The phonetics run is not started
+  // here: the Words page calls startPhonetics on its first visit, so a lesson started at app start is not blocked by it.
   useEffect(() => {
-    runRef.current = run;
-  }, [run]);
-  const runPhoneticsRef = useRef(runPhonetics);
-  useEffect(() => {
-    runPhoneticsRef.current = runPhonetics;
-  }, [runPhonetics]);
-  // Saved words with a bracketed tail are renamed once, then regenerated; then ready words without a transcription get
-  // the phonetics run. Both once per start; StrictMode's second mount sees the ref set.
-  useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    void (async () => {
-      try {
-        const db = depsRef.current.db;
-        const ids = await fixSavedWordNames(db);
-        if (ids.length > 0) runRef.current(ids);
-        runPhoneticsRef.current(wordsMissingPhonetics(await listWords(db)));
-      } catch (e) {
-        setError({ message: e instanceof Error ? e.message : String(e) });
-      }
-    })();
-  }, []);
+    void fixNames();
+  }, [fixNames]);
 
   const value = useMemo(
-    () => ({ running: progress !== null, progress, error, busy, active, run, clearNotices, version }),
-    [progress, error, busy, active, run, clearNotices, version],
+    () => ({ running: progress !== null, progress, error, busy, active, run, clearNotices, version, startPhonetics }),
+    [progress, error, busy, active, run, clearNotices, version, startPhonetics],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

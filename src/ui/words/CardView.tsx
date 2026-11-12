@@ -130,7 +130,7 @@ function Slots({ word, letters, locked, onReturn }: { word: string; letters: str
   return (
     <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
       {sizes.map((size, g) => (
-        <div key={g} data-testid="slot-group" className="flex gap-1.5">
+        <div key={g} data-testid="slot-group" className="flex flex-wrap gap-1.5">
           {Array.from({ length: size }, () => {
             const i = k++;
             const letter = letters[i];

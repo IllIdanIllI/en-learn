@@ -437,6 +437,8 @@ export const ru: Record<keyof typeof en, string> = {
   'words.field.definition': 'Определение',
   'words.field.example': 'Пример',
   'words.field.synonyms': 'Синонимы (через запятую)',
+  'words.field.transcription': 'Транскрипция',
+  'words.field.partOfSpeech': 'Часть речи',
   'words.field.link': 'Ссылка',
   'words.field.added': 'Добавлено',
   'words.save': 'Сохранить',

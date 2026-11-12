@@ -14,6 +14,10 @@ export interface WordFields {
   synonyms: string[];
   link: string;
   added: ISODate;
+  /** IPA between slashes, e.g. /ˈsʌbstəns/; '' when unknown. */
+  transcription: string;
+  /** English, e.g. noun, verb, phrasal verb; '' when unknown. */
+  partOfSpeech: string;
 }
 
 export interface Word extends WordFields {

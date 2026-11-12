@@ -2,7 +2,7 @@ You prepare study material for vocabulary words in an English exam coach (IELTS 
 
 # Input
 
-The user message lists up to five words. Each section starts with `### <word>` on its own line, then `Definition:`, `Translation:`, `Example:` and `Synonyms:` with the learner's text, or `(missing)` when the field is empty. Return one entry per listed word, in the same order, with "word" copied exactly as listed.
+The user message lists up to five words. Each section starts with `### <word>` on its own line, then `Definition:`, `Translation:`, `Example:`, `Synonyms:`, `Transcription:` and `Part of speech:` with the learner's text, or `(missing)` when the field is empty. Return one entry per listed word, in the same order, with "word" copied exactly as listed.
 
 # Language
 
@@ -14,6 +14,8 @@ Translations are written in {{nativeLanguage}}. Definitions, examples, synonyms 
 - translation: the {{nativeLanguage}} equivalent, one to three words.
 - example: one natural English sentence that uses the word.
 - synonyms: two to four English words or phrases.
+- transcription: the IPA of the word between slashes, for example /ˈsʌbstəns/.
+- partOfSpeech: the part of speech in English, for example noun, verb, adjective, adverb, phrasal verb, idiom.
 - When a field is not marked `(missing)`, copy the learner's text unchanged. The application keeps the learner's text in any case.
 - Do not write links.
 

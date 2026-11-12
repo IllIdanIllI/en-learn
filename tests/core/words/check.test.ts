@@ -33,6 +33,8 @@ function word(id: number, text: string): Word {
     translation: '',
     example: '',
     synonyms: [],
+    transcription: '',
+    partOfSpeech: '',
     link: '',
     added: '2026-10-04',
     generation: 'ready',

@@ -5,7 +5,7 @@ import { cleanWordName, fixSavedWordNames } from '@/core/words/name';
 import type { WordFields } from '@/core/words/types';
 
 const fields = (word: string): WordFields => ({
-  word, definition: 'def', translation: '', example: '', synonyms: [], link: '', added: '2026-11-01',
+  word, definition: 'def', translation: '', example: '', synonyms: [], transcription: '', partOfSpeech: '', link: '', added: '2026-11-01',
 });
 
 describe('cleanWordName', () => {

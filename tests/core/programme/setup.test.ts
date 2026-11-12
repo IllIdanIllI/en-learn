@@ -91,7 +91,7 @@ describe('setup', () => {
     const db = await createTestDb();
     await saveProgramme(db, input());
     const x = (await getTopics(db)).find((t) => t.key === 'conditionals')!;
-    const wordId = await insertWord(db, { word: 'if', definition: '', translation: '', example: '', synonyms: [], link: '', added: '2026-10-19' }, 'NOW');
+    const wordId = await insertWord(db, { word: 'if', definition: '', translation: '', example: '', synonyms: [], transcription: '', partOfSpeech: '', link: '', added: '2026-10-19' }, 'NOW');
     const reviewId = await insertReview(db, {
       wordId, cardType: 'use', exerciseId: null, answeredAt: 'NOW', date: '2026-10-20', result: 'wrong', counted: true, text: 'If I would know.',
     });

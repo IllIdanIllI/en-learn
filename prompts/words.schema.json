@@ -16,6 +16,8 @@
           "translation",
           "example",
           "synonyms",
+          "transcription",
+          "partOfSpeech",
           "gaps",
           "collocations",
           "forms",
@@ -40,6 +42,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "transcription": {
+            "type": "string"
+          },
+          "partOfSpeech": {
+            "type": "string"
           },
           "gaps": {
             "type": "array",

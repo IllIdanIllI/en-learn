@@ -24,6 +24,8 @@ const fields = (word: string, over: Partial<WordFields> = {}): WordFields => ({
   synonyms: ['consistency', 'unity'],
   link: 'https://example.com/coherence',
   added: '2026-11-04',
+  transcription: '',
+  partOfSpeech: '',
   ...over,
 });
 
@@ -162,5 +164,23 @@ describe('words repo', () => {
       { fragment: 'f', fix: 'g', topicId, suggestedTopic: null, ruleSection: null, explanation: 'e' },
     ]);
     expect(await listWordErrors(db)).toMatchObject([{ topicId }]);
+  });
+});
+
+describe('words repo: transcription and part of speech', () => {
+  test('insert, update and list round-trip the two fields', async () => {
+    const db = await createTestDb();
+    const id = await insertWord(db, fields('coherence', { transcription: '/ˌkoʊhɪərəns/', partOfSpeech: 'noun' }), '2026-11-04T09:00:00Z');
+    expect(await listWords(db)).toEqual([expect.objectContaining({ id, transcription: '/ˌkoʊhɪərəns/', partOfSpeech: 'noun' })]);
+    await updateWord(db, id, fields('coherence', { transcription: '/kəˈhɪərəns/', partOfSpeech: 'phrasal verb' }));
+    expect(await listWords(db)).toEqual([expect.objectContaining({ transcription: '/kəˈhɪərəns/', partOfSpeech: 'phrasal verb' })]);
+  });
+
+  test("a row inserted without the two columns reads ''", async () => {
+    const db = await createTestDb();
+    await db.execute(
+      "INSERT INTO word (word, definition, translation, example, synonyms, link, added, generation, created_at) VALUES ('old', '', '', '', '[]', '', '2026-11-04', 'ready', 'x')",
+    );
+    expect(await listWords(db)).toEqual([expect.objectContaining({ word: 'old', transcription: '', partOfSpeech: '' })]);
   });
 });

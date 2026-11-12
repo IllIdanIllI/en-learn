@@ -15,6 +15,8 @@ function word(id: number, added = '2026-10-04', generation: Word['generation'] =
     translation: '',
     example: '',
     synonyms: [],
+    transcription: '',
+    partOfSpeech: '',
     link: '',
     added,
     generation,

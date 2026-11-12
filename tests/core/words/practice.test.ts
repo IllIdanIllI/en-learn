@@ -17,7 +17,7 @@ import { exercisesOf, LIMIT_WORDS, PREVIEW_WORDS } from '@/adapters/preview/word
 const good = (data: unknown): LlmResult<unknown> => ({ ok: true, data, costUsd: 0, durationMs: 1, raw: '{}' });
 const fail: LlmResult<unknown> = { ok: false, code: 'not_signed_in', message: 'sign in', costUsd: 0, durationMs: 1, raw: '' };
 const fields = (word: string, over: Partial<WordFields> = {}): WordFields => ({
-  word, definition: 'def', translation: '', example: '', synonyms: [], link: '', added: '2026-11-01', ...over,
+  word, definition: 'def', translation: '', example: '', synonyms: [], transcription: '', partOfSpeech: '', link: '', added: '2026-11-01', ...over,
 });
 
 async function setup(llm = new FakeLlm({}), today = '2026-11-04') {

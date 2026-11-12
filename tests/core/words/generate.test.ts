@@ -3,9 +3,9 @@ import { createTestDb } from '@/adapters/test/sqliteDb';
 import { FixedClock } from '@/adapters/test/fixedClock';
 import { FakeLlm } from '@/adapters/test/fakeLlm';
 import { bundledPrompts } from '@/core/llm/bundledPrompts';
-import { deleteWord, insertWord, listExercises, listWords } from '@/core/db/repos/words';
+import { deleteWord, insertWord, listExercises, listWords, replaceExercises, setGeneration, updateWord } from '@/core/db/repos/words';
 import { withJobLock } from '@/core/session/jobLock';
-import { generateWords } from '@/core/words/generate';
+import { generatePhonetics, generateWords } from '@/core/words/generate';
 import type { Deps, LlmResult } from '@/core/ports';
 import type { GeneratedWord, WordsReply } from '@/core/llm/types';
 import type { WordFields } from '@/core/words/types';
@@ -15,7 +15,7 @@ import { gen } from './helpers';
 const good = (data: unknown): LlmResult<unknown> => ({ ok: true, data, costUsd: 0, durationMs: 1, raw: '{}' });
 const fail: LlmResult<unknown> = { ok: false, code: 'not_signed_in', message: 'sign in', costUsd: 0, durationMs: 1, raw: '' };
 const fields = (word: string, over: Partial<WordFields> = {}): WordFields => ({
-  word, definition: '', translation: '', example: '', synonyms: [], link: '', added: '2026-11-04', ...over,
+  word, definition: '', translation: '', example: '', synonyms: [], link: '', added: '2026-11-04', transcription: '', partOfSpeech: '', ...over,
 });
 const echo = (over: (w: string) => Partial<GeneratedWord> = () => ({})) => (req: { userPrompt: string }): LlmResult<unknown> => {
   const words = [...req.userPrompt.matchAll(/^### (.+)$/gm)].map((m) => m[1]!);
@@ -166,4 +166,88 @@ test('previewLlm words reply passes generation; word_check errors only for 3+ wo
   expect(long.data.wordOk).toBe(true);
   expect(long.data.errors.map((e) => e.fragment)).toEqual(['I']);
   expect(((await mk('Too short')) as typeof long).data.errors).toEqual([]);
+});
+
+describe('generateWords: transcription and part of speech', () => {
+  test('fills empty fields and keeps the non-empty ones the learner wrote', async () => {
+    const llm = new FakeLlm({ words: [echo()] });
+    const deps = await setup(llm);
+    const [empty, kept] = [
+      await insertWord(deps.db, fields('alpha'), 't'),
+      await insertWord(deps.db, fields('beta', { transcription: '/mine/', partOfSpeech: 'noun' }), 't'),
+    ];
+    expect(await generateWords(deps, [empty, kept])).toEqual({ ok: true, failed: 0 });
+    const byWord = Object.fromEntries((await listWords(deps.db)).map((w) => [w.word, w]));
+    expect(byWord.alpha).toMatchObject({ transcription: '/ˈsuːpəsiːd/', partOfSpeech: 'verb' });
+    expect(byWord.beta).toMatchObject({ transcription: '/mine/', partOfSpeech: 'noun' });
+  });
+});
+
+describe('generatePhonetics', () => {
+  const ready = async (deps: Deps, word: string, over: Partial<WordFields> = {}) => {
+    const id = await insertWord(deps.db, fields(word, over), 't');
+    await setGeneration(deps.db, id, 'ready');
+    await replaceExercises(deps.db, id, [
+      { type: 'gap', prompt: 'keep ___', translation: null, cue: null, options: null, answers: ['x'], note: null },
+    ]);
+    return id;
+  };
+
+  test('writes the empty fields of a ready word; generation and exercises stay as they are', async () => {
+    const llm = new FakeLlm({ words: [echo()] });
+    const deps = await setup(llm);
+    const id = await ready(deps, 'alpha', { definition: 'mine' });
+    const before = await listExercises(deps.db);
+    expect(await generatePhonetics(deps, [id])).toEqual({ ok: true, failed: 0 });
+    expect((await listWords(deps.db))[0]).toMatchObject({
+      generation: 'ready', definition: 'mine', transcription: '/ˈsuːpəsiːd/', partOfSpeech: 'verb',
+    });
+    expect(await listExercises(deps.db)).toEqual(before);
+    expect(llm.calls).toHaveLength(1);
+  });
+
+  test('a stored non-empty value is kept; the empty one is filled', async () => {
+    const llm = new FakeLlm({ words: [echo()] });
+    const deps = await setup(llm);
+    const id = await ready(deps, 'alpha', { transcription: '/mine/' });
+    await generatePhonetics(deps, [id]);
+    expect((await listWords(deps.db))[0]).toMatchObject({ transcription: '/mine/', partOfSpeech: 'verb' });
+  });
+
+  test('exercise problems do not matter here: the phonetics are still written', async () => {
+    const llm = new FakeLlm({ words: [echo(() => ({ gaps: [] }))] });
+    const deps = await setup(llm);
+    const id = await ready(deps, 'alpha');
+    expect(await generatePhonetics(deps, [id])).toEqual({ ok: true, failed: 0 });
+    expect((await listWords(deps.db))[0]).toMatchObject({ generation: 'ready', transcription: '/ˈsuːpəsiːd/' });
+  });
+
+  test("an edit made while the call runs is kept; only the two fields are written", async () => {
+    const inner = new FakeLlm({ words: [echo()] });
+    const deps = await setup(inner);
+    const id = await ready(deps, 'alpha');
+    deps.llm = { call: async (req) => { await updateWord(deps.db, id, fields('alpha', { definition: 'edited' })); return inner.call(req); } };
+    await generatePhonetics(deps, [id]);
+    expect((await listWords(deps.db))[0]).toMatchObject({ definition: 'edited', transcription: '/ˈsuːpəsiːd/', partOfSpeech: 'verb' });
+  });
+
+  test('a failed call changes nothing', async () => {
+    const llm = new FakeLlm({ words: [fail] });
+    const deps = await setup(llm);
+    const id = await ready(deps, 'alpha');
+    const before = await listWords(deps.db);
+    expect(await generatePhonetics(deps, [id])).toMatchObject({ ok: false, code: 'not_signed_in' });
+    expect(await listWords(deps.db)).toEqual(before);
+  });
+});
+
+test('previewLlm words reply gives both fields a non-empty value', async () => {
+  const deps = await setup(new FakeLlm({}));
+  deps.llm = previewLlm;
+  const ids = await add(deps, 'alpha', 'beta');
+  await generateWords(deps, ids);
+  for (const w of await listWords(deps.db)) {
+    expect(w.transcription.trim()).not.toBe('');
+    expect(w.partOfSpeech.trim()).not.toBe('');
+  }
 });

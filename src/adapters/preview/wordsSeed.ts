@@ -9,6 +9,8 @@ export interface PreviewWord {
   definition: string;
   example: string;
   synonyms: string[];
+  transcription: string;
+  partOfSpeech: string;
   added: ISODate;
   /** Days of the counted reviews, all correct: the replay gives the word's stage (the comment on each word). */
   reviews: ISODate[];
@@ -27,7 +29,7 @@ export interface PreviewWord {
  */
 export const PREVIEW_WORDS: PreviewWord[] = [
   {
-    word: 'resilient', translation: 'устойчивый', definition: 'able to recover quickly after difficulties', example: 'Children are often more resilient than adults expect.',
+    word: 'resilient', transcription: '/rɪˈzɪliənt/', partOfSpeech: 'adjective', translation: 'устойчивый', definition: 'able to recover quickly after difficulties', example: 'Children are often more resilient than adults expect.',
     synonyms: ['tough', 'hardy'], added: '2025-03-01',
     reviews: ['2025-03-03', '2025-03-07', '2025-03-14', '2025-03-28', '2025-04-23', '2025-06-04'], // Stage 4
     gaps: ['After the storm the town proved remarkably ___ and rebuilt within a year.', 'A ___ economy recovers fast from a crisis.'],
@@ -37,7 +39,7 @@ export const PREVIEW_WORDS: PreviewWord[] = [
     translations: [{ text: 'Наша команда очень устойчивая.', answers: ['Our team is very resilient.'] }, { text: 'Дети быстро восстанавливаются.', answers: ['Children are resilient.'] }],
   },
   {
-    word: 'meticulous', translation: 'тщательный', definition: 'showing great attention to every detail', example: 'She kept meticulous records of every sale.',
+    word: 'meticulous', transcription: '/məˈtɪkjʊləs/', partOfSpeech: 'adjective', translation: 'тщательный', definition: 'showing great attention to every detail', example: 'She kept meticulous records of every sale.',
     synonyms: ['careful', 'thorough'], added: '2026-07-20',
     reviews: ['2026-08-01', '2026-08-05', '2026-08-10', '2026-08-16'], // Stage 3
     gaps: ['The editor was ___ and checked every comma twice.', 'His ___ notes helped the whole class.'],
@@ -47,7 +49,7 @@ export const PREVIEW_WORDS: PreviewWord[] = [
     translations: [{ text: 'Он очень тщательный человек.', answers: ['He is a very meticulous person.', 'He is very meticulous.'] }, { text: 'Она тщательно планирует поездки.', answers: ['She plans her trips meticulously.'] }],
   },
   {
-    word: 'pragmatic', translation: 'практичный', definition: 'dealing with problems in a sensible, realistic way', example: 'We need a pragmatic solution, not a perfect one.',
+    word: 'pragmatic', transcription: '/præɡˈmætɪk/', partOfSpeech: 'adjective', translation: 'практичный', definition: 'dealing with problems in a sensible, realistic way', example: 'We need a pragmatic solution, not a perfect one.',
     synonyms: ['practical', 'realistic'], added: '2026-07-25',
     reviews: ['2026-08-02', '2026-08-07', '2026-08-12', '2026-08-18'], // Stage 3
     gaps: ['She took a ___ approach and fixed the problem step by step.', 'A ___ leader accepts what is possible.'],
@@ -57,7 +59,7 @@ export const PREVIEW_WORDS: PreviewWord[] = [
     translations: [{ text: 'Нам нужен практичный подход.', answers: ['We need a pragmatic approach.'] }, { text: 'Она практичный человек.', answers: ['She is a pragmatic person.'] }],
   },
   {
-    word: 'candid', translation: 'откровенный', definition: 'honest and direct, even when the truth is uncomfortable', example: 'I appreciate your candid opinion.',
+    word: 'candid', transcription: '/ˈkændɪd/', partOfSpeech: 'adjective', translation: 'откровенный', definition: 'honest and direct, even when the truth is uncomfortable', example: 'I appreciate your candid opinion.',
     synonyms: ['frank', 'open'], added: '2026-09-20',
     reviews: ['2026-10-01', '2026-10-04'], // Stage 2
     gaps: ['To be ___, I did not enjoy the film.', 'She gave a ___ answer about her mistakes.'],
@@ -67,7 +69,7 @@ export const PREVIEW_WORDS: PreviewWord[] = [
     translations: [{ text: 'Он откровенно рассказал о проблемах.', answers: ['He was candid about the problems.', 'He spoke candidly about the problems.'] }, { text: 'Мне нужен откровенный ответ.', answers: ['I need a candid answer.'] }],
   },
   {
-    word: 'tenacious', translation: 'упорный', definition: 'holding on firmly and refusing to give up', example: 'A tenacious reporter, she never dropped a story.',
+    word: 'tenacious', transcription: '/təˈneɪʃəs/', partOfSpeech: 'adjective', translation: 'упорный', definition: 'holding on firmly and refusing to give up', example: 'A tenacious reporter, she never dropped a story.',
     synonyms: ['persistent', 'determined'], added: '2026-10-12',
     reviews: ['2026-10-16'], // Stage 1
     gaps: ['The ___ climber kept going despite the cold.', 'His ___ efforts finally paid off.'],
@@ -77,7 +79,7 @@ export const PREVIEW_WORDS: PreviewWord[] = [
     translations: [{ text: 'Он упорный спортсмен.', answers: ['He is a tenacious athlete.'] }, { text: 'Она упорно идёт к цели.', answers: ['She tenaciously pursues her goal.'] }],
   },
   {
-    word: 'ubiquitous', translation: 'вездесущий', definition: 'seeming to be present everywhere at the same time', example: 'Smartphones have become ubiquitous.',
+    word: 'ubiquitous', transcription: '/juːˈbɪkwɪtəs/', partOfSpeech: 'adjective', translation: 'вездесущий', definition: 'seeming to be present everywhere at the same time', example: 'Smartphones have become ubiquitous.',
     synonyms: ['omnipresent', 'widespread'], added: '2026-10-10',
     reviews: ['2026-10-14'], // Stage 1
     gaps: ['Coffee shops are ___ in this part of the city.', 'The ___ advertising followed us everywhere.'],
@@ -87,7 +89,7 @@ export const PREVIEW_WORDS: PreviewWord[] = [
     translations: [{ text: 'Телефоны есть повсюду.', answers: ['Phones are ubiquitous.'] }, { text: 'Реклама стала вездесущей.', answers: ['Advertising has become ubiquitous.'] }],
   },
   {
-    word: 'ephemeral', translation: 'недолговечный', definition: 'lasting for a very short time', example: 'Fame can be ephemeral.',
+    word: 'ephemeral', transcription: '/ɪˈfemərəl/', partOfSpeech: 'adjective', translation: 'недолговечный', definition: 'lasting for a very short time', example: 'Fame can be ephemeral.',
     synonyms: ['fleeting', 'brief'], added: '2026-10-18',
     reviews: [], // never reviewed (Stage 1)
     gaps: ['The beauty of the sunset was ___ and soon faded.', 'Social media posts are often ___.'],
@@ -126,7 +128,7 @@ export const PREVIEW_WORD_ANSWERS: Record<string, string> = answersOf(PREVIEW_WO
  */
 export const PHRASE_WORDS: PreviewWord[] = [
   {
-    word: 'give up', translation: 'сдаваться', definition: 'stop trying to do something, or accept that you cannot do it', example: 'Never give up on your dreams.',
+    word: 'give up', transcription: '/ɡɪv ʌp/', partOfSpeech: 'phrasal verb', translation: 'сдаваться', definition: 'stop trying to do something, or accept that you cannot do it', example: 'Never give up on your dreams.',
     synonyms: ['quit'], added: '2026-10-18',
     reviews: [], // never reviewed
     gaps: ['She decided not to ___ until the very end.', 'The runners refused to ___ in the heat.'],
@@ -136,21 +138,21 @@ export const PHRASE_WORDS: PreviewWord[] = [
     translations: [{ text: 'Он никогда не сдаётся.', answers: ['He never gives up.'] }, { text: 'Мы не сдадимся.', answers: ['We will not give up.'] }],
   },
   {
-    word: 'steady', translation: 'ровный', definition: 'firm, regular and not changing', example: 'Keep a steady pace.',
+    word: 'steady', transcription: '/ˈstedi/', partOfSpeech: 'adjective', translation: 'ровный', definition: 'firm, regular and not changing', example: 'Keep a steady pace.',
     synonyms: ['even'], added: '2026-10-01',
     reviews: ['2026-10-20'], gaps: ['Keep a ___ pace.'], collocations: ['a ___ hand'], form: { sentence: 'He walks ___.', cue: 'steady', answer: 'steadily' },
     confusable: { sentence: 'The boat stayed ___ in the wind.', options: ['steady', 'shaky'], reason: 'Steady means firm.' },
     translations: [{ text: 'Ровный шаг.', answers: ['A steady pace.'] }],
   },
   {
-    word: 'mellow', translation: 'мягкий', definition: 'pleasantly soft and relaxed', example: 'The mellow music calmed the room.',
+    word: 'mellow', transcription: '/ˈmeləʊ/', partOfSpeech: 'adjective', translation: 'мягкий', definition: 'pleasantly soft and relaxed', example: 'The mellow music calmed the room.',
     synonyms: ['soft'], added: '2026-10-02',
     reviews: ['2026-10-20'], gaps: ['The ___ light of the evening.'], collocations: ['a ___ mood'], form: { sentence: 'She laughed ___.', cue: 'mellow', answer: 'mellowly' },
     confusable: { sentence: 'The ___ wine was easy to drink.', options: ['mellow', 'bitter'], reason: 'Mellow means smooth.' },
     translations: [{ text: 'Мягкий свет.', answers: ['Mellow light.'] }],
   },
   {
-    word: 'crisp', translation: 'хрустящий', definition: 'firm, fresh and easy to break', example: 'The apple was crisp and sweet.',
+    word: 'crisp', transcription: '/krɪsp/', partOfSpeech: 'adjective', translation: 'хрустящий', definition: 'firm, fresh and easy to break', example: 'The apple was crisp and sweet.',
     synonyms: ['fresh'], added: '2026-10-03',
     reviews: ['2026-10-20'], gaps: ['A ___ autumn morning.'], collocations: ['a ___ bite'], form: { sentence: 'The bread was ___ on the outside.', cue: 'crisp', answer: 'crispy' },
     confusable: { sentence: 'The snow was ___ under our boots.', options: ['crisp', 'crispy'], reason: 'Crisp is the adjective used here.' },
@@ -168,7 +170,7 @@ const LIMIT_NAMES = [
 
 const limitWord = (word: string, i: number, reviewed: boolean): PreviewWord => ({
   word, translation: `перевод ${word}`, definition: `the meaning of ${word} (${i})`, example: `This is an example with ${word}.`,
-  synonyms: [`${word}ish`], added: `2026-10-${String(i + 1).padStart(2, '0')}`,
+  synonyms: [`${word}ish`], transcription: `/${word}/`, partOfSpeech: 'adjective', added: `2026-10-${String(i + 1).padStart(2, '0')}`,
   reviews: reviewed ? ['2026-10-20'] : [],
   gaps: [`Gap ${i}-1 ___.`, `Gap ${i}-2 ___.`],
   collocations: [`Collocation ${i} ___`],

@@ -1,6 +1,8 @@
 import { createContext, useCallback, useEffect, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
-import { generateWords } from '@/core/words/generate';
+import { generatePhonetics, generateWords } from '@/core/words/generate';
 import { fixSavedWordNames } from '@/core/words/name';
+import { wordsMissingPhonetics } from '@/core/words/phonetics';
+import { listWords } from '@/core/db/repos/words';
 import { useCore } from '@/ui/app/CoreProvider';
 import type { GenError } from '@/ui/today/StartSession';
 
@@ -36,6 +38,8 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState<ReadonlySet<number>>(new Set());
   const [version, setVersion] = useState(0);
   const queue = useRef<number[]>([]);
+  // Start-up phonetics run: runs after the queue is empty, never shown in `active` (its words stay ready).
+  const phonetics = useRef<number[]>([]);
   const looping = useRef(false);
   const current = useRef<number[]>([]);
   const started = useRef(false);
@@ -43,7 +47,18 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
   const loop = useCallback(async () => {
     looping.current = true;
     try {
-      while (queue.current.length > 0) {
+      while (queue.current.length > 0 || phonetics.current.length > 0) {
+        if (queue.current.length === 0) {
+          const ids = phonetics.current.splice(0);
+          setProgress({ done: 0, total: ids.length });
+          try {
+            await generatePhonetics(depsRef.current, ids, (done, total) => setProgress({ done, total }));
+          } catch {
+            // The words keep what they have; the next start runs them once more.
+          }
+          setVersion((n) => n + 1);
+          continue;
+        }
         const ids = queue.current.splice(0);
         current.current = ids;
         setProgress({ done: 0, total: ids.length });
@@ -62,7 +77,10 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
           setError({ message: e instanceof Error ? e.message : String(e) });
         }
         current.current = [];
-        if (stop) queue.current = [];
+        if (stop) {
+          queue.current = [];
+          phonetics.current = [];
+        }
         const left = new Set(queue.current);
         setActive(left);
         setVersion((n) => n + 1);
@@ -85,6 +103,14 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
     },
     [loop],
   );
+  const runPhonetics = useCallback(
+    (ids: number[]) => {
+      if (ids.length === 0) return;
+      phonetics.current.push(...ids);
+      if (!looping.current) void loop();
+    },
+    [loop],
+  );
   const clearNotices = useCallback(() => {
     setBusy(false);
     setError(null);
@@ -94,14 +120,21 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     runRef.current = run;
   }, [run]);
-  // Saved words with a bracketed tail are renamed once, then regenerated; StrictMode's second mount sees the ref set.
+  const runPhoneticsRef = useRef(runPhonetics);
+  useEffect(() => {
+    runPhoneticsRef.current = runPhonetics;
+  }, [runPhonetics]);
+  // Saved words with a bracketed tail are renamed once, then regenerated; then ready words without a transcription get
+  // the phonetics run. Both once per start; StrictMode's second mount sees the ref set.
   useEffect(() => {
     if (started.current) return;
     started.current = true;
     void (async () => {
       try {
-        const ids = await fixSavedWordNames(depsRef.current.db);
+        const db = depsRef.current.db;
+        const ids = await fixSavedWordNames(db);
         if (ids.length > 0) runRef.current(ids);
+        runPhoneticsRef.current(wordsMissingPhonetics(await listWords(db)));
       } catch (e) {
         setError({ message: e instanceof Error ? e.message : String(e) });
       }

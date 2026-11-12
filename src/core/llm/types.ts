@@ -75,6 +75,10 @@ export interface GeneratedWord {
   translation: string;
   example: string;
   synonyms: string[];
+  /** IPA between slashes. */
+  transcription: string;
+  /** English: noun, verb, adjective, adverb, phrasal verb, idiom, ... */
+  partOfSpeech: string;
   gaps: { sentence: string; answer: string; translation: string }[];
   collocations: { phrase: string; answer: string }[];
   forms: { sentence: string; cue: string; answer: string }[];

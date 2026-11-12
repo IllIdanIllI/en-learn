@@ -28,6 +28,8 @@ interface WordRow {
   link: string;
   added: ISODate;
   generation: Generation;
+  transcription: string;
+  part_of_speech: string;
 }
 
 interface ExerciseRow {
@@ -64,6 +66,8 @@ const toWord = (r: WordRow): Word => ({
   link: r.link,
   added: r.added,
   generation: r.generation,
+  transcription: r.transcription,
+  partOfSpeech: r.part_of_speech,
 });
 
 const toExercise = (r: ExerciseRow): WordExercise => ({
@@ -99,8 +103,8 @@ async function assertUnique(db: Db, word: string, exceptId: number): Promise<voi
 export async function insertWord(db: Db, f: WordFields, createdAt: string): Promise<number> {
   await assertUnique(db, f.word, -1);
   const { lastInsertId } = await db.execute(
-    'INSERT INTO word (word, definition, translation, example, synonyms, link, added, generation, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [f.word, f.definition, f.translation, f.example, JSON.stringify(f.synonyms), f.link, f.added, 'pending', createdAt],
+    'INSERT INTO word (word, definition, translation, example, synonyms, link, added, generation, created_at, transcription, part_of_speech) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [f.word, f.definition, f.translation, f.example, JSON.stringify(f.synonyms), f.link, f.added, 'pending', createdAt, f.transcription, f.partOfSpeech],
   );
   return lastInsertId;
 }
@@ -108,8 +112,8 @@ export async function insertWord(db: Db, f: WordFields, createdAt: string): Prom
 export async function updateWord(db: Db, id: number, f: WordFields): Promise<void> {
   await assertUnique(db, f.word, id);
   await db.execute(
-    'UPDATE word SET word = ?, definition = ?, translation = ?, example = ?, synonyms = ?, link = ?, added = ? WHERE id = ?',
-    [f.word, f.definition, f.translation, f.example, JSON.stringify(f.synonyms), f.link, f.added, id],
+    'UPDATE word SET word = ?, definition = ?, translation = ?, example = ?, synonyms = ?, link = ?, added = ?, transcription = ?, part_of_speech = ? WHERE id = ?',
+    [f.word, f.definition, f.translation, f.example, JSON.stringify(f.synonyms), f.link, f.added, f.transcription, f.partOfSpeech, id],
   );
 }
 
@@ -119,7 +123,7 @@ export async function setGeneration(db: Db, id: number, g: Generation): Promise<
 
 export async function listWords(db: Db): Promise<Word[]> {
   const rows = await db.select<WordRow>(
-    'SELECT id, word, definition, translation, example, synonyms, link, added, generation FROM word ORDER BY added, id',
+    'SELECT id, word, definition, translation, example, synonyms, link, added, generation, transcription, part_of_speech FROM word ORDER BY added, id',
   );
   return rows.map(toWord);
 }

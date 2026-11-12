@@ -385,6 +385,8 @@ const words = (userPrompt: string): WordsReply => ({
       translation: 'перевод',
       example: `I use ${w} in an example.`,
       synonyms: ['alternative', 'similar'],
+      transcription: `/${w}/`,
+      partOfSpeech: 'noun',
       gaps: [
         { sentence: 'I like ___ a lot.', answer: w, translation: 'Мне это очень нравится.' },
         { sentence: 'We talked about ___ yesterday.', answer: w, translation: 'Вчера мы говорили об этом.' },

@@ -6,7 +6,7 @@ import { wordErrorRows } from '@/core/progress/wordErrors';
 describe('wordErrorRows', () => {
   test('wordErrorRows maps a stored word error', async () => {
     const db = await createTestDb();
-    const wordId = await insertWord(db, { word: 'if', definition: '', translation: '', example: '', synonyms: [], link: '', added: '2026-10-19' }, 'NOW');
+    const wordId = await insertWord(db, { word: 'if', definition: '', translation: '', example: '', synonyms: [], transcription: '', partOfSpeech: '', link: '', added: '2026-10-19' }, 'NOW');
     const reviewId = await insertReview(db, {
       wordId, cardType: 'use', exerciseId: null, answeredAt: 'NOW', date: '2026-11-04', result: 'wrong', counted: true, text: 'If I would know.',
     });

@@ -115,7 +115,7 @@ async function runWords(model: string): Promise<WordsRun> {
   for (const c of cases) {
     ids.set(c.id, await insertWord(db, {
       word: c.word, definition: c.definition ?? '', translation: c.translation ?? '', example: c.example ?? '',
-      synonyms: c.synonyms ?? [], link: c.link ?? '', added: GRADE_DATE,
+      synonyms: c.synonyms ?? [], transcription: '', partOfSpeech: '', link: c.link ?? '', added: GRADE_DATE,
     }, clock.now()));
   }
   const started = Date.now();

@@ -28,6 +28,8 @@ export async function fixSavedWordNames(db: Db): Promise<number[]> {
         synonyms: w.synonyms,
         link: w.link,
         added: w.added,
+        transcription: w.transcription,
+        partOfSpeech: w.partOfSpeech,
       });
       // The exercises were made from the old name: the word is pending until it is generated again.
       await setGeneration(db, w.id, 'pending');

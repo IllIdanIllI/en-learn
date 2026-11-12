@@ -20,6 +20,8 @@ export function WordForm({ word, onSaved, onCancel }: { word?: Word; onSaved: ()
   const job = useWordsJob();
   const [text, setText] = useState(word?.word ?? '');
   const [translation, setTranslation] = useState(word?.translation ?? '');
+  const [transcription, setTranscription] = useState(word?.transcription ?? '');
+  const [partOfSpeech, setPartOfSpeech] = useState(word?.partOfSpeech ?? '');
   const [definition, setDefinition] = useState(word?.definition ?? '');
   const [example, setExample] = useState(word?.example ?? '');
   const [synonyms, setSynonyms] = useState((word?.synonyms ?? []).join(', '));
@@ -41,6 +43,8 @@ export function WordForm({ word, onSaved, onCancel }: { word?: Word; onSaved: ()
       synonyms: synonyms.split(',').map((s) => s.trim()).filter((s) => s !== ''),
       link: link.trim(),
       added: ISO.test(added) ? added : (word?.added ?? deps.clock.today()),
+      transcription: transcription.trim(),
+      partOfSpeech: partOfSpeech.trim(),
     };
     setSaving(true);
     setError(null);
@@ -56,6 +60,8 @@ export function WordForm({ word, onSaved, onCancel }: { word?: Word; onSaved: ()
       if (!word) {
         setText('');
         setTranslation('');
+        setTranscription('');
+        setPartOfSpeech('');
         setDefinition('');
         setExample('');
         setSynonyms('');
@@ -105,6 +111,8 @@ export function WordForm({ word, onSaved, onCancel }: { word?: Word; onSaved: ()
         {duplicate && <p role="alert" className="mt-1 text-sm text-destructive">{t(lang, 'words.duplicate')}</p>}
       </div>
       {field('translation', t(lang, 'words.field.translation'), translation, setTranslation)}
+      {field('transcription', t(lang, 'words.field.transcription'), transcription, setTranscription)}
+      {field('partOfSpeech', t(lang, 'words.field.partOfSpeech'), partOfSpeech, setPartOfSpeech)}
       {field('definition', t(lang, 'words.field.definition'), definition, setDefinition, { area: true })}
       {field('example', t(lang, 'words.field.example'), example, setExample, { area: true })}
       {field('synonyms', t(lang, 'words.field.synonyms'), synonyms, setSynonyms)}

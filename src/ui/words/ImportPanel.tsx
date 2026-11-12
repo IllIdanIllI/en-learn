@@ -38,6 +38,8 @@ export function ImportPanel({ existing, onImported, onChanged, onCancel }: { exi
               synonyms: fields.synonyms ?? [],
               link: fields.link ?? '',
               added: fields.added || today,
+              transcription: '',
+              partOfSpeech: '',
             },
             deps.clock.now(),
           );

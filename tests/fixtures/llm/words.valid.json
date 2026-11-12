@@ -6,6 +6,8 @@
       "translation": "заменять, вытеснять",
       "example": "The new rules supersede the old ones.",
       "synonyms": ["replace", "displace"],
+      "transcription": "/ˈsuːpəsiːd/",
+      "partOfSpeech": "verb",
       "gaps": [
         { "sentence": "Paper tickets were ___ by mobile ones.", "answer": "superseded", "translation": "Бумажные билеты заменили мобильными." },
         { "sentence": "This law will ___ the earlier regulation.", "answer": "supersede", "translation": "Этот закон заменит прежнее постановление." },

@@ -435,6 +435,8 @@ export const en = {
   'words.field.definition': 'Definition',
   'words.field.example': 'Example',
   'words.field.synonyms': 'Synonyms (comma-separated)',
+  'words.field.transcription': 'Transcription',
+  'words.field.partOfSpeech': 'Part of speech',
   'words.field.link': 'Link',
   'words.field.added': 'Added',
   'words.save': 'Save',

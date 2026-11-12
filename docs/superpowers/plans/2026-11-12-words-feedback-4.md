@@ -94,3 +94,31 @@
 - [ ] **Step 3: Implement** as in the notes.
 - [ ] **Step 4:** checks + e2e → PASS.
 - [ ] **Step 5: Commit** `feat(words): intro and easy tiles, slots with spaces, clue in the app language, Skip on the Check row`.
+
+---
+
+## Binding notes from the plan review (apply on top of the tasks above)
+
+**Task 1**
+- Module placement: `revealsWord`, `withSpaces`, `buildResult`, `clueOf` in `check.ts`; `BUILD_ATTEMPTS` in `constants.ts`.
+- `LIMIT_WORDS` seed: `limitWord()` in `wordsSeed.ts` puts the word in every gap/collocation/form prompt, so all of them reveal. Rewrite the prompts so they do not contain the word and stay unique (e.g. `Gap ${i}-1 ___.`, `Collocation ${i} ___`, `Form ${i} ___.`); keep `LIMIT_WORD_ANSWERS` consistent (keyed by prompt). Add a vitest that every exercise of `PREVIEW_WORDS` and `LIMIT_WORDS` passes `!revealsWord`.
+- Unit tests to update explicitly (new behaviour, not weakening): practice.test "ten new words give 30 cards" → 40, round 1 is intro cards (fix `options`/`letters` assertions on the first 10); "card counts by stage" → `[4, 2, 1]` and the per-round test gets round 4; `extraCardFor(…, 'choice')` → `build`; "no word back to back across 50 practices": add a second 4-card word so rounds 3–4 hold 2+ words, or assert "no neighbours share a word unless that round holds only one word"; check.test "spaces are removed before shuffling" → rewrite per K3.
+- `withSpaces` with a partial string: insert a space only before a letter whose index passes a gap; never a trailing space: `withSpaces('giveu','give up') === 'give u'`, `withSpaces('give','give up') === 'give'`, `withSpaces('giv','give up') === 'giv'`.
+- `anagram`: split on single spaces, skip empty parts; `canDiffer = parts.some(p => new Set(p).size > 1)`; if false return the joined original; otherwise up to 20 attempts shuffling each part; then fallback: rotate the first part that can differ by one letter (never across parts).
+- `revealsWord`: normalise ’ to '; return false when the word (trimmed) is empty, and ignore empty answers; escape with `/[.*+?^${}()|[\]\\]/g`; inside a phrase allow `\s+` between parts; match with flags `iu` and boundaries `(?<![\p{L}\p{N}'])…(?![\p{L}\p{N}'])`. Tests also: `revealsWord('', [], 'up') === false`, `revealsWord('x ___', [''], '') === false`.
+- Between the Task 1 and Task 2 commits the app plans `intro`/`build` cards that CardView cannot render yet; acceptable (Task 2 follows at once), do not stub.
+
+**Task 2**
+- Build state without races: keep `placed` and `mistakes` in state **and** refs (`placedRef`, `mistakesRef`) updated synchronously; compute the next list locally (`next = [...placedRef.current, i]`), then `setPlaced(next)` and `finish` when full; never call `finish`/`setMistakes` inside a state updater. Key handlers return early when `finished.current` or locked, and ignore `e.repeat`. Clear the previous flash timeout before setting a new one; clear on unmount.
+- DOM contract: tiles `data-testid="tile"`, placed tiles render `disabled` (anagram and build); slots `data-testid="slot"` inside one `data-testid="slot-group"` per word part; anagram filled slots are buttons with `data-testid="placed"` (as now); build slots are plain elements.
+- Tile grid: `cols = Math.min(6, n)` in JS, `style={{ gridTemplateColumns: \`repeat(${cols}, 2.75rem)\` }}`, `justify-content: center`; tiles `h-11 min-w-11` with larger text.
+- K1 layout: on typed cards the Input stays on its own line; Check, First letter (where shown) and Skip go together in one flex row under it (same for translation, anagram and use).
+- `spell` with a space: render the letters per word group (a visible gap between groups), not one joined string.
+- Intro: "Понятно" focused on mount; it ignores Enter auto-repeat (`e.repeat`), and the `Дальше` focus logic is unchanged.
+- e2e/cursor updates (counts re-counted after the change; expected now: 14→15, import test 20→23, failed-word 14→15, 30→40, wrong-choice 15→16; verify each by running):
+  - words-limit's first card is `intro`; "first seven cards … ephemeral first" → ephemeral's first card is `intro`.
+  - "Ending early": answer until the first non-intro card is answered, then assert the end count dynamically (intro cards are not counted).
+  - Ephemeral order `intro, choice, build, gap_hint`; adjacency assertion: no two neighbours share a word **unless only that word has cards left in the round** (ephemeral's build and gap_hint may be consecutive in the `words` seed). After a wrong choice the extra is `build`; drop the "extra not next to ephemeral" assertion where it cannot hold. "A second wrong answer adds no card" is rewritten around `build`.
+  - cursor.spec anagram case: use `?state=words` and `advanceTo('anagram')` (stage-1 words) with `PREVIEW_WORD_ANSWERS`; add a separate `build` case in `words-limit`; the 30→40 end-screen loop branches on `intro` ("Понятно", no "Дальше").
+  - `words-phrase`: add to `PREVIEW_STATES` and the seeding `if` in fixtures.ts; export `PHRASE_WORDS` and `PHRASE_WORD_ANSWERS` from wordsSeed.ts; the three other words have `reviews: ['2026-10-20']` (not due on TUESDAY); no failed word is added in this state (intended).
+  - Re-verify that `spell`, `translation` and `use` still appear in the first `words` practice (seeded rand changed); if not, adjust the seed, never drop the test.

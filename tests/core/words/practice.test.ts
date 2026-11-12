@@ -11,6 +11,8 @@ import { getSettings } from '@/core/db/repos/settings';
 import { extraNewFor } from '@/core/words/queue';
 import type { Deps, LlmResult } from '@/core/ports';
 import type { ExerciseType, WordExercise, WordFields, WordReview } from '@/core/words/types';
+import { revealsWord } from '@/core/words/check';
+import { exercisesOf, LIMIT_WORDS, PREVIEW_WORDS } from '@/adapters/preview/wordsSeed';
 
 const good = (data: unknown): LlmResult<unknown> => ({ ok: true, data, costUsd: 0, durationMs: 1, raw: '{}' });
 const fail: LlmResult<unknown> = { ok: false, code: 'not_signed_in', message: 'sign in', costUsd: 0, durationMs: 1, raw: '' };
@@ -62,19 +64,25 @@ describe('recordAnswer', () => {
 });
 
 describe('buildPractice', () => {
-  test('ten new words give 30 cards: 10 choice cards on distinct words first, then anagrams, no repeat field', async () => {
+  test('ten new words give 40 cards: round 1 is the 10 intro cards, then choice, build and anagram rounds, no repeat field', async () => {
     const deps = await setup();
     for (let i = 0; i < 12; i++) await addReady(deps, `word${i}`);
     const cards = await buildPractice(deps);
-    expect(cards).toHaveLength(30);
-    expect(cards.slice(0, 10).every((c) => c.card.type === 'choice' && c.round === 1)).toBe(true);
+    expect(cards).toHaveLength(40);
+    expect(cards.slice(0, 10).every((c) => c.card.type === 'intro' && c.round === 1)).toBe(true);
     expect(new Set(cards.slice(0, 10).map((c) => c.wordId)).size).toBe(10);
-    expect(cards.slice(10).map((c) => c.card.type)).toEqual(Array(20).fill('anagram'));
     for (const c of cards.slice(0, 10)) {
+      expect(c.options).toBeNull();
+      expect(c.letters).toBeNull();
+    }
+    expect(cards.slice(10, 20).map((c) => c.card.type)).toEqual(Array(10).fill('choice'));
+    for (const c of cards.slice(10, 20)) {
       expect(c.options).toContain(c.word.word);
       expect(c.letters).toBeNull();
     }
-    for (const c of cards.slice(10)) expect(c.letters).not.toBeNull();
+    expect(cards.slice(20, 30).map((c) => c.card.type)).toEqual(Array(10).fill('build'));
+    expect(cards.slice(30).map((c) => c.card.type)).toEqual(Array(10).fill('anagram'));
+    for (const c of cards.slice(20)) expect(c.letters).not.toBeNull();
     expect(cards.every((c) => !('repeat' in c))).toBe(true);
   });
 
@@ -90,8 +98,9 @@ describe('buildPractice', () => {
     expect(inRound(1)).toEqual(ids);
     expect(inRound(2)).toEqual(ids);
     expect(inRound(3)).toEqual([fresh]);
+    expect(inRound(4)).toEqual([fresh]);
     const of = (id: number) => cards.filter((c) => c.wordId === id).map((c) => c.card.type);
-    expect(of(fresh)).toEqual(['choice', 'anagram', 'gap_hint']);
+    expect(of(fresh)).toEqual(['intro', 'choice', 'build', 'gap_hint']);
     expect(of(stage2)).toHaveLength(2);
     expect(of(stage2).every((t) => t === 'gap' || t === 'form' || t === 'spell')).toBe(true);
   });
@@ -112,6 +121,7 @@ describe('buildPractice', () => {
     await insertReview(deps.db, review(stage2, '2026-01-01'));
     await insertReview(deps.db, review(stage2, '2026-01-05'));
     await addReady(deps, 'fresh', '2026-11-01', [ex('gap', { answers: ['x'] })]);
+    await addReady(deps, 'fresh2', '2026-11-01', [ex('gap', { answers: ['x'] })]);
     for (let seed = 1; seed <= 50; seed++) {
       deps.rand = mulberry32(seed);
       const cards = await buildPractice(deps);
@@ -119,7 +129,7 @@ describe('buildPractice', () => {
     }
   });
 
-  test('card counts by stage: new 3, stage 2 with gap and form 2, stage 4 1', async () => {
+  test('card counts by stage: new 4, stage 2 with gap and form 2, stage 4 1', async () => {
     const deps = await setup();
     const fresh = await addReady(deps, 'fresh', '2026-10-01');
     const s2 = await addReady(deps, 's2', '2026-10-01', [ex('gap', { answers: ['x'] }), ex('form', { answers: ['y'] })]);
@@ -133,7 +143,7 @@ describe('buildPractice', () => {
     }
     const cards = await buildPractice(deps);
     const count = (id: number) => cards.filter((c) => c.wordId === id).length;
-    expect([count(fresh), count(s2), count(s4)]).toEqual([3, 2, 1]);
+    expect([count(fresh), count(s2), count(s4)]).toEqual([4, 2, 1]);
   });
 
   test('a stage 2 word without exercises gets two spell cards with letters', async () => {
@@ -165,12 +175,12 @@ describe('extraCardFor', () => {
     expect(card?.wordId).toBe(id);
   });
 
-  test('a missed choice card gives an anagram card with letters', async () => {
+  test('a missed choice card gives a build card with letters', async () => {
     const deps = await setup();
     const id = await addReady(deps, 'alpha');
     const { views, view } = await viewOf(deps, id);
     const card = extraCardFor(view, 'choice', views.map((v) => v.word), () => 0.5);
-    expect(card?.card.type).toBe('anagram');
+    expect(card?.card.type).toBe('build');
     expect(card?.letters).not.toBeNull();
   });
 
@@ -187,6 +197,44 @@ describe('extraCardFor', () => {
     // Without the queued card g2 the never-used g2 would come first.
     expect(extraCardFor(after.view, 'gap', all, () => 0.5)?.card.exercise?.id).toBe(g2);
     expect(extraCardFor(after.view, 'gap', all, () => 0.5, [g2])?.card.exercise?.id).toBe(g3);
+  });
+});
+
+describe('saved exercises that reveal the word', () => {
+  test('a gap that reveals the word is not planned; the clean gap is', async () => {
+    const deps = await setup();
+    const id = await addReady(deps, 'intermittent', '2026-11-01', [
+      ex('gap', { prompt: 'Intermittent ___ showers kept on.', answers: ['rain'] }),
+      ex('gap', { prompt: 'The sky was ___ today.', answers: ['grey'] }),
+    ]);
+    const views = await loadWordViews(deps.db);
+    expect(views.find((v) => v.word.id === id)!.exercises.map((e) => e.prompt)).toEqual(['The sky was ___ today.']);
+    const cards = (await buildPractice(deps)).filter((c) => c.wordId === id);
+    expect(cards.map((c) => c.card.type)).toEqual(['intro', 'choice', 'build', 'gap_hint']);
+    expect(cards[3]?.card.exercise?.prompt).toBe('The sky was ___ today.');
+  });
+
+  test('a collocation and a form that reveal the word are dropped; other types are kept', async () => {
+    const deps = await setup();
+    const id = await addReady(deps, 'intermittent', '2026-11-01', [
+      ex('collocation', { prompt: 'an intermittent ___', answers: ['x'] }),
+      ex('form', { prompt: 'It rained ___ today, intermittent.', answers: ['x'] }),
+      ex('confusable', { prompt: 'A ___ signal.', answers: ['intermittent'], options: ['intermittent', 'steady'] }),
+    ]);
+    const views = await loadWordViews(deps.db);
+    expect(views.find((v) => v.word.id === id)!.exercises.map((e) => e.type)).toEqual(['confusable']);
+  });
+});
+
+describe('seeded practice words', () => {
+  test('no seeded gap, collocation or form reveals its word', () => {
+    for (const w of [...PREVIEW_WORDS, ...LIMIT_WORDS]) {
+      for (const e of exercisesOf(w)) {
+        if (e.type === 'gap' || e.type === 'collocation' || e.type === 'form') {
+          expect(revealsWord(e.prompt, e.answers, w.word)).toBe(false);
+        }
+      }
+    }
   });
 });
 

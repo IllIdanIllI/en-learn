@@ -74,6 +74,28 @@ describe('generateWords', () => {
     expect((await listExercises(deps.db)).every((e) => e.wordId === ids[0])).toBe(true);
   });
 
+  test('a gap that reveals the word is not saved; the other gaps are', async () => {
+    const llm = new FakeLlm({ words: [echo((w) => (w === 'mixed' ? { gaps: [{ sentence: 'mixed ___ here.', answer: 'x', translation: '' }, ...gen().gaps] } : {}))] });
+    const deps = await setup(llm);
+    const [id] = await add(deps, 'mixed');
+    expect(await generateWords(deps, [id!])).toEqual({ ok: true, failed: 0 });
+    const saved = (await listExercises(deps.db)).filter((e) => e.wordId === id);
+    expect(saved.filter((e) => e.type === 'gap').map((e) => e.prompt)).toEqual(['Gap 1 ___ here.', 'Gap 2 ___ here.', 'Gap 3 ___ here.']);
+    expect(saved).toHaveLength(7);
+    expect((await listWords(deps.db))[0]!.generation).toBe('ready');
+  });
+
+  test('a word whose every gap reveals it fails; the others are ready', async () => {
+    const revealing = (w: string) => ({ gaps: gen().gaps.map((g) => ({ ...g, sentence: `${w} ___ here.` })) });
+    const llm = new FakeLlm({ words: [echo((w) => (w === 'bad' ? revealing(w) : {}))] });
+    const deps = await setup(llm);
+    const ids = await add(deps, 'good', 'bad');
+    expect(await generateWords(deps, ids)).toEqual({ ok: true, failed: 1 });
+    const gens = Object.fromEntries((await listWords(deps.db)).map((w) => [w.word, w.generation]));
+    expect(gens).toEqual({ good: 'ready', bad: 'failed' });
+    expect((await listExercises(deps.db)).some((e) => e.wordId === ids[1])).toBe(false);
+  });
+
   test('12 words -> 3 calls', async () => {
     const llm = new FakeLlm({ words: [echo(), echo(), echo()] });
     const deps = await setup(llm);

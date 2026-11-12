@@ -1,4 +1,5 @@
 import type { GeneratedWord, WordCheckReply, WordsReply } from '@/core/llm/types';
+import { revealsWord } from './check';
 import type { Word, WordExercise } from './types';
 
 const GAP = '___';
@@ -53,6 +54,17 @@ export function wordProblems(g: GeneratedWord, word: string): string[] {
     for (const a of x.answers) answer('translation', a);
   }
   return p;
+}
+
+/** The gaps, collocations and forms that do not reveal the word (their text, with ___ taken out, shows neither the word nor the answer). */
+export function withoutRevealing(g: GeneratedWord, word: string): GeneratedWord {
+  const clean = (text: string, answer: string) => !revealsWord(text, [answer], word);
+  return {
+    ...g,
+    gaps: g.gaps.filter((x) => clean(x.sentence, x.answer)),
+    collocations: g.collocations.filter((x) => clean(x.phrase, x.answer)),
+    forms: g.forms.filter((x) => clean(x.sentence, x.answer)),
+  };
 }
 
 type Ex = Omit<WordExercise, 'id' | 'wordId'>;

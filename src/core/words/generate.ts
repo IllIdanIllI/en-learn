@@ -5,7 +5,7 @@ import { callStructured } from '@/core/llm/call';
 import { listWords, replaceExercises, setGeneration, updateWord } from '@/core/db/repos/words';
 import { withJobLock } from '@/core/session/jobLock';
 import { BATCH_SIZE } from './constants';
-import { checkWordsReply, exercisesFrom, wordProblems } from './generated';
+import { checkWordsReply, exercisesFrom, withoutRevealing, wordProblems } from './generated';
 
 export type GenerateResult = { ok: true; failed: number } | { ok: false; message: string; code?: 'busy' | LlmErrorCode };
 
@@ -48,6 +48,12 @@ async function runBatch(deps: Deps, ids: number[]): Promise<BatchOutcome> {
       failed++;
       continue;
     }
+    const kept = withoutRevealing(g, w.word);
+    if (kept.gaps.length === 0) {
+      await setGeneration(deps.db, w.id, 'failed');
+      failed++;
+      continue;
+    }
     await updateWord(deps.db, w.id, {
       word: w.word,
       definition: w.definition.trim() === '' ? g.definition : w.definition,
@@ -57,7 +63,7 @@ async function runBatch(deps: Deps, ids: number[]): Promise<BatchOutcome> {
       link: w.link,
       added: w.added,
     });
-    await replaceExercises(deps.db, w.id, exercisesFrom(g));
+    await replaceExercises(deps.db, w.id, exercisesFrom(kept));
     await setGeneration(deps.db, w.id, 'ready');
   }
   return { failed };

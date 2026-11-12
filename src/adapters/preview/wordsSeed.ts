@@ -125,9 +125,9 @@ const limitWord = (word: string, i: number, reviewed: boolean): PreviewWord => (
   word, translation: `перевод ${word}`, definition: `the meaning of ${word} (${i})`, example: `This is an example with ${word}.`,
   synonyms: [`${word}ish`], added: `2026-10-${String(i + 1).padStart(2, '0')}`,
   reviews: reviewed ? ['2026-10-20'] : [],
-  gaps: [`A gap sentence number one for ${word} is ___.`, `A gap sentence number two for ${word} is ___.`],
-  collocations: [`a ${word} ___`],
-  form: { sentence: `A form sentence for ${word} is ___.`, cue: word, answer: `${word}ly` },
+  gaps: [`Gap ${i}-1 ___.`, `Gap ${i}-2 ___.`],
+  collocations: [`Collocation ${i} ___`],
+  form: { sentence: `Form ${i} ___.`, cue: word, answer: `${word}ly` },
   confusable: { sentence: `A confusable sentence for ${word} is ___.`, options: [word, `${word}er`], reason: `${word} is the right one.` },
   translations: [{ text: `Русский текст про ${word}.`, answers: [`English text about ${word}.`] }],
 });

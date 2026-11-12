@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
-  buildWordCheckPrompt, checkWordCheckReply, checkWordsReply, exercisesFrom, wordProblems,
+  buildWordCheckPrompt, checkWordCheckReply, checkWordsReply, exercisesFrom, withoutRevealing, wordProblems,
 } from '@/core/words/generated';
 import type { GeneratedWord, WordCheckReply, WordsReply } from '@/core/llm/types';
 import { gen } from './helpers';
@@ -70,6 +70,30 @@ describe('wordProblems', () => {
   test('irregular and phrasal answers pass (no stem check)', () => {
     const g = gen({ forms: [{ sentence: 'She ___ on more work.', cue: 'take on', answer: 'took on' }] });
     expect(wordProblems(g, 'take on')).toEqual([]);
+  });
+});
+
+describe('withoutRevealing', () => {
+  test('keeps the gaps, collocations and forms that do not reveal the word', () => {
+    const g = gen({ forms: [{ sentence: 'She ___ on.', cue: 'c', answer: 'went' }] });
+    expect(withoutRevealing(g, 'supersede')).toEqual(g);
+  });
+
+  test('drops a gap, collocation or form whose text or answer shows the word', () => {
+    const g = gen({
+      gaps: [{ sentence: 'Supersede ___ here.', answer: 'x', translation: '' }, ...gen().gaps],
+      collocations: [{ phrase: 'a ___ b', answer: 'supersede' }, { phrase: 'Supersede the ___', answer: 'x' }],
+      forms: [{ sentence: 'It was ___ and superseded later.', cue: 'c', answer: 'superseded' }, { sentence: 'It ___ ok.', cue: 'c', answer: 'superseded' }],
+    });
+    const kept = withoutRevealing(g, 'supersede');
+    expect(kept.gaps.map((x) => x.sentence)).toEqual(['Gap 1 ___ here.', 'Gap 2 ___ here.', 'Gap 3 ___ here.']);
+    expect(kept.collocations.map((x) => x.phrase)).toEqual(['a ___ b']);
+    expect(kept.forms.map((x) => x.sentence)).toEqual(['It ___ ok.']);
+  });
+
+  test('the other fields are kept as they are', () => {
+    const g = gen({ gaps: [{ sentence: 'Supersede ___.', answer: 'x', translation: '' }, ...gen().gaps] });
+    expect(withoutRevealing(g, 'supersede')).toMatchObject({ word: g.word, definition: g.definition, translations: g.translations });
   });
 });
 

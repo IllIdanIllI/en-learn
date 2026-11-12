@@ -14,9 +14,9 @@ export function cardOfType(type: CardType, exercises: WordExercise[], lastUsed: 
   return exercise ? { type, exercise } : null;
 }
 
-// The extra card after a mistake repeats the missed type; a missed choice card becomes an anagram.
+// The extra card after a mistake repeats the missed type; a missed choice or build card becomes a build card.
 export function extraType(missed: CardType): CardType {
-  return missed === 'choice' ? 'anagram' : missed;
+  return missed === 'choice' || missed === 'build' ? 'build' : missed;
 }
 
 // The cards of one word for one practice, fixed from its stage at the start.
@@ -38,7 +38,7 @@ export function planCards(i: {
   const pick = <T>(list: T[]): T | undefined => list[Math.floor(rand() * list.length)];
   const hasGap = exercises.some((e) => e.type === 'gap');
 
-  if (!state.reviewed) return plan(['choice', 'anagram', hasGap ? 'gap_hint' : 'anagram']);
+  if (!state.reviewed) return plan(['intro', 'choice', 'build', hasGap ? 'gap_hint' : 'anagram']);
   if (state.stage === 1) return plan(['anagram', hasGap ? 'gap_hint' : 'anagram']);
 
   const recall = availableTypes(2, false, exercises);

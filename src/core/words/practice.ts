@@ -6,7 +6,7 @@ import { getSettings, setSetting } from '@/core/db/repos/settings';
 import { getTopics } from '@/core/db/repos/programme';
 import { findTopicRule } from '@/core/db/repos/writing';
 import { insertReview, insertWordErrors, listExercises, listReviews, listWords } from '@/core/db/repos/words';
-import { anagram, choiceOptions } from './check';
+import { anagram, choiceOptions, revealsWord } from './check';
 import { EXTRA_NEW_STEP } from './constants';
 import { buildWordCheckPrompt, checkWordCheckReply } from './generated';
 import { cardOfType, extraType, orderRounds, planCards, USED_LAST } from './plan';
@@ -37,7 +37,11 @@ export async function loadWordViews(db: Db): Promise<WordView[]> {
   const rv = groupBy(reviews, (r) => r.wordId);
   return words.map((word) => {
     const wordReviews = rv.get(word.id) ?? [];
-    return { word, state: replayWord(wordReviews), exercises: ex.get(word.id) ?? [], reviews: wordReviews };
+    // A saved gap, collocation or form that shows the word is left in the database but never practised.
+    const exercises = (ex.get(word.id) ?? []).filter(
+      (e) => !((e.type === 'gap' || e.type === 'collocation' || e.type === 'form') && revealsWord(e.prompt, e.answers, word.word)),
+    );
+    return { word, state: replayWord(wordReviews), exercises, reviews: wordReviews };
   });
 }
 
@@ -68,11 +72,11 @@ export function toPracticeCard(view: WordView, card: Card, all: Word[], rand: ()
       : card.type === 'confusable'
         ? (card.exercise?.options ?? null)
         : null;
-  const letters = card.type === 'anagram' || card.type === 'spell' ? anagram(view.word.word, rand) : null;
+  const letters = card.type === 'anagram' || card.type === 'build' || card.type === 'spell' ? anagram(view.word.word, rand) : null;
   return { wordId: view.word.id, word: view.word, card, options, letters };
 }
 
-// The extra card after a mistake: the missed type again (a missed choice card becomes an anagram).
+// The extra card after a mistake: the missed type again (a missed choice card becomes a build card).
 // queued: exercise ids of this word's cards still ahead in the practice; they count as just used, so the extra takes another item.
 export function extraCardFor(
   view: WordView,

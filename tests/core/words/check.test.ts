@@ -1,12 +1,16 @@
 import { describe, expect, test } from 'vitest';
 import {
   anagram,
+  buildResult,
   checkTranslation,
   checkTyped,
   choiceOptions,
+  clueOf,
   normalise,
   resultFor,
+  revealsWord,
   spellingsOf,
+  withSpaces,
 } from '@/core/words/check';
 import type { Word } from '@/core/words/types';
 
@@ -126,10 +130,26 @@ describe('anagram', () => {
     }
   });
 
-  test('spaces are removed before shuffling', () => {
-    const result = anagram('ice cream', mulberry32(7));
-    expect(result).not.toContain(' ');
-    expect([...result].sort().join('')).toBe([...'icecream'].sort().join(''));
+  test('a phrase keeps its single space, each word is a permutation of its letters, and the result differs', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const result = anagram('give up', mulberry32(seed));
+      expect(result.indexOf(' ')).toBe(4);
+      expect(result.split(' ')).toHaveLength(2);
+      const [first, second] = result.split(' ') as [string, string];
+      expect([...first].sort().join('')).toBe('egiv');
+      expect([...second].sort().join('')).toBe('pu');
+      expect(result).not.toBe('give up');
+    }
+  });
+
+  test('a phrase whose words all repeat one letter is returned as it is', () => {
+    expect(anagram('aa bb', mulberry32(4))).toBe('aa bb');
+    expect(anagram('a b', mulberry32(4))).toBe('a b');
+  });
+
+  test('the fallback rotates the first word that can differ, never across words', () => {
+    expect(anagram('ab cd', () => 0.999999)).toBe('ba cd');
+    expect(anagram('aa bcd', () => 0.999999)).toBe('aa cdb');
   });
 
   test('all-same letters cannot differ and still return', () => {
@@ -162,6 +182,84 @@ describe('choiceOptions', () => {
     expect(options).toHaveLength(3);
     expect(options.filter((o) => o.toLowerCase() === 'coherence')).toHaveLength(1);
     expect(options.filter((o) => o.toLowerCase() === 'unity')).toHaveLength(1);
+  });
+});
+
+describe('withSpaces', () => {
+  test('puts the spaces of the word back at the same positions', () => {
+    expect(withSpaces('giveup', 'give up')).toBe('give up');
+    expect(withSpaces('abc', 'abc')).toBe('abc');
+  });
+
+  test('a partial string gets a space only before a letter that passes a gap, never a trailing one', () => {
+    expect(withSpaces('giveu', 'give up')).toBe('give u');
+    expect(withSpaces('give', 'give up')).toBe('give');
+    expect(withSpaces('giv', 'give up')).toBe('giv');
+  });
+});
+
+describe('buildResult', () => {
+  test('no mistake is correct, one or two are hard, three or more are wrong', () => {
+    expect(buildResult(0)).toBe('correct');
+    expect(buildResult(1)).toBe('hard');
+    expect(buildResult(2)).toBe('hard');
+    expect(buildResult(3)).toBe('wrong');
+    expect(buildResult(4)).toBe('wrong');
+  });
+});
+
+describe('revealsWord', () => {
+  test('a word shown in the text, outside the gap, reveals it, whatever the case', () => {
+    expect(revealsWord('Intermittent ___ showers', ['rain'], 'intermittent')).toBe(true);
+    expect(revealsWord('Intermittent ___ showers kept on', ['rain'], 'intermittent')).toBe(true);
+  });
+
+  test('an answer shown in the text reveals the word', () => {
+    expect(revealsWord('They ___ it; superseded rules', ['superseded'], 'supersede')).toBe(true);
+  });
+
+  test('a phrase word reveals the phrase, with any spaces between its words', () => {
+    expect(revealsWord('Do not give up ___', ['x'], 'give up')).toBe(true);
+    expect(revealsWord('Do not give   up ___', ['x'], 'give up')).toBe(true);
+  });
+
+  test('the word only inside a longer word does not reveal it', () => {
+    expect(revealsWord('It was ___ reliable', ['rely'], 'rely')).toBe(false);
+    expect(revealsWord('It is reliable ___', [], 'able')).toBe(false);
+  });
+
+  test('a gap that is the only place for the word does not reveal it', () => {
+    expect(revealsWord('___ showers kept on', ['rain'], 'intermittent')).toBe(false);
+    expect(revealsWord('Intermittent ___ showers', ['rain'], 'supersede')).toBe(false);
+  });
+
+  test('a word with regular-expression characters does not throw', () => {
+    expect(revealsWord('The c++ language ___', ['x'], 'c++')).toBe(true);
+    expect(revealsWord('The ___ language', ['x'], 'c++')).toBe(false);
+  });
+
+  test('a typographic apostrophe matches a straight one', () => {
+    expect(revealsWord('Don’t ___', [], "don't")).toBe(true);
+  });
+
+  test('an empty word or no text reveals nothing; empty answers are ignored', () => {
+    expect(revealsWord('', [], 'up')).toBe(false);
+    expect(revealsWord('x ___', [''], '')).toBe(false);
+    expect(revealsWord('x ___', [''], 'up')).toBe(false);
+  });
+});
+
+describe('clueOf', () => {
+  const both = { ...word(1, 'coherence'), translation: '  связность ', definition: 'the quality of fitting together' };
+
+  test('Russian shows the translation, English the definition', () => {
+    expect(clueOf(both, 'ru')).toBe('связность');
+    expect(clueOf(both, 'en')).toBe('the quality of fitting together');
+  });
+
+  test('a missing field falls back to the other one', () => {
+    expect(clueOf({ ...both, translation: '  ' }, 'ru')).toBe('the quality of fitting together');
+    expect(clueOf({ ...both, definition: '' }, 'en')).toBe('связность');
   });
 });
 

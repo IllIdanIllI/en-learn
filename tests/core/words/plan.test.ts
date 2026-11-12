@@ -18,12 +18,12 @@ const plan = (overrides: Partial<WordState>, exercises: WordExercise[], lastUsed
 const types = (cards: { type: CardType }[]) => cards.map((c) => c.type);
 
 describe('planCards', () => {
-  test('new word: choice, anagram, gap_hint when a gap exercise exists', () => {
-    expect(types(plan({}, [exercise(1, 'gap')]))).toEqual(['choice', 'anagram', 'gap_hint']);
+  test('new word: intro, choice, build, gap_hint when a gap exercise exists', () => {
+    expect(types(plan({}, [exercise(1, 'gap')]))).toEqual(['intro', 'choice', 'build', 'gap_hint']);
   });
 
-  test('new word without a gap exercise: choice, anagram, anagram', () => {
-    expect(types(plan({}, []))).toEqual(['choice', 'anagram', 'anagram']);
+  test('new word without a gap exercise: intro, choice, build, anagram', () => {
+    expect(types(plan({}, []))).toEqual(['intro', 'choice', 'build', 'anagram']);
   });
 
   test('in progress stage 1: anagram, gap_hint when a gap exercise exists', () => {
@@ -110,6 +110,11 @@ describe('planCards', () => {
 });
 
 describe('cardOfType', () => {
+  test('intro and build have no exercise', () => {
+    expect(cardOfType('intro', [], new Map())).toEqual({ type: 'intro', exercise: null });
+    expect(cardOfType('build', [], new Map())).toEqual({ type: 'build', exercise: null });
+  });
+
   test('gap returns a gap card regardless of stage', () => {
     const gap = exercise(5, 'gap');
     expect(cardOfType('gap', [gap], new Map())).toEqual({ type: 'gap', exercise: gap });
@@ -125,9 +130,11 @@ describe('cardOfType', () => {
 });
 
 describe('extraType', () => {
-  test('a missed choice card gets an anagram, other types stay the same', () => {
-    expect(extraType('choice')).toBe('anagram');
+  test('a missed choice or build card gets a build card, other types stay the same', () => {
+    expect(extraType('choice')).toBe('build');
+    expect(extraType('build')).toBe('build');
     expect(extraType('form')).toBe('form');
+    expect(extraType('anagram')).toBe('anagram');
   });
 
   test('a missed spell card gives a spell card', () => {

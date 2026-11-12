@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, LoaderCircle, X } from 'lucide-react';
 import { t } from '@/core/i18n';
 import type { WordCheckReply } from '@/core/llm/types';
-import { checkTranslation, checkTyped, normalise, resultFor, spellingsOf } from '@/core/words/check';
+import { buildResult, checkTranslation, checkTyped, clueOf, normalise, resultFor, spellingsOf, withSpaces } from '@/core/words/check';
+import { BUILD_ATTEMPTS } from '@/core/words/constants';
 import { wordLink } from '@/core/words/link';
 import { checkUseIt, type PracticeCard } from '@/core/words/practice';
 import type { ReviewResult } from '@/core/words/types';
@@ -25,6 +26,10 @@ type Feedback = { result: ReviewResult; text: string; use?: WordCheckReply; skip
 
 const TYPED = ['spell', 'gap_hint', 'gap', 'collocation', 'form'] as const;
 const GAP_TYPES = ['gap_hint', 'gap', 'collocation', 'form'];
+// The fill-the-word cards that show the clue line (K5); form has its cue instead.
+const CLUE_TYPES = ['gap_hint', 'gap', 'collocation'];
+// Cards without a Check button keep Skip on a row of its own (K1).
+const SKIP_ALONE = ['choice', 'confusable', 'build'];
 
 function enterKey(e: React.KeyboardEvent, submit: () => void) {
   if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -82,6 +87,75 @@ function FeedbackView({ pc, fb }: { pc: PracticeCard; fb: Feedback }) {
   );
 }
 
+/** The intro of a new word: not a test, so it has no result, no Skip and no Check; Понятно moves on. */
+function IntroView({ pc, onNext }: { pc: PracticeCard; onNext: () => void }) {
+  const { lang } = useCore();
+  const { word } = pc;
+  const gotIt = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    gotIt.current?.focus();
+  }, []);
+  return (
+    <div data-card-type="intro">
+      <p className="text-sm text-muted-foreground">{t(lang, 'words.instr.intro')}</p>
+      <p className="answer mt-3 text-2xl font-semibold">{word.word}</p>
+      {word.translation !== '' && <p className="mt-1 text-muted-foreground">{word.translation}</p>}
+      {word.definition !== '' && <p className="reading mt-3">{word.definition}</p>}
+      {word.example !== '' && <p className="mt-3 text-muted-foreground">{word.example}</p>}
+      <p className="mt-3">
+        <ExternalLink href={wordLink(word.word, word.link)} className="text-primary underline underline-offset-2">
+          {t(lang, 'words.openLink')}
+        </ExternalLink>
+      </p>
+      <div className="mt-4">
+        <Button
+          ref={gotIt}
+          // Holding Enter must not press Понятно again and again.
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && e.repeat) e.preventDefault();
+          }}
+          onClick={onNext}
+        >
+          {t(lang, 'words.gotIt')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** The letters of a word in slots, one box per letter, grouped per word part with a gap between the parts; `letters` fill the boxes in order. */
+function Slots({ word, letters, locked, onReturn }: { word: string; letters: string[]; locked: boolean; onReturn?: (k: number) => void }) {
+  const sizes = word.split(' ').filter((p) => p !== '').map((p) => Array.from(p).length);
+  let k = 0;
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+      {sizes.map((size, g) => (
+        <div key={g} data-testid="slot-group" className="flex gap-1.5">
+          {Array.from({ length: size }, () => {
+            const i = k++;
+            const letter = letters[i];
+            if (letter === undefined) {
+              return <div key={i} data-testid="slot" className="size-11 rounded-md border-2 border-dashed border-border" />;
+            }
+            if (onReturn) {
+              return (
+                <Button key={i} data-testid="placed" variant="secondary" className="answer size-11 p-0 text-xl" disabled={locked} onClick={() => onReturn(i)}>
+                  {letter}
+                </Button>
+              );
+            }
+            return (
+              <div key={i} data-testid="slot" className="answer flex size-11 items-center justify-center rounded-md border-2 border-primary text-xl">
+                {letter}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function CardView({ pc, onResult, onNext }: CardProps) {
   const { deps, lang } = useCore();
   const { card, word } = pc;
@@ -98,8 +172,15 @@ export function CardView({ pc, onResult, onNext }: CardProps) {
   const [checking, setChecking] = useState(false);
   const [useError, setUseError] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
-  // Anagram: the letters placed so far, as indexes into the shuffled tiles, in answer order.
+  // Anagram and build: the letters placed so far, as indexes into the shuffled tiles, in answer order.
   const [placed, setPlaced] = useState<number[]>([]);
+  // Build: mistakes so far, and the tile that flashes after one.
+  const [mistakes, setMistakes] = useState(0);
+  const [flash, setFlash] = useState<number | null>(null);
+  // The same placed letters and mistakes, set at once, so two quick presses cannot race.
+  const placedRef = useRef<number[]>([]);
+  const mistakesRef = useRef(0);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const locked = feedback !== null;
   // One result per card, however many times Enter or a button fires before the state catches up.
   const finished = useRef(false);
@@ -129,10 +210,13 @@ export function CardView({ pc, onResult, onNext }: CardProps) {
     }
   };
 
-  // Tiles have no spaces, so a multi-word anagram is compared without them.
-  const letters = Array.from(pc.letters ?? '');
-  const typedAnswer = type === 'anagram' ? placed.map((i) => letters[i]).join('') : text;
-  const accepted = type === 'anagram' ? [word.word.replace(/ /g, '')] : type === 'spell' ? spellingsOf(word.word) : (ex?.answers ?? []);
+  // Tiles are the letters without the spaces, in the shuffled order; the target is the word's letters in order.
+  const tiles = Array.from((pc.letters ?? '').replace(/ /g, ''));
+  const target = Array.from(word.word.replace(/ /g, '')).map((ch) => ch.toLowerCase());
+  const placedLetters = placed.map((i) => tiles[i] ?? '');
+  // An anagram is checked as written, with the spaces put back between the words.
+  const typedAnswer = type === 'anagram' ? withSpaces(placedLetters.join(''), word.word) : text;
+  const accepted = type === 'anagram' ? [word.word] : type === 'spell' ? spellingsOf(word.word) : (ex?.answers ?? []);
   const correctOption = type === 'choice' ? [word.word] : (ex?.answers ?? []);
 
   const checkTypedAnswer = () => {
@@ -174,13 +258,59 @@ export function CardView({ pc, onResult, onNext }: CardProps) {
       } else {
         const ch = typedChar(e);
         if (ch === null) return;
-        const tiles = Array.from(pc.letters ?? '');
         setPlaced((p) => {
           const i = tiles.findIndex((l, j) => !p.includes(j) && l.toLowerCase() === ch);
           return i < 0 ? p : [...p, i];
         });
         setAlmost(false);
       }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  useEffect(() => () => {
+    if (flashTimer.current !== null) clearTimeout(flashTimer.current);
+  }, []);
+
+  // Build: a tile with the next letter goes into the next slot; any other tile is a mistake and flashes.
+  const flashTile = (i: number) => {
+    if (flashTimer.current !== null) clearTimeout(flashTimer.current);
+    setFlash(i);
+    flashTimer.current = setTimeout(() => {
+      flashTimer.current = null;
+      setFlash(null);
+    }, 600);
+  };
+  const pressBuild = (i: number) => {
+    if (finished.current || placedRef.current.includes(i)) return;
+    if (tiles[i]?.toLowerCase() === target[placedRef.current.length]) {
+      const next = [...placedRef.current, i];
+      placedRef.current = next;
+      setPlaced(next);
+      if (next.length === target.length) {
+        void finish({ result: buildResult(mistakesRef.current), text: withSpaces(next.map((j) => tiles[j] ?? '').join(''), word.word) });
+      }
+      return;
+    }
+    const m = mistakesRef.current + 1;
+    mistakesRef.current = m;
+    setMistakes(m);
+    flashTile(i);
+    if (m >= BUILD_ATTEMPTS) {
+      void finish({ result: 'wrong', text: withSpaces(placedRef.current.map((j) => tiles[j] ?? '').join(''), word.word) });
+    }
+  };
+
+  useEffect(() => {
+    if (type !== 'build' || locked) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || finished.current) return;
+      const ch = typedChar(e);
+      if (ch === null) return;
+      // The first unused tile with this letter; a letter on no unused tile is ignored and costs nothing.
+      const i = tiles.findIndex((l, j) => !placedRef.current.includes(j) && l.toLowerCase() === ch);
+      if (i >= 0) pressBuild(i);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -234,9 +364,18 @@ export function CardView({ pc, onResult, onNext }: CardProps) {
     inputRef.current?.focus();
   };
 
+  const skipButton = (
+    <Button variant="ghost" disabled={checking || saving} onClick={skip}>{t(lang, 'words.skip')}</Button>
+  );
+
+  // No hooks below this line: the intro card has no answer of its own.
+  if (type === 'intro') return <IntroView pc={pc} onNext={onNext} />;
+
+  const clue = clueOf(word, lang);
   const instruction =
     type === 'choice' ? t(lang, 'words.instr.choice')
     : type === 'anagram' ? t(lang, 'words.instr.anagram')
+    : type === 'build' ? t(lang, 'words.instr.build')
     : type === 'spell' ? t(lang, 'words.instr.spell')
     : type === 'form' ? t(lang, 'words.instr.form', { cue: ex?.cue ?? '' })
     : type === 'confusable' ? t(lang, 'words.instr.confusable')
@@ -250,12 +389,14 @@ export function CardView({ pc, onResult, onNext }: CardProps) {
   return (
     <div data-card-type={type}>
       <p className="text-sm text-muted-foreground">{instruction}</p>
-      {(type === 'choice' || type === 'anagram' || type === 'spell') && <p className="reading mt-3">{word.definition}</p>}
+      {(type === 'choice' || type === 'anagram' || type === 'build' || type === 'spell') && <p className="reading mt-3">{word.definition}</p>}
       {type === 'spell' && pc.letters !== null && (
-        <p className="answer mt-3 text-2xl tracking-[0.4em]" aria-label={pc.letters}>{Array.from(pc.letters).join(' ')}</p>
+        <p className="answer mt-3 flex flex-wrap gap-x-5 text-2xl tracking-[0.4em]" aria-label={pc.letters}>
+          {pc.letters.split(' ').filter((g) => g !== '').map((g, i) => <span key={i}>{Array.from(g).join(' ')}</span>)}
+        </p>
       )}
+      {CLUE_TYPES.includes(type) && clue !== '' && <p className="mt-3 text-muted-foreground">{clue}</p>}
       {GAP_TYPES.includes(type) && ex && <Sentence text={ex.prompt} />}
-      {type === 'gap_hint' && ex?.translation && <p className="mt-1 text-muted-foreground">{ex.translation}</p>}
       {type === 'confusable' && ex && <Sentence text={ex.prompt} />}
       {type === 'translation' && ex && <Sentence text={ex.prompt} />}
 
@@ -282,32 +423,50 @@ export function CardView({ pc, onResult, onNext }: CardProps) {
         </div>
       )}
 
-      {type === 'anagram' && (
-        <div className="mt-4 grid gap-3">
-          <div className="flex min-h-[34px] flex-wrap gap-2">
-            {placed.map((i, k) => (
-              <Button key={k} data-testid="placed" variant="secondary" className="answer min-w-[34px]" disabled={locked} onClick={() => returnTile(k)}>
-                {letters[i]}
-              </Button>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {letters.map((ch, i) => (
-              <Button key={i} data-testid="tile" variant="outline" className="answer min-w-[34px]" disabled={locked || placed.includes(i)} onClick={() => placeTile(i)}>
+      {(type === 'anagram' || type === 'build') && (
+        <div className="mt-4 grid gap-4">
+          <Slots word={word.word} letters={placedLetters} locked={locked} onReturn={type === 'anagram' ? returnTile : undefined} />
+          <div className="mx-auto flex flex-wrap justify-center gap-2" style={{ maxWidth: 'calc(6 * 2.75rem + 5 * 0.5rem)' }}>
+            {tiles.map((ch, i) => (
+              <Button
+                key={i}
+                data-testid="tile"
+                variant="outline"
+                className={cn('answer h-11 min-w-11 p-0 text-xl', flash === i && 'ring-2 ring-destructive')}
+                disabled={locked || placed.includes(i)}
+                onClick={() => (type === 'build' ? pressBuild(i) : placeTile(i))}
+              >
                 {ch}
               </Button>
             ))}
           </div>
-          {!locked && (
-            <div className="flex flex-wrap gap-2">
+          {type === 'build' && !locked && (
+            <div data-testid="attempts" className="flex items-center justify-center gap-1.5">
+              <span className="sr-only">{t(lang, 'words.attempts', { left: BUILD_ATTEMPTS - mistakes, total: BUILD_ATTEMPTS })}</span>
+              {Array.from({ length: BUILD_ATTEMPTS }, (_, k) => {
+                const used = k >= BUILD_ATTEMPTS - mistakes;
+                return (
+                  <span
+                    key={k}
+                    aria-hidden="true"
+                    data-used={used ? 'true' : 'false'}
+                    className={cn('size-2.5 rounded-full border border-primary', !used && 'bg-primary')}
+                  />
+                );
+              })}
+            </div>
+          )}
+          {type === 'anagram' && !locked && (
+            <div className="flex flex-wrap items-center gap-2">
               <Button disabled={typedAnswer.trim() === ''} onClick={checkTypedAnswer}>{t(lang, 'words.check')}</Button>
+              {skipButton}
             </div>
           )}
         </div>
       )}
 
       {(typed || type === 'translation') && (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
+        <div className="mt-4 grid gap-3">
           <Input
             ref={inputRef}
             className="max-w-sm"
@@ -321,12 +480,13 @@ export function CardView({ pc, onResult, onNext }: CardProps) {
             onKeyDown={(e) => enterKey(e, () => (typed ? checkTypedAnswer() : checkTranslated()))}
           />
           {!locked && !mismatch && (
-            <>
+            <div className="flex flex-wrap items-center gap-2">
               <Button disabled={text.trim() === ''} onClick={() => (typed ? checkTypedAnswer() : checkTranslated())}>{t(lang, 'words.check')}</Button>
               {typed && type !== 'spell' && (
                 <Button variant="ghost" disabled={hinted} onClick={hint}>{t(lang, 'words.hint')}</Button>
               )}
-            </>
+              {skipButton}
+            </div>
           )}
         </div>
       )}
@@ -360,20 +520,19 @@ export function CardView({ pc, onResult, onNext }: CardProps) {
             </Notice>
           )}
           {!locked && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button disabled={checking || text.trim() === ''} onClick={() => void checkUse()}>
                 {checking && <LoaderCircle className="animate-spin" aria-hidden />}
                 {t(lang, 'words.check')}
               </Button>
+              {skipButton}
             </div>
           )}
         </div>
       )}
 
-      {!locked && !mismatch && (
-        <div className="mt-4">
-          <Button variant="ghost" disabled={checking || saving} onClick={skip}>{t(lang, 'words.skip')}</Button>
-        </div>
+      {SKIP_ALONE.includes(type) && !locked && (
+        <div className="mt-4">{skipButton}</div>
       )}
       {feedback && <FeedbackView pc={pc} fb={feedback} />}
       {saveError !== null && <Notice className="mt-3">{t(lang, 'words.saveError', { message: saveError })}</Notice>}

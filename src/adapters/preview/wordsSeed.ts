@@ -21,7 +21,7 @@ export interface PreviewWord {
 
 /**
  * Seven ready words (stages 4, 3, 3, 2, 1, 1 and one never reviewed); all but the never-reviewed one are due on TUESDAY.
- * The first practice has 14 cards; the first card is ephemeral's choice card, its anagram and gap_hint cards come later.
+ * The first practice has 15 cards: ephemeral is new, so its intro, choice, build and gap_hint cards come in rounds 1 to 4 (the intro in round 1).
  * The seeded random of buildPreview picks the other card types (resilient's card is a use card) and review dates and stages
  * set the order, so changing them changes which card types words.spec.ts meets.
  */
@@ -105,16 +105,61 @@ export const FAILED_WORD = 'obscure';
  * What the practice page asks mapped to the right answer, for the e2e helper: the definition (choice, anagram), a gap, collocation,
  * form or confusable sentence, or the Russian text of a translation card.
  */
-export const PREVIEW_WORD_ANSWERS: Record<string, string> = Object.fromEntries(
-  PREVIEW_WORDS.flatMap((w) => [
-    [w.definition, w.word],
-    ...w.gaps.map((g) => [g, w.word]),
-    ...w.collocations.map((c) => [c, w.word]),
-    [w.form.sentence, w.form.answer],
-    [w.confusable.sentence, w.word],
-    ...w.translations.map((tr) => [tr.text, tr.answers[0] ?? '']),
-  ]),
-);
+function answersOf(words: PreviewWord[]): Record<string, string> {
+  return Object.fromEntries(
+    words.flatMap((w) => [
+      [w.definition, w.word],
+      ...w.gaps.map((g) => [g, w.word]),
+      ...w.collocations.map((c) => [c, w.word]),
+      [w.form.sentence, w.form.answer],
+      [w.confusable.sentence, w.word],
+      ...w.translations.map((tr) => [tr.text, tr.answers[0] ?? '']),
+    ]),
+  );
+}
+
+export const PREVIEW_WORD_ANSWERS: Record<string, string> = answersOf(PREVIEW_WORDS);
+
+/**
+ * The `words-phrase` state: one never-reviewed ready word with a space, "give up", and three reviewed words that are not due
+ * (their choice options). Its cards are intro, choice, build and gap_hint; no exercise reveals the word.
+ */
+export const PHRASE_WORDS: PreviewWord[] = [
+  {
+    word: 'give up', translation: 'сдаваться', definition: 'stop trying to do something, or accept that you cannot do it', example: 'Never give up on your dreams.',
+    synonyms: ['quit'], added: '2026-10-18',
+    reviews: [], // never reviewed
+    gaps: ['She decided not to ___ until the very end.', 'The runners refused to ___ in the heat.'],
+    collocations: ['to ___ smoking', 'never ___ hope'],
+    form: { sentence: 'They ___ the plan last week.', cue: 'give up', answer: 'gave up' },
+    confusable: { sentence: 'Never ___ on your dreams.', options: ['give up', 'give out'], reason: 'Give up means stop trying; give out means run out.' },
+    translations: [{ text: 'Он никогда не сдаётся.', answers: ['He never gives up.'] }, { text: 'Мы не сдадимся.', answers: ['We will not give up.'] }],
+  },
+  {
+    word: 'steady', translation: 'ровный', definition: 'firm, regular and not changing', example: 'Keep a steady pace.',
+    synonyms: ['even'], added: '2026-10-01',
+    reviews: ['2026-10-20'], gaps: ['Keep a ___ pace.'], collocations: ['a ___ hand'], form: { sentence: 'He walks ___.', cue: 'steady', answer: 'steadily' },
+    confusable: { sentence: 'The boat stayed ___ in the wind.', options: ['steady', 'shaky'], reason: 'Steady means firm.' },
+    translations: [{ text: 'Ровный шаг.', answers: ['A steady pace.'] }],
+  },
+  {
+    word: 'mellow', translation: 'мягкий', definition: 'pleasantly soft and relaxed', example: 'The mellow music calmed the room.',
+    synonyms: ['soft'], added: '2026-10-02',
+    reviews: ['2026-10-20'], gaps: ['The ___ light of the evening.'], collocations: ['a ___ mood'], form: { sentence: 'She laughed ___.', cue: 'mellow', answer: 'mellowly' },
+    confusable: { sentence: 'The ___ wine was easy to drink.', options: ['mellow', 'bitter'], reason: 'Mellow means smooth.' },
+    translations: [{ text: 'Мягкий свет.', answers: ['Mellow light.'] }],
+  },
+  {
+    word: 'crisp', translation: 'хрустящий', definition: 'firm, fresh and easy to break', example: 'The apple was crisp and sweet.',
+    synonyms: ['fresh'], added: '2026-10-03',
+    reviews: ['2026-10-20'], gaps: ['A ___ autumn morning.'], collocations: ['a ___ bite'], form: { sentence: 'The bread was ___ on the outside.', cue: 'crisp', answer: 'crispy' },
+    confusable: { sentence: 'The snow was ___ under our boots.', options: ['crisp', 'crispy'], reason: 'Crisp is the adjective used here.' },
+    translations: [{ text: 'Хрустящее яблоко.', answers: ['A crisp apple.'] }],
+  },
+];
+
+/** Like PREVIEW_WORD_ANSWERS, for the cards of PHRASE_WORDS. */
+export const PHRASE_WORD_ANSWERS: Record<string, string> = answersOf(PHRASE_WORDS);
 
 const LIMIT_NAMES = [
   'brisk', 'gentle', 'vivid', 'humble', 'sturdy', 'eager', 'swift', 'calm', 'bold', 'frail', 'noble',

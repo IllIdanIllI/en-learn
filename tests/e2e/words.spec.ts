@@ -1,20 +1,23 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { LIMIT_WORD_ANSWERS, LIMIT_WORDS, PREVIEW_WORD_ANSWERS, PREVIEW_WORDS } from '../../src/adapters/preview/wordsSeed';
+import { LIMIT_WORD_ANSWERS, LIMIT_WORDS, PHRASE_WORD_ANSWERS, PHRASE_WORDS, PREVIEW_WORD_ANSWERS, PREVIEW_WORDS } from '../../src/adapters/preview/wordsSeed';
 import { clearTiles, tapTiles } from './helpers';
 
+// Button names are matched in both languages, so the same helpers drive the Russian and the English practice.
 const card = (page: Page) => page.locator('[data-card-type]');
 const cardType = async (page: Page) => (await card(page).getAttribute('data-card-type')) ?? '';
-const next = (page: Page) => page.getByRole('button', { name: 'Дальше' });
-const check = (page: Page) => card(page).getByRole('button', { name: 'Проверить' });
+const next = (page: Page) => page.getByRole('button', { name: /^(Дальше|Next)$/ });
+const check = (page: Page) => card(page).getByRole('button', { name: /^(Проверить|Check)$/ });
+const skipOf = (c: Locator) => c.getByRole('button', { name: /^(Пропустить|Skip)$/ });
+const gotIt = (c: Locator) => c.getByRole('button', { name: /^(Понятно|Got it)$/ });
 
 /** What the current card asks: the first paragraph of text (definition, sentence or Russian text), never the use card's. */
 const promptOf = async (page: Page) => (await card(page).locator('p.reading').first().innerText()).trim();
 
-const ANSWERS: Record<string, string> = { ...PREVIEW_WORD_ANSWERS, ...LIMIT_WORD_ANSWERS };
+const ANSWERS: Record<string, string> = { ...PREVIEW_WORD_ANSWERS, ...LIMIT_WORD_ANSWERS, ...PHRASE_WORD_ANSWERS };
 
 /** Each prompt the cards show, mapped to the word it belongs to. */
 const WORD_OF: Record<string, string> = Object.fromEntries(
-  [...PREVIEW_WORDS, ...LIMIT_WORDS].flatMap((w) => [
+  [...PREVIEW_WORDS, ...LIMIT_WORDS, ...PHRASE_WORDS].flatMap((w) => [
     [w.definition, w.word],
     ...w.gaps.map((g) => [g, w.word]),
     ...w.collocations.map((c) => [c, w.word]),
@@ -32,25 +35,40 @@ async function wordOfCard(page: Page): Promise<string> {
 
 const SENTENCE = 'Honestly the word fits this sentence quite well.';
 
+/** Taps a wrong tile of a build card three times: the card ends wrong. */
+async function failBuild(c: Locator, word: string) {
+  const first = word.replace(/ /g, '')[0]!;
+  const wrong = c.locator('[data-testid="tile"]:enabled').filter({ hasNotText: first }).first();
+  for (let n = 0; n < 3; n++) await wrong.click();
+}
+
 /** Answers the current card, right (or wrong, except for a use card, which the fake checker always accepts), and presses Дальше. */
 async function answer(page: Page, right = true) {
   const type = await cardType(page);
   const c = card(page);
+  if (type === 'intro') {
+    // The intro is not a test: Понятно moves on, with no Дальше.
+    await gotIt(c).click();
+    return;
+  }
   if (type === 'use') {
     // A use card cannot be answered wrong in the preview (the checker accepts any sentence), so a wrong answer is a Skip.
     if (right) {
       await c.getByRole('textbox').fill(SENTENCE);
       await check(page).click();
     } else {
-      await c.getByRole('button', { name: 'Пропустить' }).click();
+      await skipOf(c).click();
     }
   } else {
     const correct = ANSWERS[await promptOf(page)];
     expect(correct, `an answer for the ${type} card is in the fixture`).toBeDefined();
     if (type === 'choice' || type === 'confusable') {
-      const options = (await c.getByRole('button').allInnerTexts()).map((o) => o.trim()).filter((o) => o !== 'Пропустить');
+      const options = (await c.getByRole('button').allInnerTexts()).map((o) => o.trim()).filter((o) => !/^(Пропустить|Skip)$/.test(o));
       const pick = right ? correct! : options.find((o) => o !== correct)!;
       await c.getByRole('button', { name: pick, exact: true }).click();
+    } else if (type === 'build') {
+      if (right) await tapTiles(c, correct!);
+      else await failBuild(c, correct!);
     } else if (type === 'translation') {
       await c.getByRole('textbox').fill(right ? correct! : 'Totally wrong answer here.');
       await check(page).click();
@@ -139,8 +157,8 @@ test.describe('words page', () => {
     await expect(page.getByText('Создаю упражнения…')).toHaveCount(0);
     await expect(page.getByText('Упражнения не созданы')).toHaveCount(1);
     await page.getByRole('link', { name: 'Начать практику' }).click();
-    // Seven seeded words (14 cards) and the two new ones (3 cards each).
-    await expect(page.getByText('1 / 20')).toBeVisible();
+    // Seven seeded words (15 cards: ephemeral is new, with 4 cards) and the two new ones (4 cards each).
+    await expect(page.getByText('1 / 23')).toBeVisible();
   });
 
   test('an imported card with a bracketed tail is saved as the bare word', async ({ page }) => {
@@ -172,8 +190,8 @@ test.describe('words page', () => {
     await expect(failed).toContainText('Упражнения не созданы');
     await expect(failed.getByRole('button', { name: 'Повторить' })).toBeVisible();
     await page.getByRole('link', { name: 'Начать практику' }).click();
-    // Seven ready words are due or new (14 cards); the failed one is not among them.
-    await expect(page.getByText('1 / 14')).toBeVisible();
+    // Seven ready words are due or new (15 cards); the failed one is not among them.
+    await expect(page.getByText('1 / 15')).toBeVisible();
   });
 });
 
@@ -231,15 +249,15 @@ test.describe('summary and +10 new words', () => {
     await expect(startRow.getByRole('button', { name: '+10 новых слов' })).toBeVisible();
     await addNew(page).dblclick();
     await card(page).waitFor();
-    // A double click adds ten, not twenty: ten new words of three cards each.
-    await expect(page.getByText('1 / 30')).toBeVisible();
-    expect(await cardType(page)).toBe('choice');
+    // A double click adds ten, not twenty: ten new words of four cards each (the intro is the first).
+    await expect(page.getByText('1 / 40')).toBeVisible();
+    expect(await cardType(page)).toBe('intro');
   });
 
-  test('words-limit: after +10 and its thirty cards the end screen offers +10', async ({ page }) => {
+  test('words-limit: after +10 and its forty cards the end screen offers +10', async ({ page }) => {
     await page.goto('/?state=words-limit#/words');
     await addNew(page).click();
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 40; i++) {
       await card(page).waitFor();
       await answer(page);
     }
@@ -253,40 +271,41 @@ test.describe('practice', () => {
   test('answers every card type it meets, one by one, up to the end screen', async ({ page }) => {
     await openPractice(page);
     const seen: string[] = [];
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 15; i++) {
       await card(page).waitFor();
-      await expect(page.getByText(`${i + 1} / 14`)).toBeVisible();
+      await expect(page.getByText(`${i + 1} / 15`)).toBeVisible();
       seen.push(await cardType(page));
       await answer(page);
     }
+    // The intro is not counted: seven words, seven answers.
     await expect(page.getByTestId('practice-end')).toContainText('Готово: 7 из 7');
-    for (const type of ['choice', 'anagram', 'gap_hint', 'translation', 'use']) expect(seen).toContain(type);
+    for (const type of ['intro', 'choice', 'build', 'anagram', 'gap_hint', 'translation', 'use']) expect(seen).toContain(type);
   });
 
-  test('the first seven cards are seven different words, and ephemeral starts with its choice card', async ({ page }) => {
+  test('the first seven cards are seven different words, and ephemeral starts with its intro card', async ({ page }) => {
     await openPractice(page);
-    await expect(page.getByText('1 / 14')).toBeVisible();
+    await expect(page.getByText('1 / 15')).toBeVisible();
     const seen = await runCards(page, 7);
     expect(new Set(seen.map((c) => c.word)).size).toBe(7);
-    // Rounds are shuffled, so ephemeral's choice card is among the first seven but not always first.
-    expect(seen.find((c) => c.word === 'ephemeral')?.type).toBe('choice');
+    // Rounds are shuffled, but round 1 holds every word's first card: ephemeral's intro is among the first seven.
+    expect(seen.find((c) => c.word === 'ephemeral')?.type).toBe('intro');
   });
 
-  test('ephemeral shows choice, anagram and gap_hint in that order, and no word twice in a row', async ({ page }) => {
+  test('ephemeral shows intro, choice, build and gap_hint in that order', async ({ page }) => {
     await openPractice(page);
-    const seen = await runCards(page, 14);
-    expect(seen.filter((c) => c.word === 'ephemeral').map((c) => c.type)).toEqual(['choice', 'anagram', 'gap_hint']);
-    for (let i = 1; i < seen.length; i++) expect(seen[i]!.word, `card ${i + 1}`).not.toBe(seen[i - 1]!.word);
+    const seen = await runCards(page, 15);
+    expect(seen.filter((c) => c.word === 'ephemeral').map((c) => c.type)).toEqual(['intro', 'choice', 'build', 'gap_hint']);
+    // No word twice in a row, except in the last round, where ephemeral's build and gap_hint may end the practice together.
+    for (let i = 1; i < seen.length - 1; i++) expect(seen[i]!.word, `card ${i + 1}`).not.toBe(seen[i - 1]!.word);
   });
 
-  test('a wrong answer on the choice card of ephemeral adds one anagram: the total grows to 15 and the extra is not next to ephemeral', async ({ page }) => {
+  test('a wrong answer on the choice card of ephemeral adds one build card: the total grows to 16', async ({ page }) => {
     await openPractice(page);
     const before = await playUntil(page, 'ephemeral', 'choice');
     await answer(page, false);
-    await expect(page.locator('header span.tabular')).toHaveText(`${before.length + 2} / 15`);
-    const seen = [...before, { type: 'choice', word: 'ephemeral' }, ...(await runCards(page, 15 - before.length - 1))];
-    expect(seen.filter((c) => c.word === 'ephemeral').map((c) => c.type)).toEqual(['choice', 'anagram', 'anagram', 'gap_hint']);
-    for (let i = 1; i < seen.length; i++) expect(seen[i]!.word, `card ${i + 1}`).not.toBe(seen[i - 1]!.word);
+    await expect(page.locator('header span.tabular')).toHaveText(`${before.length + 2} / 16`);
+    const seen = [...before, { type: 'choice', word: 'ephemeral' }, ...(await runCards(page, 16 - before.length - 1))];
+    expect(seen.filter((c) => c.word === 'ephemeral').map((c) => c.type)).toEqual(['intro', 'choice', 'build', 'build', 'gap_hint']);
   });
 
   test('a second wrong answer on the same word adds no card', async ({ page }) => {
@@ -294,31 +313,33 @@ test.describe('practice', () => {
     await playUntil(page, 'ephemeral', 'choice');
     await answer(page, false);
     const header = page.locator('header span.tabular');
-    await expect(header).toHaveText(/^\d+ \/ 15$/);
-    // Ephemeral's own anagram or the extra one, whichever comes first.
+    await expect(header).toHaveText(/^\d+ \/ 16$/);
+    // Ephemeral's own build card or the extra one, whichever comes first.
     let found = false;
     for (let i = 0; i < 30 && !found; i++) {
       await card(page).waitFor();
-      found = (await cardType(page)) === 'anagram' && (await wordOfCard(page)) === 'ephemeral';
+      found = (await cardType(page)) === 'build' && (await wordOfCard(page)) === 'ephemeral';
       if (!found) await answer(page);
     }
-    expect(found, 'the ephemeral anagram card within 30 cards').toBe(true);
-    await answer(page, false);
-    await expect(header).toHaveText(/^\d+ \/ 15$/);
+    expect(found, 'an ephemeral build card within 30 cards').toBe(true);
+    await failBuild(card(page), 'ephemeral');
+    await expect(page.getByText('Неверно')).toBeVisible();
+    await next(page).click();
+    await expect(header).toHaveText(/^\d+ \/ 16$/);
   });
 
   test('a mistake on the last card adds a card instead of ending the practice', async ({ page }) => {
     await openPractice(page);
-    await runCards(page, 13);
-    await expect(page.getByText('14 / 14')).toBeVisible();
-    await answer(page, false);
+    await runCards(page, 14);
     await expect(page.getByText('15 / 15')).toBeVisible();
+    await answer(page, false);
+    await expect(page.getByText('16 / 16')).toBeVisible();
     await expect(page.getByTestId('practice-end')).toHaveCount(0);
     await answer(page);
     await expect(page.getByTestId('practice-end')).toContainText('Готово: 7 из 7');
   });
 
-  test('a new word starts with the choice card: tapping the right option shows the word', async ({ page }) => {
+  test('a new word\'s choice card: tapping the right option shows the word', async ({ page }) => {
     await openPractice(page);
     await advanceTo(page, 'choice');
     await card(page).getByRole('button', { name: 'ephemeral', exact: true }).click();
@@ -368,6 +389,170 @@ test.describe('practice', () => {
     await page.evaluate((l) => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ф', code: `Key${l.toUpperCase()}` })), letter);
     await expect(c.getByTestId('placed')).toHaveCount(1);
     await expect(c.getByTestId('placed')).toHaveText(letter);
+  });
+
+  test('intro: the new word shows its word and definition, Понятно is focused and moves on with no review', async ({ page }) => {
+    await openPractice(page);
+    await playUntil(page, 'ephemeral', 'intro');
+    const c = card(page);
+    await expect(c.getByText('Новое слово')).toBeVisible();
+    await expect(c.locator('.answer').first()).toHaveText('ephemeral');
+    await expect(c.getByText('lasting for a very short time', { exact: true })).toBeVisible();
+    await expect(gotIt(c)).toBeFocused();
+    await expect(skipOf(c)).toHaveCount(0);
+    await gotIt(c).click();
+    // No feedback and no Дальше: the card is gone, and the next one is not the intro.
+    await expect(page.getByText('Верно')).toHaveCount(0);
+    await expect(next(page)).toHaveCount(0);
+    await expect(c).not.toHaveAttribute('data-card-type', 'intro');
+  });
+
+  test('build: the right letters fill the slots and the card ends Верно without a Check button', async ({ page }) => {
+    await openPractice(page);
+    await playUntil(page, 'ephemeral', 'build');
+    const c = card(page);
+    await expect(c.getByText('Соберите слово по буквам')).toBeVisible();
+    await expect(c.getByTestId('slot')).toHaveCount(9);
+    await expect(c.getByTestId('tile')).toHaveCount(9);
+    await expect(c.getByRole('textbox')).toHaveCount(0);
+    await expect(check(page)).toHaveCount(0);
+    await tapTiles(c, 'ephemeral');
+    await expect(page.getByText('Верно')).toBeVisible();
+    await expect(check(page)).toHaveCount(0);
+    await expect(next(page)).toBeVisible();
+  });
+
+  test('build tiles are at least 44 pixels, and nine letters take two centred rows of at most six', async ({ page }) => {
+    await openPractice(page);
+    await playUntil(page, 'ephemeral', 'build');
+    const boxes = await card(page).getByTestId('tile').evaluateAll((els) =>
+      els.map((el) => {
+        const r = el.getBoundingClientRect();
+        return { w: r.width, h: r.height, x: r.left, y: Math.round(r.top), right: r.right };
+      }),
+    );
+    for (const b of boxes) {
+      expect(b.w).toBeGreaterThanOrEqual(44);
+      expect(b.h).toBeGreaterThanOrEqual(44);
+    }
+    const rows = [...new Set(boxes.map((b) => b.y))];
+    expect(rows).toHaveLength(2);
+    const centre = (y: number) => {
+      const row = boxes.filter((b) => b.y === y);
+      expect(row.length).toBeLessThanOrEqual(6);
+      return (Math.min(...row.map((b) => b.x)) + Math.max(...row.map((b) => b.right))) / 2;
+    };
+    expect(Math.abs(centre(rows[0]!) - centre(rows[1]!))).toBeLessThan(1);
+  });
+
+  test('build: a wrong tile flashes and costs one of three attempts, and the card goes on', async ({ page }) => {
+    await openPractice(page);
+    await playUntil(page, 'ephemeral', 'build');
+    const c = card(page);
+    const attempts = c.getByTestId('attempts');
+    await expect(attempts).toHaveText('Попытки: 3 из 3');
+    await c.locator('[data-testid="tile"]:enabled').filter({ hasNotText: 'e' }).first().click();
+    await expect(attempts).toHaveText('Попытки: 2 из 3');
+    await expect(c.locator('[data-used="true"]')).toHaveCount(1);
+    await expect(page.getByText('Неверно')).toHaveCount(0);
+    await tapTiles(c, 'ephemeral');
+    await expect(page.getByText('Верно')).toBeVisible();
+  });
+
+  test('build: three wrong tiles end the card Неверно and the header total grows by one', async ({ page }) => {
+    await openPractice(page);
+    await playUntil(page, 'ephemeral', 'build');
+    const [position, total] = await headerPosition(page);
+    await failBuild(card(page), 'ephemeral');
+    await expect(page.getByText('Неверно')).toBeVisible();
+    await expect(page.locator('span.answer.font-semibold', { hasText: 'ephemeral' })).toBeVisible();
+    await expect(page.locator('header span.tabular')).toHaveText(`${position} / ${total! + 1}`);
+  });
+
+  test('build keyboard: letters place tiles in order in any case, a letter on no tile is ignored, Backspace and Enter do nothing', async ({ page }) => {
+    await openPractice(page);
+    await playUntil(page, 'ephemeral', 'build');
+    const c = card(page);
+    const placedTiles = c.locator('[data-testid="tile"]:disabled');
+    await page.keyboard.type('EPH');
+    await expect(placedTiles).toHaveCount(3);
+    await page.keyboard.type('z');
+    await expect(placedTiles).toHaveCount(3);
+    await expect(c.getByTestId('attempts')).toHaveText('Попытки: 3 из 3');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.press('Enter');
+    await expect(placedTiles).toHaveCount(3);
+    await expect(page.getByText('Верно')).toHaveCount(0);
+    // A letter on another unused tile is a mistake: the a tile flashes and costs an attempt.
+    await page.keyboard.type('a');
+    await expect(c.getByTestId('attempts')).toHaveText('Попытки: 2 из 3');
+    await page.keyboard.type('emeral');
+    await expect(page.getByText('Верно')).toBeVisible();
+  });
+
+  test('phrase: the build card shows a gap between the word parts, and tapping its letters ends Верно', async ({ page }) => {
+    await openPractice(page, 'words-phrase');
+    await expect(page.getByText('1 / 4')).toBeVisible();
+    await advanceTo(page, 'build');
+    const c = card(page);
+    const groups = c.getByTestId('slot-group');
+    await expect(groups).toHaveCount(2);
+    await expect(groups.nth(0).getByTestId('slot')).toHaveCount(4);
+    await expect(groups.nth(1).getByTestId('slot')).toHaveCount(2);
+    await expect(c.getByTestId('tile')).toHaveCount(6);
+    await tapTiles(c, 'give up');
+    await expect(page.getByText('Верно')).toBeVisible();
+  });
+
+  test('phrase: the gap card accepts the answer with its space', async ({ page }) => {
+    await openPractice(page, 'words-phrase');
+    await advanceTo(page, 'gap_hint');
+    expect(await wordOfCard(page)).toBe('give up');
+    await card(page).getByRole('textbox').fill('give up');
+    await check(page).click();
+    await expect(page.getByText('Верно')).toBeVisible();
+  });
+
+  test('the fill-the-word clue is the translation in Russian, and the sentence translation is not shown', async ({ page }) => {
+    await openPractice(page);
+    await advanceTo(page, 'gap_hint');
+    const word = await wordOfCard(page);
+    const translation = PREVIEW_WORDS.find((w) => w.word === word)!.translation;
+    await expect(card(page).getByText(translation, { exact: true })).toBeVisible();
+    await expect(card(page).getByText('Пример перевода.')).toHaveCount(0);
+  });
+
+  test('in English, the fill-the-word clue is the definition', async ({ page }) => {
+    await page.goto('/?state=words#/settings');
+    await page.getByRole('radio', { name: 'English' }).click();
+    await page.evaluate(() => {
+      window.location.hash = '#/words/practice';
+    });
+    await card(page).waitFor();
+    await advanceTo(page, 'gap_hint');
+    const word = await wordOfCard(page);
+    const definition = PREVIEW_WORDS.find((w) => w.word === word)!.definition;
+    await expect(card(page).getByText(definition, { exact: true })).toBeVisible();
+    await expect(card(page).getByText('Пример перевода.')).toHaveCount(0);
+  });
+
+  test('Skip is on the Check row of a typed card', async ({ page }) => {
+    await openPractice(page);
+    await advanceTo(page, 'gap_hint');
+    await expect(check(page).locator('xpath=..').getByRole('button', { name: /^(Пропустить|Skip)$/ })).toHaveCount(1);
+  });
+
+  test('Skip is on the Check row of an anagram', async ({ page }) => {
+    await openPractice(page);
+    await advanceTo(page, 'anagram');
+    await expect(check(page).locator('xpath=..').getByRole('button', { name: /^(Пропустить|Skip)$/ })).toHaveCount(1);
+  });
+
+  test('Skip is alone in its row under a choice card', async ({ page }) => {
+    await openPractice(page);
+    await advanceTo(page, 'choice');
+    await expect(skipOf(card(page))).toBeVisible();
+    await expect(skipOf(card(page)).locator('xpath=..').getByRole('button')).toHaveCount(1);
   });
 
   test('Almost, then retry: two neighbouring letters swapped get one more try', async ({ page }) => {
@@ -493,13 +678,15 @@ test.describe('practice', () => {
 
   test('ending early offers Continue, which starts a practice with the cards left', async ({ page }) => {
     await openPractice(page);
+    // Intro cards are not answers: answer up to the first card that is.
+    while ((await cardType(page)) === 'intro') await answer(page);
     await answer(page);
     await page.getByRole('button', { name: 'Закончить' }).click();
     const end = page.getByTestId('practice-end');
     await expect(end).toContainText('Готово: 1 из 1');
     await end.getByRole('button', { name: 'Продолжить · ещё 10 слов' }).click();
-    // The seeded first card is a due word, so it is no longer due: five due words are left (nine cards), plus ephemeral's three new cards.
-    await expect(page.getByText('1 / 12')).toBeVisible();
+    // The answered word is no longer due and its other cards go with it: five due words are left (nine cards), plus ephemeral's four new cards.
+    await expect(page.getByText('1 / 13')).toBeVisible();
   });
 
   test('words-done: nothing is due, so practice says All done with the next date', async ({ page }) => {

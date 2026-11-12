@@ -19,6 +19,7 @@ A practice showed each word once, so a new word got only its choice card and the
 The plan of each word is fixed when the practice starts, from its stage at that moment (a stage change during the practice does not change the remaining cards).
 
 - **New word:** choice → anagram → gap with the translation (`gap_hint`). Without a gap exercise: choice → anagram → anagram.
+  - Superseded by feedback round 4 (K4, `2026-11-12-words-feedback-4.md`): intro → choice → build → gap (`gap_hint`); without a gap: intro → choice → build → anagram.
 - **In progress, stage 1 (New):** anagram and `gap_hint` (two anagrams without a gap exercise). The choice card stays only on a word's very first card (V4).
 - **Stage 2 (Recall):** two **different** types from gap / collocation / form / confusable; if only one type exists, the same type with another item.
 - **Stage 3 (Use):** translation → "use it". Without a translation exercise: one Recall type → "use it".

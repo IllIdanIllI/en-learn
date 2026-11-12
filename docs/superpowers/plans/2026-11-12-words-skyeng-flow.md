@@ -117,3 +117,28 @@
 - [ ] **Step 3: Implement** as in the notes.
 - [ ] **Step 4:** checks + e2e → PASS.
 - [ ] **Step 5: Commit** `feat(words): new and review trainings, Skyeng-style word card`.
+
+---
+
+## Binding notes from the plan review (apply on top of the tasks above; they override the task text)
+
+**Task 1**
+- Phonetics-only start-up run (no exercise replacement): add `generatePhonetics(deps, wordIds, onProgress?)` in `generate.ts` (or an option of `generateWords`) using the same `words` call and batching/job lock. It does **not** set `pending`/`failed`, does **not** call `replaceExercises`, and on success writes only `transcription`/`partOfSpeech` when the stored value is empty (via `updateWord` with all other fields carried over). On an LLM error or `checkWordsReply` problem it changes nothing. `wordProblems` is not applied in this mode. WordsJobProvider: name-fix ids (they are `pending`) still go to `run(ids)`; `wordsMissingPhonetics` ids (ready only) go to the phonetics run afterwards, once per app start (ref guard). A word whose reply has an empty transcription is retried on the next start (accepted).
+- `tests/core/db/migrate.test.ts` expects `schema_version` 6 → update to 7.
+- Every `WordFields` / `GeneratedWord` literal must carry the two fields: `repos/words.ts` (`WordRow`, `toWord`, `listWords` SELECT, insert, update), `name.ts` `fixSavedWordNames` and `generate.ts` `runBatch` (carry the existing values, never blank them), `importParse.ts`, `ImportPanel.tsx`, `WordForm.tsx`, `fixtures.ts` `seedWords` (both literals), `evals/run.ts`, `tests/core/words/helpers.ts` `gen()`, and any other place `yarn typecheck` reports.
+- Preview seeds: add `transcription` and `partOfSpeech` to the `PreviewWord` interface and give every seeded word (PREVIEW_WORDS, LIMIT_WORDS via `limitWord`, PHRASE_WORDS) non-empty values, so the start-up run never touches preview words; `previewLlm` `words` reply returns non-empty values too.
+
+**Task 2**
+- `insertRetry<T extends { wordId: number; card: { type: CardType } }>(cards: T[], at: number, extra: Omit<T, 'round'> & Partial<Pick<T & { round: number }, 'round'>>)`: simpler rule for the implementer — signature `insertRetry(cards: PracticeCard[], at: number, extra: Omit<PracticeCard, 'round'>): PracticeCard[]`; it inserts after the first card after `at` that is a **test** (`card.type !== 'intro'`) of **another** word; the inserted card takes that card's `round`; if there is none, it is appended with the round of the last card. Tests: `[A1(miss), introC, B1]` → after B1; `[A1, A2]` at 0 → appended; `[A1, B1, A2]` at 0 → after B1.
+- `replayWord`: the `known` branch is checked first for a counted review and overrides the generic correct branch: grade `Rating.Easy`, `stage = 4`, `passedUse = true`, `stageCorrect = 0`; then the usual FSRS step. No migration needed (`result` is `correct`; `exercise_type` has no CHECK).
+- Counts: `newAvailable` = never-reviewed ready words left in today's allowance (not capped at 10); `reviewAvailable` = all due reviewed ready words (not capped). The queues for a training cap at `PRACTICE_WORDS`. `available` = the sum (Today link).
+- New-mode intro cards are built with `toPracticeCard(view, { type: 'intro', exercise: null }, all, rand)`; `planCards` no longer returns `intro`.
+
+**Task 3**
+- Mode: `?mode=new` → new, anything else → review. `Practice` is keyed by `${mode}-${run}`. "+10 new words" on the Words page navigates to `/words/practice?mode=new`; on the end screen `onAddNew` adds the allowance and opens the **new** mode (not the current one). Continue keeps the current mode. `canContinue` = the per-mode count > 0 (`newAvailable`/`reviewAvailable`), `words.more` with `n = min(left, 10)`.
+- E2E facts (verify by running, record old → new): in `?state=words` only ephemeral is new (New = 1 word, 3 tests, one group of 1); Review = the 6 due words, no intro. Group-order tests use `?state=words-limit` after "+10 new words" (10 words → groups 3,3,2,2, 30 tests; header `1 / 30`); in `words-limit` both start buttons are disabled before +10 (allowance used, nothing due). The old test "a second wrong answer adds no card" changes to: a second wrong answer adds a second extra; a third adds none.
+- All e2e and cursor tests that open the bare `/words/practice` and expect new-word cards switch to `?mode=new` (`openPractice` gets a mode argument); the hash route accepts `#/words/practice?mode=new`. cursor CASES gain `words/practice?mode=new`, `words/practice?mode=review` and the word card with its confirmation open; the anagram cursor test and any helper that clicks "Понятно" now click "Дальше" on the word card.
+- Already know / Remove: run only from the click handler; disable both (and Дальше) while pending; `const next = dropWord(cards, index, wordId); setCards(next); advance(next, index)`; Remove wraps `deleteWord` in try/catch and shows `words.saveError`. If the list ends, `finish()` runs; when no word was tested the end screen still shows "Готово: 0 из 0" with the Back/Continue buttons (accepted).
+- Remove confirmation is inline (the `WordDetails` pattern), text `words.remove.confirm`, buttons `words.delete.yes`/`words.delete.no`.
+- Speech: `canSpeak()` = `'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined'`; `speak(text, lang)` cancels any current speech, sets `utterance.lang`, picks a voice from `getVoices()` whose `lang` starts with it when the list is non-empty. `WordCard` gets `spelling` from `getSettings().spellingVariant` (`british` → `en-GB`, `american` → `en-US`) loaded once in WordsPractice. The e2e stub records calls on `window.__spoken`.
+- `words.more` now has `{n}`: every caller passes it.

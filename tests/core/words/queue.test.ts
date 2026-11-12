@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { availableTypes, canAddNew, extraNewFor, pickExercise, practiceQueue, type QueueWord } from '@/core/words/queue';
+import { availableTypes, canAddNew, extraNewFor, newQueue, pickExercise, reviewQueue, type QueueWord } from '@/core/words/queue';
 import type { WordState } from '@/core/words/progress';
 import type { Word, WordExercise, ExerciseType } from '@/core/words/types';
 
@@ -93,8 +93,8 @@ describe('pickExercise', () => {
   });
 });
 
-describe('practiceQueue', () => {
-  test('due words first, most overdue first (ties by id), then new words (oldest added first)', () => {
+describe('reviewQueue', () => {
+  test('due reviewed words, most overdue first (ties by id); new words are not in it', () => {
     const words: QueueWord[] = [
       { word: word(1, '2026-10-10'), state: state({ reviewed: true, due: '2026-11-02' }), firstReviewDate: '2026-10-10' },
       { word: word(2, '2026-10-10'), state: state({ reviewed: true, due: '2026-11-01' }), firstReviewDate: '2026-10-10' },
@@ -102,7 +102,47 @@ describe('practiceQueue', () => {
       { word: word(4, '2026-10-20'), state: state(), firstReviewDate: null },
       { word: word(5, '2026-10-05'), state: state(), firstReviewDate: null },
     ];
-    expect(practiceQueue(words, TODAY)).toEqual([2, 3, 1, 5, 4]);
+    expect(reviewQueue(words, TODAY)).toEqual([2, 3, 1]);
+  });
+
+  test('total is at most 10 words', () => {
+    const due: QueueWord[] = Array.from({ length: 25 }, (_, i) => ({
+      word: word(i + 1),
+      state: state({ reviewed: true, due: '2026-10-01' }),
+      firstReviewDate: '2026-09-01',
+    }));
+    const queue = reviewQueue(due, TODAY);
+    expect(queue).toHaveLength(10);
+    expect(queue).toEqual(Array.from({ length: 10 }, (_, i) => i + 1));
+  });
+
+  test('skips words without ready exercises', () => {
+    const words: QueueWord[] = [
+      { word: word(1, '2026-10-01', 'pending'), state: state({ reviewed: true, due: '2026-10-30' }), firstReviewDate: '2026-10-02' },
+      { word: word(2, '2026-10-01', 'failed'), state: state({ reviewed: true, due: '2026-10-30' }), firstReviewDate: '2026-10-02' },
+      { word: word(3, '2026-10-01', 'ready'), state: state({ reviewed: true, due: '2026-10-30' }), firstReviewDate: '2026-10-02' },
+    ];
+    expect(reviewQueue(words, TODAY)).toEqual([3]);
+  });
+
+  test('words answered today are not due, so Continue gives the next words', () => {
+    const words: QueueWord[] = [
+      { word: word(1), state: state({ reviewed: true, due: '2026-11-07' }), firstReviewDate: '2026-10-01' },
+      { word: word(2), state: state({ reviewed: true, due: '2026-11-05' }), firstReviewDate: '2026-10-01' },
+      { word: word(3), state: state({ reviewed: true, due: '2026-11-03' }), firstReviewDate: '2026-10-01' },
+    ];
+    expect(reviewQueue(words, TODAY)).toEqual([3]);
+  });
+});
+
+describe('newQueue', () => {
+  test('never-reviewed ready words, oldest added first (ties by id)', () => {
+    const words: QueueWord[] = [
+      { word: word(1, '2026-10-10'), state: state({ reviewed: true, due: '2026-11-02' }), firstReviewDate: '2026-10-10' },
+      { word: word(4, '2026-10-20'), state: state(), firstReviewDate: null },
+      { word: word(5, '2026-10-05'), state: state(), firstReviewDate: null },
+    ];
+    expect(newQueue(words, TODAY)).toEqual([5, 4]);
   });
 
   test('new words are limited to NEW_PER_DAY minus those first reviewed today', () => {
@@ -116,9 +156,7 @@ describe('practiceQueue', () => {
       { word: word(2), state: state({ reviewed: true, due: '2026-11-10' }), firstReviewDate: TODAY },
       { word: word(3), state: state({ reviewed: true, due: '2026-11-10' }), firstReviewDate: TODAY },
     ];
-    const queue = practiceQueue([...fresh, ...todayStarted], TODAY);
-    expect(queue.filter((id) => id >= 100)).toHaveLength(7);
-    expect(queue.filter((id) => id >= 100)).toEqual([100, 101, 102, 103, 104, 105, 106]);
+    expect(newQueue([...fresh, ...todayStarted], TODAY)).toEqual([100, 101, 102, 103, 104, 105, 106]);
   });
 
   test('no new words when NEW_PER_DAY is already used up today', () => {
@@ -128,36 +166,21 @@ describe('practiceQueue', () => {
       firstReviewDate: TODAY,
     }));
     const fresh: QueueWord = { word: word(50), state: state(), firstReviewDate: null };
-    expect(practiceQueue([...today, fresh], TODAY)).toEqual([]);
+    expect(newQueue([...today, fresh], TODAY)).toEqual([]);
   });
 
   test('total is at most 10 words', () => {
-    const due: QueueWord[] = Array.from({ length: 25 }, (_, i) => ({
-      word: word(i + 1),
-      state: state({ reviewed: true, due: '2026-10-01' }),
-      firstReviewDate: '2026-09-01',
-    }));
-    const queue = practiceQueue(due, TODAY);
-    expect(queue).toHaveLength(10);
-    expect(queue).toEqual(Array.from({ length: 10 }, (_, i) => i + 1));
+    const fresh = Array.from({ length: 25 }, (_, i) => ({ word: word(i + 1), state: state(), firstReviewDate: null }));
+    expect(newQueue(fresh, TODAY)).toEqual(Array.from({ length: 10 }, (_, i) => i + 1));
   });
 
   test('skips words without ready exercises', () => {
     const words: QueueWord[] = [
       { word: word(1, '2026-10-01', 'pending'), state: state(), firstReviewDate: null },
-      { word: word(2, '2026-10-01', 'failed'), state: state({ reviewed: true, due: '2026-10-30' }), firstReviewDate: '2026-10-02' },
+      { word: word(2, '2026-10-01', 'failed'), state: state(), firstReviewDate: null },
       { word: word(3, '2026-10-01', 'ready'), state: state(), firstReviewDate: null },
     ];
-    expect(practiceQueue(words, TODAY)).toEqual([3]);
-  });
-
-  test('words answered today are not due, so Continue gives the next words', () => {
-    const words: QueueWord[] = [
-      { word: word(1), state: state({ reviewed: true, due: '2026-11-07' }), firstReviewDate: '2026-10-01' },
-      { word: word(2), state: state({ reviewed: true, due: '2026-11-05' }), firstReviewDate: '2026-10-01' },
-      { word: word(3), state: state({ reviewed: true, due: '2026-11-03' }), firstReviewDate: '2026-10-01' },
-    ];
-    expect(practiceQueue(words, TODAY)).toEqual([3]);
+    expect(newQueue(words, TODAY)).toEqual([3]);
   });
 });
 
@@ -173,8 +196,8 @@ describe('extra new words', () => {
 
   test('extraNew raises the limit', () => {
     const words = [...started(10), ...fresh(3)];
-    expect(practiceQueue(words, TODAY, 0).filter((id) => id >= 100)).toEqual([]);
-    expect(practiceQueue(words, TODAY, 10).filter((id) => id >= 100)).toEqual([100, 101, 102]);
+    expect(newQueue(words, TODAY, 0).filter((id) => id >= 100)).toEqual([]);
+    expect(newQueue(words, TODAY, 10).filter((id) => id >= 100)).toEqual([100, 101, 102]);
   });
 
   test('extraNewFor is 0 for null or another date', () => {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getSettings } from '@/core/db/repos/settings';
 import { t } from '@/core/i18n';
-import { insertExtra } from '@/core/words/plan';
+import { insertRetry } from '@/core/words/plan';
 import { extraNewFor } from '@/core/words/queue';
 import {
   addExtraNew, buildPractice, extraCardFor, loadWordViews, recordAnswer, stageChanges, wordsOverview,
@@ -40,7 +40,7 @@ function Practice({ onContinue }: { onContinue: () => void }) {
       const views = await loadWordViews(deps.db);
       before.current = new Map(views.map((v) => [v.word.id, v.state.stage]));
       const extra = extraNewFor((await getSettings(deps.db)).wordsExtraNew, deps.clock.today());
-      const built = await buildPractice(deps, extra);
+      const built = await buildPractice(deps, 'review', extra);
       if (built.length === 0) setNextDue((await wordsOverview(deps.db, deps.clock.today(), extra)).nextDue);
       setCards(built);
     })().catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
@@ -84,7 +84,7 @@ function Practice({ onContinue }: { onContinue: () => void }) {
       const views = await loadWordViews(deps.db);
       const view = views.find((v) => v.word.id === pc.wordId);
       const extra = view ? extraCardFor(view, pc.card.type, views.map((v) => v.word), deps.rand ?? Math.random, queued) : null;
-      if (extra) setCards((cur) => (cur ? insertExtra(cur, at, extra) : cur));
+      if (extra) setCards((cur) => (cur ? insertRetry(cur, at, extra) : cur));
     }
   };
 

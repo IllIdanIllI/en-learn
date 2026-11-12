@@ -19,6 +19,11 @@ export function extraType(missed: CardType): CardType {
   return missed === 'choice' || missed === 'build' ? 'build' : missed;
 }
 
+// The tests of a never-reviewed word, in order.
+export function newWordTests(hasGap: boolean): CardType[] {
+  return ['choice', 'build', hasGap ? 'gap_hint' : 'anagram'];
+}
+
 // The cards of one word for one practice, fixed from its stage at the start.
 export function planCards(i: {
   state: WordState;
@@ -38,7 +43,7 @@ export function planCards(i: {
   const pick = <T>(list: T[]): T | undefined => list[Math.floor(rand() * list.length)];
   const hasGap = exercises.some((e) => e.type === 'gap');
 
-  if (!state.reviewed) return plan(['intro', 'choice', 'build', hasGap ? 'gap_hint' : 'anagram']);
+  if (!state.reviewed) return plan(newWordTests(hasGap));
   if (state.stage === 1) return plan(['anagram', hasGap ? 'gap_hint' : 'anagram']);
 
   const recall = availableTypes(2, false, exercises);
@@ -125,24 +130,24 @@ export function orderRounds<T extends { wordId: number }>(plans: T[][], rand: ()
   return rounds.flatMap((cards, k) => arrange(cards, ends[k] ?? { first: 0, last: cards.length - 1 }).map((c) => ({ ...c, round: k + 1 })));
 }
 
-// Puts an extra card after a mistake at the end of the next round (a new round after the last one).
-export function insertExtra<T extends { wordId: number; round: number }>(
+// Sizes of the groups of a new training: as few groups as hold 3 words each, as even as possible, larger first.
+export function groupSizes(n: number): number[] {
+  if (n === 0) return [];
+  const groups = Math.ceil(n / 3);
+  const base = Math.floor(n / groups);
+  const extra = n % groups;
+  return Array.from({ length: groups }, (_, g) => (g < extra ? base + 1 : base));
+}
+
+// Puts the extra card after a mistake right after the first test of another word that follows the mistake,
+// so the word is not repeated back to back; it takes that card's round. With no such test, it goes at the end.
+export function insertRetry<T extends { wordId: number; round: number; card: { type: CardType } }>(
   cards: T[],
   at: number,
   extra: Omit<T, 'round'>,
 ): T[] {
-  const round = (cards[at]?.round ?? 0) + 1;
-  const end = cards.reduce((found, c, j) => (c.round === round ? j : found), -1);
-  if (end < 0) return [...cards, { ...extra, round } as T];
-
-  // Slots inside the round, from just after its last card back to its first: the first one with no card of the extra's word beside it.
-  const start = cards.findIndex((c) => c.round === round);
-  let pos = end + 1;
-  for (let p = end + 1; p >= start; p--) {
-    if (cards[p - 1]?.wordId !== extra.wordId && cards[p]?.wordId !== extra.wordId) {
-      pos = p;
-      break;
-    }
-  }
-  return [...cards.slice(0, pos), { ...extra, round } as T, ...cards.slice(pos)];
+  const j = cards.findIndex((c, i) => i > at && c.card.type !== 'intro' && c.wordId !== extra.wordId);
+  const next = cards[j];
+  if (next === undefined) return [...cards, { ...extra, round: cards[cards.length - 1]?.round ?? 1 } as T];
+  return [...cards.slice(0, j + 1), { ...extra, round: next.round } as T, ...cards.slice(j + 1)];
 }

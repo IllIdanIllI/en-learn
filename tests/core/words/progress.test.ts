@@ -83,6 +83,17 @@ describe('replayWord', () => {
     expect(hard.stage).toBe(4);
   });
 
+  it('a known review is learned at once: stage 4, reviewed, due in the future', () => {
+    const s = replayWord([{ ...rev(day(0), 'correct'), cardType: 'known' }]);
+    expect(s).toMatchObject({ stage: 4, passedUse: true, stageCorrect: 0, reviewed: true });
+    expect(s.due! > day(0)).toBe(true);
+  });
+
+  it('a wrong answer after a known review goes down as usual', () => {
+    const known = { ...rev(day(0), 'correct'), cardType: 'known' as const };
+    expect(replayWord([known, rev(day(20), 'wrong')])).toMatchObject({ stage: 3, passedUse: false, stageCorrect: 0 });
+  });
+
   it('replay is stable', () => {
     const reviews = [...correct(4), rev(day(10), 'hard'), rev(day(30), 'wrong'), rev(day(32), 'correct')];
     expect(replayWord(reviews)).toEqual(replayWord(reviews));

@@ -9,9 +9,9 @@ import { insertReview, insertWordErrors, listExercises, listReviews, listWords }
 import { anagram, choiceOptions, revealsWord } from './check';
 import { EXTRA_NEW_STEP } from './constants';
 import { buildWordCheckPrompt, checkWordCheckReply } from './generated';
-import { cardOfType, extraType, orderRounds, planCards, USED_LAST } from './plan';
+import { cardOfType, extraType, groupSizes, orderRounds, planCards, USED_LAST } from './plan';
 import { replayWord, type WordState } from './progress';
-import { canAddNew, extraNewFor, practiceQueue, type Card, type QueueWord } from './queue';
+import { canAddNew, extraNewFor, newQueue, newWords, reviewQueue, reviewWords, type Card, type QueueWord } from './queue';
 import type { CardType, ReviewResult, Stage, Word, WordExercise, WordReview } from './types';
 
 export interface WordView {
@@ -91,7 +91,16 @@ export function extraCardFor(
   return card ? toPracticeCard(view, card, all, rand) : null;
 }
 
-export async function buildPractice(deps: Deps, extraNew = 0): Promise<PracticeCard[]> {
+export type PracticeMode = 'new' | 'review';
+
+const planOf = (view: WordView, all: Word[], rand: () => number): Omit<PracticeCard, 'round'>[] =>
+  planCards({ state: view.state, exercises: view.exercises, lastUsed: lastUsedOf(view), rand }).map((card) =>
+    toPracticeCard(view, card, all, rand),
+  );
+
+// A review training: the due words' cards in rounds. A new training: groups of new words, each group's word
+// cards first (in queue order), then its tests in rounds; round numbers keep increasing across groups.
+export async function buildPractice(deps: Deps, mode: PracticeMode, extraNew = 0): Promise<PracticeCard[]> {
   const rand = deps.rand ?? Math.random;
   const views = await loadWordViews(deps.db);
   const queue: QueueWord[] = views.map((v) => ({
@@ -101,15 +110,40 @@ export async function buildPractice(deps: Deps, extraNew = 0): Promise<PracticeC
   }));
   const all = views.map((v) => v.word);
   const byId = new Map(views.map((v) => [v.word.id, v]));
-  const plans: Omit<PracticeCard, 'round'>[][] = [];
-  for (const id of practiceQueue(queue, deps.clock.today(), extraNew)) {
-    const view = byId.get(id);
-    if (!view) continue;
-    const cards = planCards({ state: view.state, exercises: view.exercises, lastUsed: lastUsedOf(view), rand });
-    const plan = cards.map((card) => toPracticeCard(view, card, all, rand));
-    if (plan.length > 0) plans.push(plan);
+  const today = deps.clock.today();
+  const ids = mode === 'review' ? reviewQueue(queue, today) : newQueue(queue, today, extraNew);
+  const words = ids.flatMap((id) => byId.get(id) ?? []);
+  if (mode === 'review') return orderRounds(words.map((v) => planOf(v, all, rand)), rand);
+
+  const out: PracticeCard[] = [];
+  let rounds = 0;
+  let start = 0;
+  for (const size of groupSizes(words.length)) {
+    const group = words.slice(start, start + size);
+    start += size;
+    const intros = group.map((v) => ({ ...toPracticeCard(v, { type: 'intro', exercise: null }, all, rand), round: rounds + 1 }));
+    const tests = orderRounds(group.map((v) => planOf(v, all, rand)), rand);
+    out.push(...intros, ...tests.map((c) => ({ ...c, round: c.round + rounds })));
+    rounds += Math.max(0, ...tests.map((c) => c.round));
   }
-  return orderRounds(plans, rand);
+  return out;
+}
+
+export const isTest = (pc: PracticeCard): boolean => pc.card.type !== 'intro';
+
+// The number of a test card among the training's tests: k is the next test's number (1 + tests before index), n is all tests.
+export function testPosition(cards: PracticeCard[], index: number): { k: number; n: number } {
+  return { k: cards.slice(0, index).filter(isTest).length + 1, n: cards.filter(isTest).length };
+}
+
+// Removes the word's cards after index from (the word is now known, so its later cards are not needed).
+export function dropWord(cards: PracticeCard[], from: number, wordId: number): PracticeCard[] {
+  return cards.filter((c, i) => i <= from || c.wordId !== wordId);
+}
+
+// The word is already known: a counted review that replays it as learned (see replayWord).
+export async function markKnown(deps: Deps, wordId: number): Promise<void> {
+  await recordAnswer(deps, { wordId, cardType: 'known', exerciseId: null, result: 'correct', text: '' });
 }
 
 export async function recordAnswer(
@@ -183,6 +217,10 @@ export interface WordsOverview {
   available: number;
   nextDue: ISODate | null;
   canAddNew: boolean;
+  /** Never-reviewed ready words within today's new-word allowance (not capped). */
+  newAvailable: number;
+  /** Due reviewed ready words (not capped). */
+  reviewAvailable: number;
   /** Words with a counted review that are not Learned. */
   inProgress: number;
   /** Words at stage 4. */
@@ -202,11 +240,15 @@ export async function wordsOverview(db: Db, today: ISODate, extraNew = 0): Promi
     state: v.state,
     firstReviewDate: v.reviews.find((r) => r.counted)?.date ?? null,
   }));
+  const newAvailable = newWords(queue, today, extraNew).length;
+  const reviewAvailable = reviewWords(queue, today).length;
   const later = ready.flatMap((v) => (v.state.due !== null && v.state.due > today ? [v.state.due] : [])).sort();
   return {
     counts,
     dueToday,
-    available: practiceQueue(queue, today, extraNew).length,
+    newAvailable,
+    reviewAvailable,
+    available: newAvailable + reviewAvailable,
     nextDue: later[0] ?? null,
     canAddNew: canAddNew(queue, today, extraNew),
     inProgress: views.filter((v) => v.state.reviewed && v.state.stage < 4).length,

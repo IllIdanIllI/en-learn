@@ -5,12 +5,13 @@ import { FakeLlm } from '@/adapters/test/fakeLlm';
 import { bundledPrompts } from '@/core/llm/bundledPrompts';
 import { insertReview, insertWord, listExercises, listReviews, listWordErrors, replaceExercises, setGeneration } from '@/core/db/repos/words';
 import {
-  addExtraNew, buildPractice, checkUseIt, extraCardFor, loadWordViews, recordAnswer, stageChanges, wordsOverview,
+  addExtraNew, buildPractice, checkUseIt, dropWord, extraCardFor, isTest, loadWordViews, markKnown, recordAnswer, stageChanges,
+  testPosition, wordsOverview, type PracticeCard,
 } from '@/core/words/practice';
 import { getSettings } from '@/core/db/repos/settings';
 import { extraNewFor } from '@/core/words/queue';
 import type { Deps, LlmResult } from '@/core/ports';
-import type { ExerciseType, WordExercise, WordFields, WordReview } from '@/core/words/types';
+import type { CardType, ExerciseType, Word, WordExercise, WordFields, WordReview } from '@/core/words/types';
 import { revealsWord } from '@/core/words/check';
 import { exercisesOf, LIMIT_WORDS, PREVIEW_WORDS } from '@/adapters/preview/wordsSeed';
 
@@ -64,48 +65,91 @@ describe('recordAnswer', () => {
 });
 
 describe('buildPractice', () => {
-  test('ten new words give 40 cards: round 1 is the 10 intro cards, then choice, build and anagram rounds, no repeat field', async () => {
-    const deps = await setup();
-    for (let i = 0; i < 12; i++) await addReady(deps, `word${i}`);
-    const cards = await buildPractice(deps);
-    expect(cards).toHaveLength(40);
-    expect(cards.slice(0, 10).every((c) => c.card.type === 'intro' && c.round === 1)).toBe(true);
-    expect(new Set(cards.slice(0, 10).map((c) => c.wordId)).size).toBe(10);
-    for (const c of cards.slice(0, 10)) {
-      expect(c.options).toBeNull();
-      expect(c.letters).toBeNull();
-    }
-    expect(cards.slice(10, 20).map((c) => c.card.type)).toEqual(Array(10).fill('choice'));
-    for (const c of cards.slice(10, 20)) {
-      expect(c.options).toContain(c.word.word);
-      expect(c.letters).toBeNull();
-    }
-    expect(cards.slice(20, 30).map((c) => c.card.type)).toEqual(Array(10).fill('build'));
-    expect(cards.slice(30).map((c) => c.card.type)).toEqual(Array(10).fill('anagram'));
-    for (const c of cards.slice(20)) expect(c.letters).not.toBeNull();
-    expect(cards.every((c) => !('repeat' in c))).toBe(true);
-  });
-
-  test('each round holds one card of every word; a word keeps its order; no word back to back; every card has a round', async () => {
+  test('review: only reviewed due words, no intro cards; each round holds one card per word', async () => {
     const deps = await setup();
     const stage2 = await addReady(deps, 'stage2', '2026-10-01', [ex('gap', { answers: ['x'] }), ex('form', { answers: ['y'] })]);
     await insertReview(deps.db, review(stage2, '2026-01-01'));
     await insertReview(deps.db, review(stage2, '2026-01-05'));
-    const fresh = await addReady(deps, 'fresh', '2026-11-01', [ex('gap', { answers: ['x'] })]);
-    const cards = await buildPractice(deps);
+    const s1 = await addReady(deps, 's1', '2026-10-01', [ex('gap', { answers: ['x'] })]);
+    await insertReview(deps.db, review(s1, '2026-01-01'));
+    await addReady(deps, 'fresh', '2026-11-01', [ex('gap', { answers: ['x'] })]);
+    const cards = await buildPractice(deps, 'review');
+    expect(cards.some((c) => c.card.type === 'intro')).toBe(false);
+    expect(new Set(cards.map((c) => c.wordId))).toEqual(new Set([stage2, s1]));
     const inRound = (k: number) => cards.filter((c) => c.round === k).map((c) => c.wordId).sort((a, b) => a - b);
-    const ids = [fresh, stage2].sort((a, b) => a - b);
+    const ids = [stage2, s1].sort((a, b) => a - b);
     expect(inRound(1)).toEqual(ids);
     expect(inRound(2)).toEqual(ids);
-    expect(inRound(3)).toEqual([fresh]);
-    expect(inRound(4)).toEqual([fresh]);
-    const of = (id: number) => cards.filter((c) => c.wordId === id).map((c) => c.card.type);
-    expect(of(fresh)).toEqual(['intro', 'choice', 'build', 'gap_hint']);
-    expect(of(stage2)).toHaveLength(2);
-    expect(of(stage2).every((t) => t === 'gap' || t === 'form' || t === 'spell')).toBe(true);
+    expect(inRound(3)).toEqual([]);
+    expect(cards.filter((c) => c.wordId === s1).map((c) => c.card.type)).toEqual(['anagram', 'gap_hint']);
+    expect(cards.filter((c) => c.wordId === stage2)).toHaveLength(2);
+    expect(cards.every((c) => c.round >= 1)).toBe(true);
   });
 
-  test('with a seeded random source no word is back to back across 50 practices', async () => {
+  test('new: intro cards of each group in queue order, then the group tests; each word has choice, build, anagram', async () => {
+    const deps = await setup();
+    const ids: number[] = [];
+    for (let i = 0; i < 12; i++) ids.push(await addReady(deps, `word${i}`));
+    const cards = await buildPractice(deps, 'new');
+    expect(cards).toHaveLength(40);
+    // Groups of 10 new words are 3, 3, 2, 2: intros then their tests.
+    expect(cards.map((c) => (c.card.type === 'intro' ? 'I' : 'T')).join('')).toBe(
+      'III' + 'T'.repeat(9) + 'III' + 'T'.repeat(9) + 'II' + 'T'.repeat(6) + 'II' + 'T'.repeat(6),
+    );
+    expect(cards.filter((c) => c.card.type === 'intro').map((c) => c.wordId)).toEqual(ids.slice(0, 10));
+    expect(cards.filter((c) => c.card.type === 'intro').map((c) => c.round)).toEqual([1, 1, 1, 4, 4, 4, 7, 7, 10, 10]);
+    expect(cards.filter((c) => c.card.type !== 'intro').map((c) => c.round)).toEqual([
+      1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12,
+    ]);
+    const of = (id: number) => cards.filter((c) => c.wordId === id && c.card.type !== 'intro').map((c) => c.card.type);
+    for (const id of ids.slice(0, 10)) expect(of(id)).toEqual(['choice', 'build', 'anagram']);
+    for (const c of cards.filter((c) => c.card.type === 'intro')) {
+      expect(c.options).toBeNull();
+      expect(c.letters).toBeNull();
+    }
+  });
+
+  test('new: a word with a gap exercise gets gap_hint as its last test; intro first', async () => {
+    const deps = await setup();
+    const id = await addReady(deps, 'alpha', '2026-11-01', [ex('gap', { prompt: 'It is ___.', answers: ['x'] })]);
+    const cards = (await buildPractice(deps, 'new')).filter((c) => c.wordId === id);
+    expect(cards.map((c) => c.card.type)).toEqual(['intro', 'choice', 'build', 'gap_hint']);
+  });
+
+  test('new: only never-reviewed ready words; the allowance applies', async () => {
+    const deps = await setup();
+    const reviewed = await addReady(deps, 'reviewed');
+    await insertReview(deps.db, review(reviewed, '2026-10-01'));
+    const fresh = await addReady(deps, 'fresh');
+    const cards = await buildPractice(deps, 'new');
+    expect(new Set(cards.map((c) => c.wordId))).toEqual(new Set([fresh]));
+    expect(cards.filter((c) => c.card.type === 'intro')).toHaveLength(1);
+  });
+
+  test('no two neighbouring tests share a word, for 30 seeds (new training with groups of 3 and 2)', async () => {
+    const mulberry32 = (seed: number) => {
+      let a = seed >>> 0;
+      return () => {
+        a = (a + 0x6d2b79f5) >>> 0;
+        let t = a;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    };
+    const deps = await setup();
+    for (let i = 0; i < 5; i++) await addReady(deps, `word${i}`, '2026-11-01', [ex('gap', { answers: ['x'] })]);
+    for (let seed = 1; seed <= 30; seed++) {
+      deps.rand = mulberry32(seed);
+      const cards = await buildPractice(deps, 'new');
+      expect(cards).toHaveLength(5 * 4);
+      for (let i = 1; i < cards.length; i++) {
+        if (isTest(cards[i]!) && isTest(cards[i - 1]!)) expect(cards[i]?.wordId).not.toBe(cards[i - 1]?.wordId);
+      }
+    }
+  });
+
+  test('no word back to back across 50 practices, in both trainings', async () => {
     const mulberry32 = (seed: number) => {
       let a = seed >>> 0;
       return () => {
@@ -120,16 +164,22 @@ describe('buildPractice', () => {
     const stage2 = await addReady(deps, 'stage2', '2026-10-01', [ex('gap', { answers: ['x'] }), ex('form', { answers: ['y'] })]);
     await insertReview(deps.db, review(stage2, '2026-01-01'));
     await insertReview(deps.db, review(stage2, '2026-01-05'));
+    const s1 = await addReady(deps, 's1', '2026-10-01', [ex('gap', { answers: ['x'] })]);
+    await insertReview(deps.db, review(s1, '2026-01-01'));
     await addReady(deps, 'fresh', '2026-11-01', [ex('gap', { answers: ['x'] })]);
     await addReady(deps, 'fresh2', '2026-11-01', [ex('gap', { answers: ['x'] })]);
     for (let seed = 1; seed <= 50; seed++) {
       deps.rand = mulberry32(seed);
-      const cards = await buildPractice(deps);
-      for (let i = 1; i < cards.length; i++) expect(cards[i]?.wordId).not.toBe(cards[i - 1]?.wordId);
+      for (const mode of ['review', 'new'] as const) {
+        const cards = await buildPractice(deps, mode);
+        for (let i = 1; i < cards.length; i++) {
+          if (isTest(cards[i]!) && isTest(cards[i - 1]!)) expect(cards[i]?.wordId).not.toBe(cards[i - 1]?.wordId);
+        }
+      }
     }
   });
 
-  test('card counts by stage: new 4, stage 2 with gap and form 2, stage 4 1', async () => {
+  test('card counts: a new word 4 (intro and three tests), stage 2 with gap and form 2, stage 4 1', async () => {
     const deps = await setup();
     const fresh = await addReady(deps, 'fresh', '2026-10-01');
     const s2 = await addReady(deps, 's2', '2026-10-01', [ex('gap', { answers: ['x'] }), ex('form', { answers: ['y'] })]);
@@ -141,9 +191,10 @@ describe('buildPractice', () => {
     for (const d of ['2025-03-03', '2025-03-07', '2025-03-14', '2025-03-28', '2025-04-23', '2025-06-04']) {
       await insertReview(deps.db, review(s4, d));
     }
-    const cards = await buildPractice(deps);
-    const count = (id: number) => cards.filter((c) => c.wordId === id).length;
-    expect([count(fresh), count(s2), count(s4)]).toEqual([4, 2, 1]);
+    const count = (cards: { wordId: number }[], id: number) => cards.filter((c) => c.wordId === id).length;
+    const newCards = await buildPractice(deps, 'new');
+    const reviewCards = await buildPractice(deps, 'review');
+    expect([count(newCards, fresh), count(reviewCards, s2), count(reviewCards, s4)]).toEqual([4, 2, 1]);
   });
 
   test('a stage 2 word without exercises gets two spell cards with letters', async () => {
@@ -151,9 +202,38 @@ describe('buildPractice', () => {
     const bare = await addReady(deps, 'bare');
     await insertReview(deps.db, review(bare, '2026-01-01'));
     await insertReview(deps.db, review(bare, '2026-01-05'));
-    const cards = (await buildPractice(deps)).filter((c) => c.wordId === bare);
+    const cards = (await buildPractice(deps, 'review')).filter((c) => c.wordId === bare);
     expect(cards.map((c) => c.card.type)).toEqual(['spell', 'spell']);
     expect(cards.every((c) => c.card.exercise === null && c.letters !== null)).toBe(true);
+  });
+});
+
+describe('training helpers', () => {
+  const pc = (wordId: number, type: CardType, round = 1): PracticeCard => ({
+    wordId, word: {} as Word, card: { type, exercise: null }, options: null, letters: null, round,
+  });
+
+  test('testPosition: the number of the test among the training tests, from a word card on the next one', () => {
+    const cards = [pc(1, 'intro'), pc(2, 'intro'), pc(1, 'choice'), pc(2, 'choice'), pc(3, 'intro'), pc(3, 'choice')];
+    expect(cards.map(isTest)).toEqual([false, false, true, true, false, true]);
+    expect(testPosition(cards, 0)).toEqual({ k: 1, n: 3 });
+    expect(testPosition(cards, 2)).toEqual({ k: 1, n: 3 });
+    expect(testPosition(cards, 3)).toEqual({ k: 2, n: 3 });
+    expect(testPosition(cards, 4)).toEqual({ k: 3, n: 3 });
+  });
+
+  test('dropWord removes only the word\'s cards after the given index', () => {
+    const cards = [pc(1, 'intro'), pc(1, 'choice'), pc(2, 'choice'), pc(1, 'build')];
+    expect(dropWord(cards, 1, 1)).toEqual([cards[0], cards[1], cards[2]]);
+  });
+
+  test('markKnown saves one counted review of type known', async () => {
+    const deps = await setup();
+    const id = await addReady(deps, 'alpha');
+    await markKnown(deps, id);
+    expect(await listReviews(deps.db)).toEqual([
+      expect.objectContaining({ wordId: id, cardType: 'known', exerciseId: null, result: 'correct', text: '', counted: true }),
+    ]);
   });
 });
 
@@ -209,7 +289,7 @@ describe('saved exercises that reveal the word', () => {
     ]);
     const views = await loadWordViews(deps.db);
     expect(views.find((v) => v.word.id === id)!.exercises.map((e) => e.prompt)).toEqual(['The sky was ___ today.']);
-    const cards = (await buildPractice(deps)).filter((c) => c.wordId === id);
+    const cards = (await buildPractice(deps, 'new')).filter((c) => c.wordId === id);
     expect(cards.map((c) => c.card.type)).toEqual(['intro', 'choice', 'build', 'gap_hint']);
     expect(cards[3]?.card.exercise?.prompt).toBe('The sky was ___ today.');
   });
@@ -297,8 +377,23 @@ describe('wordsOverview', () => {
     expect(o.counts[1]).toBe(2);
     // b is new and ready; a is due (<= today); pending word is excluded
     expect(o.available).toBe(2);
+    expect(o.reviewAvailable).toBe(1);
+    expect(o.newAvailable).toBe(1);
     expect(o.dueToday).toBe(1);
     expect(b).toBeGreaterThan(0);
+  });
+
+  test('reviewAvailable and newAvailable are not capped at 10; available is their sum', async () => {
+    const deps = await setup();
+    for (let i = 0; i < 12; i++) {
+      const id = await addReady(deps, `due${i}`);
+      await insertReview(deps.db, review(id, '2026-10-01'));
+    }
+    for (let i = 0; i < 12; i++) await addReady(deps, `new${i}`);
+    const o = await wordsOverview(deps.db, '2026-11-04');
+    expect(o.reviewAvailable).toBe(12);
+    expect(o.newAvailable).toBe(10);
+    expect(o.available).toBe(22);
   });
 
   test('nextDue is the earliest due date after today', async () => {

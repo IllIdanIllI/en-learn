@@ -30,8 +30,14 @@ export function replayWord(reviews: WordReview[]): WordState {
   let stageCorrect = 0;
   let passedUse = false;
   for (const r of counted) {
-    card = f.next(card, noon(r.date), GRADE[r.result]).card;
-    if (r.result === 'wrong') {
+    const known = r.cardType === 'known';
+    card = f.next(card, noon(r.date), known ? Rating.Easy : GRADE[r.result]).card;
+    if (known) {
+      // "Already known" skips the stages: the word is learned at once.
+      stage = 4;
+      passedUse = true;
+      stageCorrect = 0;
+    } else if (r.result === 'wrong') {
       stage = Math.max(1, stage - 1) as Stage;
       stageCorrect = 0;
       passedUse = false;

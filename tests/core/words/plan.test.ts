@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { availableTypes } from '@/core/words/queue';
-import { cardOfType, extraType, insertExtra, orderRounds, planCards } from '@/core/words/plan';
+import { cardOfType, extraType, groupSizes, insertRetry, newWordTests, orderRounds, planCards } from '@/core/words/plan';
 import type { WordState } from '@/core/words/progress';
 import type { CardType, ExerciseType, WordExercise } from '@/core/words/types';
 
@@ -18,12 +18,12 @@ const plan = (overrides: Partial<WordState>, exercises: WordExercise[], lastUsed
 const types = (cards: { type: CardType }[]) => cards.map((c) => c.type);
 
 describe('planCards', () => {
-  test('new word: intro, choice, build, gap_hint when a gap exercise exists', () => {
-    expect(types(plan({}, [exercise(1, 'gap')]))).toEqual(['intro', 'choice', 'build', 'gap_hint']);
+  test('new word: choice, build, gap_hint when a gap exercise exists (no intro card)', () => {
+    expect(types(plan({}, [exercise(1, 'gap')]))).toEqual(['choice', 'build', 'gap_hint']);
   });
 
-  test('new word without a gap exercise: intro, choice, build, anagram', () => {
-    expect(types(plan({}, []))).toEqual(['intro', 'choice', 'build', 'anagram']);
+  test('new word without a gap exercise: choice, build, anagram', () => {
+    expect(types(plan({}, []))).toEqual(['choice', 'build', 'anagram']);
   });
 
   test('in progress stage 1: anagram, gap_hint when a gap exercise exists', () => {
@@ -240,57 +240,62 @@ describe('orderRounds', () => {
   });
 });
 
-describe('insertExtra', () => {
-  const card = (wordId: number, name: string, round: number) => ({ wordId, name, round });
-  const names = (cards: { name: string }[]) => cards.map((c) => c.name);
+describe('groupSizes', () => {
+  test('groups of 2 or 3, larger groups first', () => {
+    expect(
+      [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => groupSizes(n)),
+    ).toEqual([[], [1], [2], [3], [2, 2], [3, 2], [3, 3], [3, 2, 2], [3, 3, 2], [3, 3, 3], [3, 3, 2, 2]]);
+  });
+});
 
-  test('goes after the last card of the next round, with that round number', () => {
-    const cards = [card(1, 'a1', 1), card(2, 'b1', 1), card(1, 'a2', 2), card(2, 'b2', 2), card(3, 'c1', 3)];
-    const out = insertExtra(cards, 0, { wordId: 9, name: 'x' });
-    expect(names(out)).toEqual(['a1', 'b1', 'a2', 'b2', 'x', 'c1']);
-    expect(out.map((c) => c.round)).toEqual([1, 1, 2, 2, 2, 3]);
+describe('newWordTests', () => {
+  test('choice, build, then gap_hint when the word has gap exercises, else anagram', () => {
+    expect(newWordTests(true)).toEqual(['choice', 'build', 'gap_hint']);
+    expect(newWordTests(false)).toEqual(['choice', 'build', 'anagram']);
+  });
+});
+
+describe('insertRetry', () => {
+  const card = (wordId: number, name: string, round: number, type: CardType = 'build') => ({
+    wordId,
+    name,
+    round,
+    card: { type },
+  });
+  const names = (cards: { name: string }[]) => cards.map((c) => c.name);
+  const X = { wordId: 1, name: 'X', card: { type: 'build' as const } };
+
+  test('goes after the first test of another word after the mistake, with that card round', () => {
+    const cards = [card(1, 'a', 1), card(2, 'b', 1), card(3, 'c', 1)];
+    const out = insertRetry(cards, 0, X);
+    expect(names(out)).toEqual(['a', 'b', 'X', 'c']);
+    expect(out.map((c) => c.round)).toEqual([1, 1, 1, 1]);
   });
 
-  test('no next round: appended with the next round number', () => {
-    const cards = [card(1, 'a1', 1), card(2, 'b1', 1)];
-    const out = insertExtra(cards, 0, { wordId: 9, name: 'x' });
-    expect(names(out)).toEqual(['a1', 'b1', 'x']);
-    expect(out.map((c) => c.round)).toEqual([1, 1, 2]);
+  test('skips the next card of the same word', () => {
+    const cards = [card(1, 'a', 1), card(1, 'a2', 2), card(2, 'b', 2)];
+    const out = insertRetry(cards, 0, X);
+    expect(names(out)).toEqual(['a', 'a2', 'b', 'X']);
+    expect(out.map((c) => c.round)).toEqual([1, 2, 2, 2]);
+  });
+
+  test('skips intro cards', () => {
+    const cards = [card(1, 'A1', 1), card(3, 'introC', 1, 'intro'), card(2, 'B1', 1)];
+    expect(names(insertRetry(cards, 0, X))).toEqual(['A1', 'introC', 'B1', 'X']);
+  });
+
+  test('a mistake with no other word after it appends with the last card round', () => {
+    expect(names(insertRetry([card(1, 'A1', 1), card(1, 'A2', 2)], 0, X))).toEqual(['A1', 'A2', 'X']);
+    expect(insertRetry([card(1, 'A1', 1), card(1, 'A2', 2)], 0, X).map((c) => c.round)).toEqual([1, 2, 2]);
   });
 
   test('a mistake on the last card appends', () => {
-    const cards = [card(1, 'a1', 1), card(2, 'b1', 1)];
-    const out = insertExtra(cards, 1, { wordId: 9, name: 'x' });
-    expect(names(out)).toEqual(['a1', 'b1', 'x']);
-    expect(out.map((c) => c.round)).toEqual([1, 1, 2]);
+    expect(names(insertRetry([card(2, 'b', 1), card(1, 'a', 1)], 1, X))).toEqual(['b', 'a', 'X']);
   });
 
-  test('next to a card of the same word, goes one place earlier', () => {
-    const cards = [
-      card(1, 'g1', 1),
-      card(2, 'a1', 1),
-      card(3, 'b1', 1),
-      card(1, 'g2', 2),
-      card(2, 'a2', 2),
-      card(3, 'b2', 2),
-      card(1, 'g3', 3),
-    ];
-    const out = insertExtra(cards, 0, { wordId: 1, name: 'gX' });
-    expect(names(out)).toEqual(['g1', 'a1', 'b1', 'g2', 'a2', 'gX', 'b2', 'g3']);
-    expect(out.map((c) => c.round)).toEqual([1, 1, 1, 2, 2, 2, 2, 3]);
-  });
-
-  test('when the target round ends with the same word, the extra goes before that card, next to none of its word', () => {
-    const cards = [card(1, 'g1', 1), card(2, 'a1', 1), card(3, 'b1', 1), card(2, 'a2', 2), card(3, 'b2', 2), card(1, 'g2', 2)];
-    const out = insertExtra(cards, 0, { wordId: 1, name: 'gX' });
-    expect(names(out)).toEqual(['g1', 'a1', 'b1', 'a2', 'gX', 'b2', 'g2']);
-    expect(out.map((c) => c.round)).toEqual([1, 1, 1, 2, 2, 2, 2]);
-  });
-
-  test('when the target round holds only the same word, it stays at the end of that round', () => {
-    const cards = [card(1, 'g1', 1), card(2, 'a1', 1), card(1, 'g2', 2)];
-    const out = insertExtra(cards, 0, { wordId: 1, name: 'gX' });
-    expect(names(out)).toEqual(['g1', 'a1', 'g2', 'gX']);
-    expect(out.map((c) => c.round)).toEqual([1, 1, 2, 2]);
+  test('the first other-word test after the mistake, even with a same-word card between', () => {
+    expect(names(insertRetry([card(1, 'A1', 1), card(1, 'A2', 1), card(2, 'B1', 1), card(1, 'A3', 2)], 0, X))).toEqual([
+      'A1', 'A2', 'B1', 'X', 'A3',
+    ]);
   });
 });

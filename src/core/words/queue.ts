@@ -69,16 +69,30 @@ export function canAddNew(words: QueueWord[], today: ISODate, extraNew: number):
   );
 }
 
-// Word ids for one practice: due words (most overdue first), then new words up to today's allowance.
-export function practiceQueue(words: QueueWord[], today: ISODate, extraNew = 0): number[] {
-  const ready = words.filter((w) => w.word.generation === 'ready');
-  const due = ready
-    .filter((w) => w.state.due !== null && w.state.due <= today)
+// Ready reviewed words due today or earlier, most overdue first (ties by id).
+export function reviewWords(words: QueueWord[], today: ISODate): QueueWord[] {
+  return words
+    .filter((w) => w.word.generation === 'ready' && w.state.due !== null && w.state.due <= today)
     .sort((a, b) => (a.state.due ?? '').localeCompare(b.state.due ?? '') || a.word.id - b.word.id);
+}
+
+// Ready words never reviewed, oldest added first, within today's new-word allowance.
+export function newWords(words: QueueWord[], today: ISODate, extraNew = 0): QueueWord[] {
   const newLimit = Math.max(0, NEW_PER_DAY + extraNew - startedOn(words, today));
-  const fresh = ready
-    .filter((w) => !w.state.reviewed)
+  return words
+    .filter((w) => w.word.generation === 'ready' && !w.state.reviewed)
     .sort((a, b) => a.word.added.localeCompare(b.word.added) || a.word.id - b.word.id)
     .slice(0, newLimit);
-  return [...due, ...fresh].slice(0, PRACTICE_WORDS).map((w) => w.word.id);
+}
+
+const firstIds = (words: QueueWord[]): number[] => words.slice(0, PRACTICE_WORDS).map((w) => w.word.id);
+
+// Word ids for one review training: at most PRACTICE_WORDS.
+export function reviewQueue(words: QueueWord[], today: ISODate): number[] {
+  return firstIds(reviewWords(words, today));
+}
+
+// Word ids for one new training: at most PRACTICE_WORDS.
+export function newQueue(words: QueueWord[], today: ISODate, extraNew = 0): number[] {
+  return firstIds(newWords(words, today, extraNew));
 }

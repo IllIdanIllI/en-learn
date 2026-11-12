@@ -2,7 +2,7 @@ import type { ISODate } from '@/core/domain';
 
 export type Stage = 1 | 2 | 3 | 4; // 4 = Learned
 export type ExerciseType = 'gap' | 'collocation' | 'form' | 'confusable' | 'translation';
-export type CardType = 'intro' | 'build' | 'choice' | 'anagram' | 'gap_hint' | 'gap' | 'collocation' | 'form' | 'confusable' | 'translation' | 'use' | 'spell';
+export type CardType = 'intro' | 'build' | 'choice' | 'anagram' | 'gap_hint' | 'gap' | 'collocation' | 'form' | 'confusable' | 'translation' | 'use' | 'spell' | 'known';
 export type ReviewResult = 'correct' | 'hard' | 'wrong';
 export type Generation = 'pending' | 'ready' | 'failed';
 

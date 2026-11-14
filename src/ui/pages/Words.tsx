@@ -51,7 +51,7 @@ export function Words() {
   const [addError, setAddError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const loaded = useLoaded(async () => {
-    logDebug('words', 'list reload');
+    logDebug('words', `list reload ${job.version}-${reload}`);
     const { wordsExtraNew } = await getSettings(deps.db);
     return { views: await loadWordViews(deps.db), overview: await wordsOverview(deps.db, today, extraNewFor(wordsExtraNew, today)) };
   }, `${job.version}-${reload}`);

@@ -6,6 +6,7 @@ import { listWords } from '@/core/db/repos/words';
 import { useCore } from '@/ui/app/CoreProvider';
 import type { GenError } from '@/ui/today/StartSession';
 import { logDebug } from '@/ui/debug/debugLog';
+import { createFillLogGate } from '@/ui/words/fillLog';
 
 type Progress = { done: number; total: number };
 
@@ -134,13 +135,15 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
       setFillError(null);
       if (plan.phonetics.length + plan.dict.length === 0) return;
       logDebug('words', `fill start phonetics=${plan.phonetics.length} dict=${plan.dict.length}`);
+      const shouldLog = createFillLogGate();
       try {
         const res = await runFill(
           depsRef.current,
           plan,
           (done, total) => {
             setFill({ done, total });
-            logDebug('words', `fill ${done}/${total}`);
+            // A long fill must not fill the log.
+            if (shouldLog(done, total)) logDebug('words', `fill ${done}/${total}`);
           },
           () => looping.current,
         );

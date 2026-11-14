@@ -207,7 +207,7 @@ W. **Transcriptions and dictionary fill.**
 
 X. **Kokoro voice.**
    - Action 1: on a word card, press the speaker for the first time.
-   - Expected: the system voice says the word at once. The speaker shows "Загрузка голоса: N%" while about 92 MB downloads into `~/Library/Application Support/<app>/voice/`. Later presses use Kokoro.
+   - Expected: the system voice says the word at once. A notification at the bottom right shows "Загрузка голоса: N%" and then "Голос загружен" while about 92 MB downloads into `~/Library/Application Support/<app>/voice/`. Later presses use Kokoro.
    - Action 2: measure the time from a press to sound for a word and for the example (go/no-go: a word under about 2 s once ready).
    - Action 3: quit, turn Wi-Fi off, start the app, press a speaker.
    - Expected: Kokoro plays offline (the files are not downloaded again).
@@ -230,4 +230,10 @@ Y. **Debug tools (round 7).**
       Expected: the toast "Журнал скопирован" appears.
    5. Action: quit and start the app again, then Settings, Debug log, Show.
       Expected: the log starts with `--- previous run ---`.
+   6. Action: start with an empty voice folder and press a speaker.
+      Expected: the download notification appears and turns into "Голос загружен".
+   7. Action: press a few speakers, then copy the log.
+      Expected: it has `press "<word>" … kokoro-*` and a `play` line with its outline.
+   8. Action: copy the log before using the app for long or restarting twice.
+      Expected: a second restart replaces the previous run, so the earlier one is gone.
    If it fails: record the notice text, the Console error and the Settings screenshot.

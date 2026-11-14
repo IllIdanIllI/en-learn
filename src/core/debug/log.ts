@@ -22,6 +22,9 @@ export interface DebugLog {
 export const LOG_KEY = 'en-learn.debugLog';
 
 const DEFAULT_CAP = 1000;
+/** The previous run keeps at least this many entries while this run's own oldest entries make room. */
+const PREVIOUS_FLOOR = 400;
+const MAX_TEXT = 300;
 
 function isEntry(value: unknown): value is LogEntry {
   if (typeof value !== 'object' || value === null) return false;
@@ -51,16 +54,28 @@ export function createDebugLog(opts: { storage: LogStorage | null; now: () => nu
   let current: LogEntry[] = [{ t: 0, kind: 'run', text: wallClock() }];
   let dirty = true;
 
-  // Drops the previous run first, then the oldest entries of this run.
+  // Drops the previous run while it holds more than the floor, then the oldest entries of this run.
   function trim() {
     while (previous.length + current.length > cap) {
-      if (previous.length > 0) previous.shift();
+      if (previous.length > PREVIOUS_FLOOR) previous.shift();
       else current.shift();
     }
   }
 
+  // The last added entry, its text before any repeat suffix, and how often it was added in a row.
+  let last: { entry: LogEntry; kind: string; text: string; count: number } | null = null;
+
   function add(kind: string, text: string) {
-    current.push({ t: Math.round(now() - start), kind, text });
+    text = text.replace(/\s+/g, ' ').trim().slice(0, MAX_TEXT);
+    if (last && current.at(-1) === last.entry && last.kind === kind && last.text === text) {
+      last.count += 1;
+      last.entry.text = `${text} ×${last.count}`;
+      dirty = true;
+      return;
+    }
+    const entry = { t: Math.round(now() - start), kind, text };
+    current.push(entry);
+    last = { entry, kind, text, count: 1 };
     dirty = true;
     trim();
   }
@@ -82,6 +97,7 @@ export function createDebugLog(opts: { storage: LogStorage | null; now: () => nu
     clear() {
       previous = [];
       current = [];
+      last = null;
       dirty = true;
     },
     flush() {

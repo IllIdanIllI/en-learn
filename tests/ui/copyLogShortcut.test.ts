@@ -34,6 +34,10 @@ describe('isCopyLogShortcut', () => {
     expect(isCopyLogShortcut(press({ metaKey: true, shiftKey: true }), false)).toBe(false);
   });
 
+  test('a held key (repeat) does not match', () => {
+    expect(isCopyLogShortcut({ ...press({ metaKey: true, shiftKey: true }), repeat: true }, true)).toBe(false);
+  });
+
   test('another key does not match', () => {
     expect(isCopyLogShortcut(press({ key: 'k', metaKey: true, shiftKey: true }), true)).toBe(false);
   });

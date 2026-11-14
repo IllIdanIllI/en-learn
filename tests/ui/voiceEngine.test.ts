@@ -375,7 +375,7 @@ describe('KokoroEngine', () => {
     expect(logs).toContainEqual(['voice', 'press "pivotal" en-GB kokoro-cached']);
   });
 
-  test('a press while the first clip has not ended logs clip=yes', async () => {
+  test('clip=yes means a previous clip was still playing at the press', async () => {
     const engine = await readyEngine();
     engine.speak('first', 'en-US');
     workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(1), rate: 24000 });
@@ -387,7 +387,7 @@ describe('KokoroEngine', () => {
     expect(logs.at(-1)![1]).toMatch(/ system=no clip=yes$/);
   });
 
-  test('the end callback logs end, and a later clip says clip=no', async () => {
+  test('the end callback logs end, and a press after it says clip=no', async () => {
     const engine = await readyEngine();
     engine.speak('pivotal', 'en-GB');
     workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(1), rate: 24000 });
@@ -414,6 +414,96 @@ describe('KokoroEngine', () => {
     expect(logs.at(-1)![1]).toMatch(/ clip=yes$/);
   });
 
+  test('a cached press made after the previous clip ended logs clip=no, one made during playback logs clip=yes', async () => {
+    const engine = await readyEngine();
+    engine.speak('pivotal', 'en-GB');
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(1), rate: 24000 });
+    await flush();
+    ends[0]!();
+    engine.speak('pivotal', 'en-GB');
+    expect(logs.at(-1)![1]).toMatch(/ system=no clip=no$/);
+    engine.speak('pivotal', 'en-GB');
+    expect(logs.at(-1)![1]).toMatch(/ system=no clip=yes$/);
+  });
+
+  test('clip=yes is read at the press, not when a late reply starts the clip', async () => {
+    const engine = await readyEngine();
+    engine.speak('first', 'en-US');
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(1), rate: 24000 });
+    await flush();
+    engine.speak('second', 'en-US');
+    ends[0]!();
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(2), rate: 24000 });
+    await flush();
+    expect(logs.at(-1)![1]).toMatch(/ clip=yes$/);
+  });
+
+  test('a throwing deps.play leaves no playing mark and rethrows', async () => {
+    let boom = false;
+    const engine = createKokoroEngine({
+      io: completeIo(),
+      dir: '/app/voice',
+      makeWorker: () => {
+        const w = new FakeWorker();
+        workers.push(w);
+        return w as unknown as Worker;
+      },
+      system: { canSpeak: () => true, speak: () => {}, cancel: () => {}, speaking: () => false },
+      play: (_s, _r, onEnd) => {
+        if (boom) throw new Error('no audio');
+        ends.push(onEnd);
+        return { stop: () => {} };
+      },
+      log: (kind, text) => logs.push([kind, text]),
+    });
+    engine.speak('warm up', 'en-GB');
+    await flush();
+    workers[0]!.reply({ type: 'ready' });
+    engine.speak('a', 'en-US');
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(1), rate: 24000 });
+    await flush();
+    boom = true;
+    expect(() => engine.speak('a', 'en-US')).toThrow('no audio');
+    boom = false;
+    engine.speak('a', 'en-US');
+    expect(logs.at(-1)![1]).toMatch(/ clip=no$/);
+  });
+
+  test('a speaking() that throws still plays the clip and logs system=no', async () => {
+    const throwing = createKokoroEngine({
+      io: completeIo(),
+      dir: '/app/voice',
+      makeWorker: () => {
+        const w = new FakeWorker();
+        workers.push(w);
+        return w as unknown as Worker;
+      },
+      system: {
+        canSpeak: () => true,
+        speak: () => {},
+        cancel: () => {},
+        speaking: () => {
+          throw new Error('no speechSynthesis');
+        },
+      },
+      play: (samples, rate, onEnd) => {
+        plays.push({ first: samples[0]!, rate });
+        ends.push(onEnd);
+        return { stop: () => {} };
+      },
+      log: (kind, text) => logs.push([kind, text]),
+    });
+    throwing.speak('warm up', 'en-GB');
+    await flush();
+    const w = workers.at(-1)!;
+    w.reply({ type: 'ready' });
+    throwing.speak('pivotal', 'en-GB');
+    w.reply({ type: 'audio', id: w.request().id, pcm: pcm(1), rate: 24000 });
+    await flush();
+    expect(plays).toHaveLength(1);
+    expect(logs.at(-1)![1]).toMatch(/ system=no clip=no$/);
+  });
+
   test('stop logs stop', async () => {
     const engine = await readyEngine();
     engine.stop();
@@ -433,6 +523,33 @@ describe('KokoroEngine', () => {
     engine.speak('lucid', 'en-US');
     workers[0]!.reply({ type: 'error', id: workers[0]!.request().id, message: 'x'.repeat(300) });
     expect(logs).toContainEqual(['voice', `error ${'x'.repeat(200)}`]);
+  });
+
+  test('a failed load logs error once, then status failed', async () => {
+    const engine = makeEngine();
+    engine.speak('lucid', 'en-GB');
+    await flush();
+    workers[0]!.reply({ type: 'error', message: 'no wasm' });
+    const texts = logs.map(([, text]) => text);
+    expect(texts.filter((t) => t.startsWith('error '))).toEqual(['error no wasm']);
+    expect(texts.at(-1)).toBe('status failed');
+  });
+
+  test('a failed download logs error once, then status failed', async () => {
+    const io: VoiceIo = {
+      ...completeIo(),
+      size: async () => null,
+      download: async () => {
+        throw new Error('network down');
+      },
+    };
+    const engine = makeEngine(io);
+    engine.speak('lucid', 'en-GB');
+    await flush();
+    const texts = logs.map(([, text]) => text);
+    expect(texts.filter((t) => t.startsWith('error '))).toEqual(['error network down']);
+    expect(texts.at(-1)).toBe('status failed');
+    expect(texts.indexOf('error network down')).toBeLessThan(texts.indexOf('status failed'));
   });
 
   test('download progress logs each 10% step once, and no 0%', async () => {

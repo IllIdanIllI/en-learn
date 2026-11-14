@@ -27,6 +27,17 @@ function fakeWindow() {
   };
 }
 
+/** A fake element: `closest` answers by the selector's first word, so only `nav` and the clickable list matter here. */
+function fakeElement(win: Window & typeof globalThis, over: { tag: string; label?: string | null; text: string; inNav?: boolean; clickable?: boolean; parent?: unknown }) {
+  const Element = (win as unknown as { Element: new () => object }).Element;
+  const el = new Element() as Record<string, unknown>;
+  el.tagName = over.tag;
+  el.textContent = over.text;
+  el.getAttribute = () => over.label ?? null;
+  el.closest = (selector: string) => (selector === 'nav' ? (over.inNav ? {} : null) : over.parent !== undefined ? over.parent : over.clickable === false ? null : el);
+  return el;
+}
+
 describe('describeClick', () => {
   test('pins the line format, label before text, sidebar and dialog flags', () => {
     expect(describeClick({ tag: 'A', label: 'Слова', text: 'Слова', inSidebar: true }, 'auto', false)).toBe('click a "Слова" sidebar body=auto dialog=no');
@@ -34,6 +45,55 @@ describe('describeClick', () => {
 
   test('uses the text when there is no label, cut to 30 characters', () => {
     expect(describeClick({ tag: 'BUTTON', label: null, text: 'a'.repeat(40), inSidebar: false }, 'none', true)).toBe(`click button "${'a'.repeat(30)}" body=none dialog=yes`);
+  });
+});
+
+describe('click capture', () => {
+  function withDom(pointerEvents: () => string = () => 'auto') {
+    const f = fakeWindow();
+    class FakeEl {}
+    Object.assign(f.win, {
+      Element: FakeEl,
+      getComputedStyle: () => ({ pointerEvents: pointerEvents() }),
+    });
+    Object.assign(f.doc, { body: {}, querySelector: () => null });
+    const log = vi.fn();
+    installDebugCapture(f.win, log, () => {});
+    return { ...f, log };
+  }
+  const fire = (win: Window, type: string, target: unknown) => win.dispatchEvent(Object.defineProperty(new Event(type), 'target', { value: target }));
+
+  test('a target that is not an Element logs nothing', () => {
+    const { win, log } = withDom();
+    fire(win, 'pointerdown', {});
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  test('a throwing getComputedStyle is swallowed and nothing is logged', () => {
+    const { win, log } = withDom(() => {
+      throw new Error('no style');
+    });
+    const el = fakeElement(win, { tag: 'BUTTON', text: 'Go' });
+    expect(() => fire(win, 'pointerdown', el)).not.toThrow();
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  test('a sidebar link logs the exact click line on pointerdown, and click-done on click', () => {
+    const { win, log } = withDom();
+    const el = fakeElement(win, { tag: 'A', label: 'Слова', text: 'Слова', inNav: true });
+    fire(win, 'pointerdown', el);
+    expect(log).toHaveBeenLastCalledWith('click', 'click a "Слова" sidebar body=auto dialog=no');
+    fire(win, 'click', el);
+    expect(log).toHaveBeenLastCalledWith('click-done', 'click a "Слова" sidebar body=auto dialog=no');
+  });
+
+  test('a click outside the sidebar logs only on pointerdown', () => {
+    const { win, log } = withDom();
+    const el = fakeElement(win, { tag: 'BUTTON', text: 'Go' });
+    fire(win, 'click', el);
+    expect(log).not.toHaveBeenCalled();
+    fire(win, 'pointerdown', el);
+    expect(log).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -75,6 +135,14 @@ describe('installDebugCapture', () => {
     installDebugCapture(win, log, () => {});
     win.dispatchEvent(Object.assign(new Event('error'), { message: 'boom' }));
     expect(log).toHaveBeenCalledWith('error', 'boom');
+  });
+
+  test('an error event without a message logs unknown error', () => {
+    const { win } = fakeWindow();
+    const log = vi.fn();
+    installDebugCapture(win, log, () => {});
+    win.dispatchEvent(new Event('error'));
+    expect(log).toHaveBeenCalledWith('error', 'unknown error');
   });
 
   test('an unhandled rejection logs kind rejection with the reason', () => {

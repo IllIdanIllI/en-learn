@@ -26,7 +26,7 @@ describe('debug log', () => {
     expect(log.entries().current).toEqual([{ t: 0, kind: 'run', text: 'WALL' }]);
   });
 
-  test('caps at 1000 over both runs, dropping the previous run first, then the oldest current', () => {
+  test('caps at 1000 over both runs; the previous run is trimmed first but keeps its newest 400', () => {
     const old = Array.from({ length: 600 }, (_, i) => ({ t: i, kind: 'old', text: String(i) }));
     const storage = spyStorage(JSON.stringify({ previous: [], current: old }));
     const { log } = make(storage);
@@ -34,12 +34,49 @@ describe('debug log', () => {
     expect(log.count()).toBe(1000);
     expect(log.entries().previous).toHaveLength(499);
     expect(log.entries().previous[0]?.text).toBe('101');
-    for (let i = 500; i < 1700; i += 1) log.add('k', `n${i}`);
+    for (let i = 500; i < 900; i += 1) log.add('k', `n${i}`);
     expect(log.count()).toBe(1000);
-    expect(log.entries().previous).toEqual([]);
-    expect(log.entries().current).toHaveLength(1000);
-    expect(log.entries().current[0]?.text).toBe('n700');
+    expect(log.entries().previous).toHaveLength(400);
+    expect(log.entries().previous[0]?.text).toBe('200');
+    expect(log.entries().previous.at(-1)?.text).toBe('599');
+    for (let i = 900; i < 1700; i += 1) log.add('k', `n${i}`);
+    expect(log.count()).toBe(1000);
+    expect(log.entries().previous).toHaveLength(400);
+    expect(log.entries().previous[0]?.text).toBe('200');
+    expect(log.entries().current).toHaveLength(600);
+    expect(log.entries().current[0]?.text).toBe('n1100');
     expect(log.entries().current.at(-1)?.text).toBe('n1699');
+  });
+
+  test('a previous run under the floor is never trimmed', () => {
+    const old = Array.from({ length: 100 }, (_, i) => ({ t: i, kind: 'old', text: String(i) }));
+    const { log } = make(spyStorage(JSON.stringify({ previous: [], current: old })));
+    for (let i = 0; i < 1500; i += 1) log.add('k', `n${i}`);
+    expect(log.entries().previous).toHaveLength(100);
+    expect(log.count()).toBe(1000);
+  });
+
+  test('a long multi-line text is stored as one line of 300 characters', () => {
+    const { log } = make(spyStorage());
+    log.add('k', `${'a'.repeat(100)}\n  ${'b'.repeat(100)}\r\n${'c'.repeat(800)}`);
+    const text = log.entries().current.at(-1)!.text;
+    expect(text).toHaveLength(300);
+    expect(text).not.toMatch(/[\r\n]/);
+  });
+
+  test('the same kind and text in a row is one entry with a repeat count', () => {
+    const { log } = make(spyStorage());
+    log.add('k', 'same');
+    log.add('k', 'same');
+    expect(log.entries().current.at(-1)!.text).toBe('same ×2');
+    log.add('k', 'same');
+    log.add('k', 'same');
+    expect(log.entries().current.map((e) => e.text)).toEqual(['WALL', 'same ×4']);
+    log.add('k', 'other');
+    log.add('k', 'same');
+    log.add('x', 'same');
+    expect(log.entries().current.map((e) => e.text)).toEqual(['WALL', 'same ×4', 'other', 'same', 'same']);
+    expect(log.count()).toBe(5);
   });
 
   test('flush writes once to LOG_KEY', () => {

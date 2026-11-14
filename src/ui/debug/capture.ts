@@ -37,6 +37,9 @@ function describeValue(value: unknown): string {
   }
 }
 
+const CLICKABLE =
+  'a,button,input,textarea,select,[role=button],[role=link],[role=tab],[role=menuitem],[role=option],[role=checkbox],[role=radio],[role=switch]';
+
 /** Starts logging errors, rejections, console.error, stalls, clicks and a flush every second. Runs once per window. */
 export function installDebugCapture(win: Window & typeof globalThis, log: (kind: string, text: string) => void, flush: () => void): void {
   const marked = win as Window & { __debugCapture?: boolean };
@@ -44,7 +47,8 @@ export function installDebugCapture(win: Window & typeof globalThis, log: (kind:
   marked.__debugCapture = true;
 
   win.addEventListener('error', (e: Event) => {
-    log('error', String((e as Event & { message?: unknown }).message));
+    const message = (e as Event & { message?: unknown }).message;
+    log('error', typeof message === 'string' && message !== '' ? message : 'unknown error');
   });
   win.addEventListener('unhandledrejection', (e: Event) => {
     log('rejection', describeValue((e as Event & { reason?: unknown }).reason));
@@ -73,29 +77,38 @@ export function installDebugCapture(win: Window & typeof globalThis, log: (kind:
   win.setInterval(flush, 1000);
   win.addEventListener('pagehide', () => flush());
 
+  // The line for a click target, or null when it has none or cannot be described.
+  const describeTarget = (e: Event): { line: string; inSidebar: boolean } | null => {
+    try {
+      const target = e.target;
+      if (!(target instanceof win.Element)) return null;
+      const el = target.closest(CLICKABLE) ?? target;
+      const inSidebar = el.closest('nav') !== null;
+      const line = describeClick(
+        { tag: el.tagName, label: el.getAttribute('aria-label'), text: el.textContent ?? '', inSidebar },
+        win.getComputedStyle(win.document.body).pointerEvents,
+        win.document.querySelector('[role=dialog]') !== null,
+      );
+      return { line, inSidebar };
+    } catch {
+      // A click the log cannot describe is skipped.
+      return null;
+    }
+  };
   win.addEventListener(
     'pointerdown',
     (e: Event) => {
-      try {
-        const target = e.target;
-        if (!(target instanceof win.Element)) return;
-        const el = target.closest('a,button,[role],input,textarea,select') ?? target;
-        log(
-          'click',
-          describeClick(
-            {
-              tag: el.tagName,
-              label: el.getAttribute('aria-label'),
-              text: el.textContent ?? '',
-              inSidebar: el.closest('nav') !== null,
-            },
-            win.getComputedStyle(win.document.body).pointerEvents,
-            win.document.querySelector('[role=dialog]') !== null,
-          ),
-        );
-      } catch {
-        // A click the log cannot describe is skipped.
-      }
+      const described = describeTarget(e);
+      if (described) log('click', described.line);
+    },
+    true,
+  );
+  // Only sidebar clicks: a pointerdown without a click-done means the click never arrived.
+  win.addEventListener(
+    'click',
+    (e: Event) => {
+      const described = describeTarget(e);
+      if (described?.inSidebar) log('click-done', described.line);
     },
     true,
   );

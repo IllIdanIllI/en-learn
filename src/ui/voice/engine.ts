@@ -101,6 +101,7 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
   }
 
   function fail(cause: Error) {
+    logError(cause.message);
     worker?.terminate();
     worker = null;
     for (const { key, entry } of waiting.values()) {
@@ -121,21 +122,42 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
     cancel: () => {
       if (deps.system.canSpeak()) deps.system.cancel();
     },
-    speaking: () => deps.system.canSpeak() && deps.system.speaking() === true,
+    speaking: () => {
+      try {
+        return deps.system.canSpeak() && deps.system.speaking() === true;
+      } catch {
+        return false;
+      }
+    },
   };
 
-  /** Starts a clip and logs it; `system` is whether the system voice was speaking when the press came. */
-  function playClip(text: string, clip: Clip, systemSpeaking: boolean): { stop(): void } {
+  /** Starts a clip and logs it; `system` and `clip` say what was playing when the press came. */
+  function playClip(text: string, clip: Clip, systemSpeaking: boolean, hadClip: boolean): { stop(): void } {
     const id = ++clipSeq;
-    const clipWasPlaying = clipPlaying !== null;
-    clipPlaying = id;
+    let shape: string;
+    try {
+      shape = outline(clip.pcm);
+    } catch {
+      shape = '?';
+    }
     log(
-      `play "${text}" ${clip.pcm.length} samples ${clip.rate}Hz ${(clip.pcm.length / clip.rate).toFixed(2)}s ${outline(clip.pcm)} system=${systemSpeaking ? 'yes' : 'no'} clip=${clipWasPlaying ? 'yes' : 'no'}`,
+      `play "${text}" ${clip.pcm.length} samples ${clip.rate}Hz ${(clip.pcm.length / clip.rate).toFixed(2)}s ${shape} system=${systemSpeaking ? 'yes' : 'no'} clip=${hadClip ? 'yes' : 'no'}`,
     );
-    return deps.play(clip.pcm, clip.rate, () => {
-      log(`end "${text}"`);
-      if (clipPlaying === id) clipPlaying = null;
-    });
+    let ended = false;
+    let handle: { stop(): void };
+    try {
+      handle = deps.play(clip.pcm, clip.rate, () => {
+        ended = true;
+        log(`end "${text}"`);
+        if (clipPlaying === id) clipPlaying = null;
+      });
+    } catch (e) {
+      clipPlaying = null;
+      throw e;
+    }
+    // Marked only once the clip really started; a clip that already ended leaves no mark.
+    if (!ended) clipPlaying = id;
+    return handle;
   }
 
   function onMessage(w: Worker, data: WorkerOut) {
@@ -158,7 +180,6 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       if (cache.get(request.key) === request.entry) cache.delete(request.key);
       request.entry.reject(new Error(data.message));
     } else {
-      logError(data.message);
       fail(new Error(data.message));
     }
   }
@@ -191,7 +212,6 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       w.onmessage = (e: MessageEvent<WorkerOut>) => onMessage(w, e.data);
       w.onerror = () => {
         if (worker !== w) return;
-        logError('voice worker crashed');
         fail(new Error('voice worker crashed'));
       };
       w.postMessage({ type: 'init', files }, Object.values(files));
@@ -236,6 +256,8 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       deps.unlock?.();
       const token = ++seq;
       press = token;
+      // Whether a previous clip was still playing at this press.
+      const hadClip = clipPlaying !== null;
       stopPlayback();
       if (status !== 'ready') {
         log(`press "${text}" ${variant} system-not-ready`);
@@ -248,14 +270,14 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       const entry = request(text, variant, false);
       if (entry.clip) {
         log(`press "${text}" ${variant} kokoro-cached`);
-        playing = playClip(text, entry.clip, systemSpeaking);
+        playing = playClip(text, entry.clip, systemSpeaking, hadClip);
         return;
       }
       log(`press "${text}" ${variant} kokoro-wait`);
       entry.promise.then(
         (clip) => {
           if (press !== token) return;
-          playing = playClip(text, clip, systemSpeaking);
+          playing = playClip(text, clip, systemSpeaking, hadClip);
         },
         () => {
           if (press !== token) return;

@@ -78,6 +78,11 @@ describe('lookupDict', () => {
     });
   });
 
+  test('200 without Russian translations is none', async () => {
+    const german = JSON.stringify({ word: 'assertion', translations: [{ code: 'de', word: 'Behauptung' }] });
+    expect(await lookupDict(netReturning(200, german), 'assertion')).toEqual({ checked: 'none', translations: [] });
+  });
+
   test('other statuses throw', async () => {
     await expect(lookupDict(netReturning(500), 'assertion')).rejects.toThrow();
   });

@@ -67,10 +67,11 @@ export function dictMatches(translation: string, dict: string[]): boolean {
 
 export type LookupResult = { checked: 'found' | 'none'; translations: string[] };
 
-/** 404 means kaikki has no entry; any other status other than 200 throws, so the word is not marked checked. */
+/** 404 means kaikki has no entry; a 200 without Russian translations is 'none' too; any other status throws, so the word is not marked checked. */
 export async function lookupDict(net: Net, word: string): Promise<LookupResult> {
   const res = await net.getText(kaikkiUrl(word));
   if (res.status === 404) return { checked: 'none', translations: [] };
   if (res.status !== 200) throw new Error(`kaikki.org answered ${res.status}`);
-  return { checked: 'found', translations: parseKaikki(res.text) };
+  const translations = parseKaikki(res.text);
+  return { checked: translations.length > 0 ? 'found' : 'none', translations };
 }

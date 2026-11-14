@@ -20,7 +20,7 @@ export interface WordFields {
   partOfSpeech: string;
 }
 
-/** '' = not checked yet; 'found' = kaikki has the word; 'none' = kaikki has no entry. */
+/** '' = not checked yet; 'found' = kaikki has Russian translations; 'none' = no entry or no Russian translations. */
 export type DictChecked = '' | 'found' | 'none';
 
 export interface Word extends WordFields {

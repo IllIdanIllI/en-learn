@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import {
-  buildWordCheckPrompt, checkWordCheckReply, checkWordsReply, exercisesFrom, withoutRevealing, wordProblems,
+  buildWordCheckPrompt, checkPhoneticsReply, checkWordCheckReply, checkWordsReply, exercisesFrom, withoutRevealing, wordProblems,
 } from '@/core/words/generated';
-import type { GeneratedWord, WordCheckReply, WordsReply } from '@/core/llm/types';
+import type { GeneratedWord, PhoneticsReply, WordCheckReply, WordsReply } from '@/core/llm/types';
 import { gen } from './helpers';
 import type { Word } from '@/core/words/types';
 
@@ -17,6 +17,19 @@ describe('checkWordsReply', () => {
   });
   test('a duplicated word is a problem', () => {
     expect(checkWordsReply(reply('alpha', 'ALPHA', 'beta'), ['alpha', 'beta'])).toMatch(/alpha/i);
+  });
+});
+
+describe('checkPhoneticsReply', () => {
+  const pr = (...words: string[]): PhoneticsReply => ({ words: words.map((w) => ({ word: w, transcription: '/x/', partOfSpeech: 'noun' })) });
+  test('accepts all requested words, case-insensitively', () => {
+    expect(checkPhoneticsReply(pr('Alpha', 'beta'), ['alpha', 'Beta'])).toBeNull();
+  });
+  test('a missing word is a problem', () => {
+    expect(checkPhoneticsReply(pr('alpha'), ['alpha', 'beta'])).toBe('word "beta" is missing from the reply');
+  });
+  test('a duplicated word is a problem', () => {
+    expect(checkPhoneticsReply(pr('alpha', 'ALPHA', 'beta'), ['alpha', 'beta'])).toBe('word "alpha" appears 2 times in the reply');
   });
 });
 

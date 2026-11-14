@@ -3,9 +3,9 @@ import { Validator } from '@cfworker/json-schema';
 import { describe, expect, test } from 'vitest';
 import { bundledPrompts } from '@/core/llm/bundledPrompts';
 import type { LlmKind } from '@/core/domain';
-import type { DisputeBatchReply, ExplainReply, GeneratedSession, GradeResult, RuleChatReply, RuleDraft, ValidationResult, WordCheckReply, WordsReply } from '@/core/llm/types';
+import type { DisputeBatchReply, ExplainReply, GeneratedSession, GradeResult, RuleChatReply, RuleDraft, ValidationResult, PhoneticsReply, WordCheckReply, WordsReply } from '@/core/llm/types';
 
-const kinds: LlmKind[] = ['rule_draft', 'rule_chat', 'generate_session', 'validate_session', 'grade', 'dispute', 'explain', 'words', 'word_check'];
+const kinds: LlmKind[] = ['rule_draft', 'rule_chat', 'generate_session', 'validate_session', 'grade', 'dispute', 'explain', 'words', 'word_check', 'phonetics'];
 const validator = (schema: object) => new Validator(schema, '2019-09', false);
 const fixture = (kind: string, which: 'valid' | 'invalid'): unknown =>
   JSON.parse(readFileSync(`tests/fixtures/llm/${kind}.${which}.json`, 'utf8'));
@@ -21,6 +21,7 @@ export const typedFixtures = [
   fixture('explain', 'valid') as ExplainReply,
   fixture('words', 'valid') as WordsReply,
   fixture('word_check', 'valid') as WordCheckReply,
+  fixture('phonetics', 'valid') as PhoneticsReply,
 ];
 
 function strictObjects(node: unknown, path: string, problems: string[]): void {

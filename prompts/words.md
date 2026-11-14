@@ -14,7 +14,7 @@ Translations are written in {{nativeLanguage}}. Definitions, examples, synonyms 
 - translation: the {{nativeLanguage}} equivalent, one to three words.
 - example: one natural English sentence that uses the word.
 - synonyms: two to four English words or phrases.
-- transcription: the IPA of the word between slashes, for example /ˈsʌbstəns/.
+- transcription: the IPA of the word between slashes, for example /ˈsʌbstəns/. Pronounce the word as {{spellingVariant}} English does: British is Received Pronunciation, American is General American.
 - partOfSpeech: the part of speech in English, for example noun, verb, adjective, adverb, phrasal verb, idiom.
 - When a field is not marked `(missing)`, copy the learner's text unchanged. The application keeps the learner's text in any case.
 - Do not write links.

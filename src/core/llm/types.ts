@@ -88,6 +88,8 @@ export interface GeneratedWord {
 
 export interface WordsReply { words: GeneratedWord[] }
 
+export interface PhoneticsReply { words: { word: string; transcription: string; partOfSpeech: string }[] }
+
 /** '' = none, as in the writing path. */
 export interface WordCheckReply {
   wordOk: boolean;

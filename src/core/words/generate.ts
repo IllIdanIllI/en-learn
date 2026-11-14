@@ -1,11 +1,11 @@
 import type { Deps, LlmErrorCode } from '@/core/ports';
 import type { Word } from './types';
-import type { WordsReply } from '@/core/llm/types';
+import type { PhoneticsReply, WordsReply } from '@/core/llm/types';
 import { callStructured } from '@/core/llm/call';
 import { listWords, replaceExercises, setGeneration, updateWord } from '@/core/db/repos/words';
 import { withJobLock } from '@/core/session/jobLock';
-import { BATCH_SIZE } from './constants';
-import { checkWordsReply, exercisesFrom, withoutRevealing, wordProblems } from './generated';
+import { BATCH_SIZE, PHONETICS_BATCH } from './constants';
+import { checkPhoneticsReply, checkWordsReply, exercisesFrom, withoutRevealing, wordProblems } from './generated';
 
 export type GenerateResult = { ok: true; failed: number } | { ok: false; message: string; code?: 'busy' | LlmErrorCode };
 
@@ -25,6 +25,11 @@ function userPrompt(words: Word[]): string {
       ].join('\n'),
     )
     .join('\n\n');
+}
+
+/** The phonetics prompt: the words and the learner's definition, which only picks the sense. */
+function phoneticsPrompt(words: Word[]): string {
+  return words.map((w) => [`### ${w.word}`, `Definition: ${or(w.definition)}`].join('\n')).join('\n\n');
 }
 
 type BatchOutcome = { failed: number } | { error: Extract<GenerateResult, { ok: false }> };
@@ -82,7 +87,7 @@ async function runPhoneticsBatch(deps: Deps, ids: number[]): Promise<BatchOutcom
   const words = ids.map((id) => all.find((w) => w.id === id)).filter((w): w is Word => w !== undefined);
   if (words.length === 0) return { failed: 0 };
   const names = words.map((w) => w.word);
-  const res = await callStructured<WordsReply>(deps, 'words', userPrompt(words), { check: (r) => checkWordsReply(r, names) });
+  const res = await callStructured<PhoneticsReply>(deps, 'phonetics', phoneticsPrompt(words), { check: (r) => checkPhoneticsReply(r, names) });
   if (!res.ok) return { error: { ok: false, message: res.message, code: res.code } };
   // Read after the call: the learner may have edited a word meanwhile, so only the two fields are written.
   const fresh = new Map((await listWords(deps.db)).map((x) => [x.id, x]));
@@ -108,10 +113,11 @@ async function runPhoneticsBatch(deps: Deps, ids: number[]): Promise<BatchOutcom
   return { failed: 0 };
 }
 
-/** Runs `batch` over wordIds in batches of BATCH_SIZE, each under its own job lock; a busy lock stops the run and leaves the rest as they are; a failed batch call is kept as the result and the run goes on. */
+/** Runs `batch` over wordIds in batches of `size`, each under its own job lock; a busy lock stops the run and leaves the rest as they are; a failed batch call is kept as the result and the run goes on. */
 async function inBatches(
   deps: Deps,
   wordIds: number[],
+  size: number,
   onProgress: ((done: number, total: number) => void) | undefined,
   batch: (ids: number[]) => Promise<BatchOutcome>,
 ): Promise<GenerateResult> {
@@ -119,8 +125,8 @@ async function inBatches(
   let failed = 0;
   let done = 0;
   let lastError: Extract<GenerateResult, { ok: false }> | null = null;
-  for (let i = 0; i < wordIds.length; i += BATCH_SIZE) {
-    const ids = wordIds.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < wordIds.length; i += size) {
+    const ids = wordIds.slice(i, i + size);
     const out = await withJobLock(deps.db, () => batch(ids), busy);
     if ('error' in out) {
       if (out.error.code === 'busy') return out.error;
@@ -138,10 +144,10 @@ async function inBatches(
 
 /** Generates exercises in batches of BATCH_SIZE, each under its own job lock; a busy lock stops the run and leaves the rest pending; a failed batch call marks its words failed and the run goes on. */
 export function generateWords(deps: Deps, wordIds: number[], onProgress?: (done: number, total: number) => void): Promise<GenerateResult> {
-  return inBatches(deps, wordIds, onProgress, (ids) => runBatch(deps, ids));
+  return inBatches(deps, wordIds, BATCH_SIZE, onProgress, (ids) => runBatch(deps, ids));
 }
 
 /** Fills empty transcription and part of speech of ready words (start-up run); see runPhoneticsBatch. */
 export function generatePhonetics(deps: Deps, wordIds: number[], onProgress?: (done: number, total: number) => void): Promise<GenerateResult> {
-  return inBatches(deps, wordIds, onProgress, (ids) => runPhoneticsBatch(deps, ids));
+  return inBatches(deps, wordIds, PHONETICS_BATCH, onProgress, (ids) => runPhoneticsBatch(deps, ids));
 }

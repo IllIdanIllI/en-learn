@@ -38,6 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
     explain: DEFAULT_MODEL,
     words: DEFAULT_MODEL,
     word_check: DEFAULT_MODEL,
+    phonetics: DEFAULT_MODEL,
   },
   efforts: {
     rule_draft: 'medium',
@@ -49,6 +50,7 @@ export const DEFAULT_SETTINGS: Settings = {
     explain: 'medium',
     words: 'medium',
     word_check: 'medium',
+    phonetics: 'low',
   },
   budgetUsd: null,
   acceptedShorthands: ['✓'],

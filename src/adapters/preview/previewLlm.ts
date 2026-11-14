@@ -1,7 +1,7 @@
 import type { Llm, LlmRequest, LlmResult } from '@/core/ports';
 import { MINI_RULES } from './miniSeed';
 import type {
-  DisputeBatchReply, ExplainReply, GeneratedBlock, GeneratedItem, GeneratedParagraph, GeneratedSession, GradeResult, RuleChatReply, RuleDraft, ValidationResult, WordCheckReply, WordsReply,
+  DisputeBatchReply, ExplainReply, GeneratedBlock, GeneratedItem, GeneratedParagraph, GeneratedSession, GradeResult, PhoneticsReply, RuleChatReply, RuleDraft, ValidationResult, WordCheckReply, WordsReply,
 } from '@/core/llm/types';
 
 /** Canned, valid model outputs for preview mode. They are derived from the request text so they pass the code checks. */
@@ -376,6 +376,10 @@ const dispute = (userPrompt: string): DisputeBatchReply => ({
   })),
 });
 
+const phonetics = (userPrompt: string): PhoneticsReply => ({
+  words: [...userPrompt.matchAll(/^### (.+)$/gm)].map((m) => ({ word: m[1]!, transcription: `/${m[1]}/`, partOfSpeech: 'noun' })),
+});
+
 const words = (userPrompt: string): WordsReply => ({
   words: [...userPrompt.matchAll(/^### (.+)$/gm)].map((m) => {
     const w = m[1]!;
@@ -437,6 +441,7 @@ export const previewLlm: Llm = {
       case 'explain': data = { explanation: 'Перед гласным звуком нужен артикль an: an old friend.' } satisfies ExplainReply; break;
       case 'words': data = words(req.userPrompt); break;
       case 'word_check': data = wordCheck(req.userPrompt); break;
+      case 'phonetics': data = phonetics(req.userPrompt); break;
     }
     return { ok: true, data, costUsd: 0, durationMs: 5, raw: JSON.stringify(envelope(data, sessionId)), ...(sessionId ? { sessionId } : {}) };
   },

@@ -7,7 +7,7 @@ import { deleteWord, insertWord, listExercises, listWords, replaceExercises, set
 import { withJobLock } from '@/core/session/jobLock';
 import { generatePhonetics, generateWords } from '@/core/words/generate';
 import type { Deps, LlmResult } from '@/core/ports';
-import type { GeneratedWord, WordsReply } from '@/core/llm/types';
+import type { GeneratedWord, PhoneticsReply, WordsReply } from '@/core/llm/types';
 import type { WordFields } from '@/core/words/types';
 import { previewLlm } from '@/adapters/preview/previewLlm';
 import { gen } from './helpers';
@@ -183,6 +183,13 @@ describe('generateWords: transcription and part of speech', () => {
   });
 });
 
+const phon = (over: (w: string) => Partial<PhoneticsReply['words'][number]> = () => ({})) => (req: { userPrompt: string }): LlmResult<unknown> => {
+  const words = [...req.userPrompt.matchAll(/^### (.+)$/gm)].map((m) => m[1]!);
+  return good({
+    words: words.map((w) => ({ word: w, transcription: '/ˈsuːpəsiːd/', partOfSpeech: 'verb', ...over(w) })),
+  } satisfies PhoneticsReply);
+};
+
 describe('generatePhonetics', () => {
   const ready = async (deps: Deps, word: string, over: Partial<WordFields> = {}) => {
     const id = await insertWord(deps.db, fields(word, over), 't');
@@ -194,7 +201,7 @@ describe('generatePhonetics', () => {
   };
 
   test('writes the empty fields of a ready word; generation and exercises stay as they are', async () => {
-    const llm = new FakeLlm({ words: [echo()] });
+    const llm = new FakeLlm({ phonetics: [phon()] });
     const deps = await setup(llm);
     const id = await ready(deps, 'alpha', { definition: 'mine' });
     const before = await listExercises(deps.db);
@@ -207,23 +214,29 @@ describe('generatePhonetics', () => {
   });
 
   test('a stored non-empty value is kept; the empty one is filled', async () => {
-    const llm = new FakeLlm({ words: [echo()] });
+    const llm = new FakeLlm({ phonetics: [phon()] });
     const deps = await setup(llm);
     const id = await ready(deps, 'alpha', { transcription: '/mine/' });
     await generatePhonetics(deps, [id]);
     expect((await listWords(deps.db))[0]).toMatchObject({ transcription: '/mine/', partOfSpeech: 'verb' });
   });
 
-  test('exercise problems do not matter here: the phonetics are still written', async () => {
-    const llm = new FakeLlm({ words: [echo(() => ({ gaps: [] }))] });
+  test('uses the phonetics kind in batches of 20', async () => {
+    const llm = new FakeLlm({ phonetics: [phon(), phon()] });
     const deps = await setup(llm);
-    const id = await ready(deps, 'alpha');
-    expect(await generatePhonetics(deps, [id])).toEqual({ ok: true, failed: 0 });
-    expect((await listWords(deps.db))[0]).toMatchObject({ generation: 'ready', transcription: '/ˈsuːpəsiːd/' });
+    const ids: number[] = [];
+    for (let i = 0; i < 25; i++) ids.push(await ready(deps, `w${i}`));
+    expect(await generatePhonetics(deps, ids)).toEqual({ ok: true, failed: 0 });
+    expect(llm.calls).toHaveLength(2);
+    expect(llm.calls.map((c) => c.kind)).toEqual(['phonetics', 'phonetics']);
+    expect(llm.calls.map((c) => [...c.userPrompt.matchAll(/^### /gm)].length)).toEqual([20, 5]);
+    expect(llm.calls[0]!.userPrompt).toContain('Definition: (missing)');
+    const rows = await listWords(deps.db);
+    expect(rows.every((w) => w.transcription === '/ˈsuːpəsiːd/' && w.generation === 'ready')).toBe(true);
   });
 
   test("an edit made while the call runs is kept; only the two fields are written", async () => {
-    const inner = new FakeLlm({ words: [echo()] });
+    const inner = new FakeLlm({ phonetics: [phon()] });
     const deps = await setup(inner);
     const id = await ready(deps, 'alpha');
     deps.llm = { call: async (req) => { await updateWord(deps.db, id, fields('alpha', { definition: 'edited' })); return inner.call(req); } };
@@ -232,7 +245,7 @@ describe('generatePhonetics', () => {
   });
 
   test('a failed call changes nothing', async () => {
-    const llm = new FakeLlm({ words: [fail] });
+    const llm = new FakeLlm({ phonetics: [fail] });
     const deps = await setup(llm);
     const id = await ready(deps, 'alpha');
     const before = await listWords(deps.db);

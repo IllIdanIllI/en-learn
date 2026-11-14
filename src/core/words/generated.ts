@@ -1,15 +1,14 @@
-import type { GeneratedWord, WordCheckReply, WordsReply } from '@/core/llm/types';
+import type { GeneratedWord, PhoneticsReply, WordCheckReply, WordsReply } from '@/core/llm/types';
 import { revealsWord } from './check';
 import type { Word, WordExercise } from './types';
 
 const GAP = '___';
 const gaps = (s: string) => s.split(GAP).length - 1;
 
-/** A batch problem (a requested word missing or duplicated, matched case-insensitively); the call is retried. */
-export function checkWordsReply(reply: WordsReply, requested: string[]): string | null {
+function checkRequested(names: string[], requested: string[]): string | null {
   const seen = new Map<string, number>();
-  for (const w of reply.words) {
-    const k = w.word.trim().toLowerCase();
+  for (const name of names) {
+    const k = name.trim().toLowerCase();
     seen.set(k, (seen.get(k) ?? 0) + 1);
   }
   for (const r of requested) {
@@ -18,6 +17,16 @@ export function checkWordsReply(reply: WordsReply, requested: string[]): string 
     if (n > 1) return `word "${r}" appears ${n} times in the reply`;
   }
   return null;
+}
+
+/** A batch problem (a requested word missing or duplicated, matched case-insensitively); the call is retried. */
+export function checkWordsReply(reply: WordsReply, requested: string[]): string | null {
+  return checkRequested(reply.words.map((w) => w.word), requested);
+}
+
+/** Same rule as checkWordsReply, for the phonetics call. */
+export function checkPhoneticsReply(reply: PhoneticsReply, requested: string[]): string | null {
+  return checkRequested(reply.words.map((w) => w.word), requested);
 }
 
 const outside = (n: number, lo: number, hi: number) => n < lo || n > hi;

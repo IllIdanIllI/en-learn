@@ -10,6 +10,8 @@ export interface VoiceEngine {
   status(): VoiceStatus;
   /** Download progress, 0..1; meaningful while `downloading`. */
   progress(): number;
+  /** The message of the last failure; null after a new load starts. */
+  lastError(): string | null;
   subscribe(fn: () => void): () => void;
   /** Plays the text with Kokoro once it is ready; until then, and on failure, with the system voice. Never throws. */
   speak(text: string, variant: SpellingVariant): void;
@@ -57,10 +59,14 @@ const CACHE_LIMIT = 200;
 export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
   let status: VoiceStatus = 'idle';
   let fraction = 0;
+  let error: string | null = null;
+  // Set from the first line of load() until it is ready or has failed: a press during the file checks starts no second load.
+  let loading = false;
   const listeners = new Set<() => void>();
   const notify = () => listeners.forEach((fn) => fn());
   const setStatus = (next: VoiceStatus) => {
-    if (next !== status) log(`status ${next}`);
+    if (next === status) return;
+    log(`status ${next}`);
     status = next;
     notify();
   };
@@ -94,14 +100,16 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
     playing = null;
   }
 
-  function fail(error: Error) {
+  function fail(cause: Error) {
     worker?.terminate();
     worker = null;
     for (const { key, entry } of waiting.values()) {
       if (cache.get(key) === entry) cache.delete(key);
-      entry.reject(error);
+      entry.reject(cause);
     }
     waiting.clear();
+    loading = false;
+    error = cause.message;
     setStatus('failed');
   }
 
@@ -133,6 +141,7 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
   function onMessage(w: Worker, data: WorkerOut) {
     if (worker !== w) return;
     if (data.type === 'ready') {
+      loading = false;
       setStatus('ready');
     } else if (data.type === 'audio') {
       const request = waiting.get(data.id);
@@ -155,18 +164,25 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
   }
 
   async function load() {
+    loading = true;
+    fraction = 0;
+    error = null;
     lastPercent = 0;
-    setStatus('downloading');
     try {
-      await ensureVoiceFiles(deps.io, deps.dir, (f) => {
-        fraction = f;
-        const percent = Math.floor(f * 10) * 10;
-        if (percent > lastPercent) {
-          lastPercent = percent;
-          log(`status downloading ${percent}%`);
-        }
-        notify();
-      });
+      await ensureVoiceFiles(
+        deps.io,
+        deps.dir,
+        (f) => {
+          fraction = f;
+          const percent = Math.floor(f * 10) * 10;
+          if (percent > lastPercent) {
+            lastPercent = percent;
+            log(`status downloading ${percent}%`);
+          }
+          notify();
+        },
+        () => setStatus('downloading'),
+      );
       setStatus('loading');
       const files: Record<string, ArrayBuffer> = {};
       for (const file of VOICE_FILES) files[file.path] = await deps.io.read(`${deps.dir}/${file.path}`);
@@ -209,6 +225,7 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
   return {
     status: () => status,
     progress: () => fraction,
+    lastError: () => error,
     subscribe(fn) {
       listeners.add(fn);
       return () => {
@@ -223,7 +240,7 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       if (status !== 'ready') {
         log(`press "${text}" ${variant} system-not-ready`);
         system.speak(text, variant);
-        if (status === 'idle' || status === 'failed') void load();
+        if (!loading && (status === 'idle' || status === 'failed')) void load();
         return;
       }
       const systemSpeaking = system.speaking();

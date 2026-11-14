@@ -137,7 +137,6 @@ describe('KokoroEngine', () => {
     expect(engine.status()).toBe('idle');
     engine.speak('lucid', 'en-GB');
     expect(spoken).toEqual([{ text: 'lucid', variant: 'en-GB' }]);
-    expect(engine.status()).toBe('downloading');
     await flush();
     expect(engine.status()).toBe('loading');
     const init = workers[0]!.posted[0]!;
@@ -235,8 +234,8 @@ describe('KokoroEngine', () => {
     const sizes = sizeCalls;
     engine.speak('lucid', 'en-GB');
     expect(spoken).toHaveLength(2);
-    expect(engine.status()).toBe('downloading');
     await flush();
+    expect(engine.status()).toBe('loading');
     expect(sizeCalls).toBeGreaterThan(sizes);
     expect(workers).toHaveLength(2);
   });
@@ -453,5 +452,63 @@ describe('KokoroEngine', () => {
     await flush();
     const statuses = logs.map(([, text]) => text).filter((text) => text.startsWith('status ') && !text.includes('%'));
     expect(statuses).toEqual(['status downloading', 'status loading']);
+  });
+
+  test('with every file on disk the statuses seen are loading, ready', async () => {
+    const engine = makeEngine();
+    const seen: string[] = [];
+    engine.subscribe(() => seen.push(engine.status()));
+    engine.speak('lucid', 'en-GB');
+    await flush();
+    workers[0]!.reply({ type: 'ready' });
+    expect(seen).toEqual(['loading', 'ready']);
+  });
+
+  test('a missing file shows downloading while it downloads, then loading', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const base = downloadingIo([0.5]);
+    const engine = makeEngine({
+      ...base,
+      download: async (url, dest, onBytes) => {
+        await gate;
+        await base.download(url, dest, onBytes);
+      },
+    });
+    engine.speak('pivotal', 'en-GB');
+    await flush();
+    expect(engine.status()).toBe('downloading');
+    release();
+    await flush();
+    expect(engine.status()).toBe('loading');
+  });
+
+  test('a press during the file checks starts no second load', async () => {
+    const engine = makeEngine();
+    engine.speak('lucid', 'en-GB');
+    engine.speak('lucid', 'en-GB');
+    await flush();
+    expect(sizeCalls).toBe(VOICE_FILES.length);
+    expect(workers).toHaveLength(1);
+  });
+
+  test('a failed download sets lastError to its message, and the next load clears it', async () => {
+    const base = completeIo();
+    const engine = makeEngine({
+      ...base,
+      size: async (path) => (path === `/app/voice/${VOICE_FILES[0]!.path}` ? null : base.size(path)),
+      download: async () => {
+        throw new Error('HTTP 500');
+      },
+    });
+    expect(engine.lastError()).toBeNull();
+    engine.speak('pivotal', 'en-GB');
+    await flush();
+    expect(engine.status()).toBe('failed');
+    expect(engine.lastError()).toBe('HTTP 500');
+    engine.speak('pivotal', 'en-GB');
+    expect(engine.lastError()).toBeNull();
   });
 });

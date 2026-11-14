@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Toaster } from '@/ui/components/ui/sonner';
 import { TooltipProvider } from '@/ui/components/ui/tooltip';
 import { VoiceProvider } from '@/ui/voice/VoiceProvider';
+import { VoiceDownloadToast } from '@/ui/voice/VoiceDownloadToast';
 import { logDebug } from '@/ui/debug/debugLog';
 import { useCopyLogShortcut } from '@/ui/debug/useCopyLogShortcut';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -29,6 +30,7 @@ export function AppShell() {
           </main>
         </div>
         <Toaster />
+        <VoiceDownloadToast />
       </TooltipProvider>
     </VoiceProvider>
   );

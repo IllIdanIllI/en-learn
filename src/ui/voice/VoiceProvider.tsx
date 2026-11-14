@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useSyncExternalStore, type ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import { useCore } from '@/ui/app/CoreProvider';
 import type { VoiceEngine } from './engine';
 
@@ -12,11 +12,4 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 
 export function useVoice(): VoiceEngine | null {
   return useContext(VoiceContext);
-}
-
-/** Download progress 0..1 while the voice downloads, otherwise null; re-renders on every change. */
-export function useVoiceDownload(engine: VoiceEngine | null): number | null {
-  const subscribe = useCallback((fn: () => void) => (engine ? engine.subscribe(fn) : () => {}), [engine]);
-  const snapshot = useCallback(() => (engine?.status() === 'downloading' ? engine.progress() : null), [engine]);
-  return useSyncExternalStore(subscribe, snapshot);
 }

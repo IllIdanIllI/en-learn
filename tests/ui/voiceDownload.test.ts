@@ -62,6 +62,28 @@ describe('ensureVoiceFiles', () => {
     expect(fs.get(`${DIR}/voices/af_heart.bin`)).toBe(522240);
   });
 
+  test('onStart is called once, before the first download, when a file is missing', async () => {
+    const files = complete();
+    delete files[`${DIR}/${VOICE_FILES[0]!.path}`];
+    delete files[`${DIR}/${VOICE_FILES[1]!.path}`];
+    const { io, downloads } = fakeIo(files);
+    const order: string[] = [];
+    await ensureVoiceFiles(io, DIR, () => {}, () => {
+      order.push('start');
+    });
+    expect(order).toEqual(['start']);
+    expect(downloads).toHaveLength(2);
+  });
+
+  test('onStart is never called when every file is complete', async () => {
+    const { io } = fakeIo(complete());
+    let started = 0;
+    await ensureVoiceFiles(io, DIR, () => {}, () => {
+      started += 1;
+    });
+    expect(started).toBe(0);
+  });
+
   test('progress is a fraction of the bytes still to fetch and ends at 1', async () => {
     const files = complete();
     delete files[`${DIR}/${VOICE_FILES[0]!.path}`];

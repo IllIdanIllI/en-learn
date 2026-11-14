@@ -930,11 +930,18 @@ test.describe('two trainings, the word card and its buttons', () => {
     expect(await spoken(page)).toEqual(['ephemeral', 'Fame can be ephemeral.']);
   });
 
-  test('while the voice downloads, the speaker shows the progress and stays pressable', async ({ page }) => {
+  test('while the voice downloads, one notification shows the progress and the speaker stays pressable', async ({ page }) => {
     await page.goto('/?state=words&voice=downloading#/words/practice?mode=new');
     await card(page).waitFor();
-    await expect(card(page).getByRole('img', { name: 'Загрузка голоса: 40%' }).first()).toBeVisible();
+    await expect(page.getByText('Загрузка голоса: 40%')).toBeVisible();
+    await expect(card(page).getByRole('img', { name: /Загрузка голоса/ })).toHaveCount(0);
     await expect(card(page).getByRole('button', { name: 'Произнести' }).first()).toBeEnabled();
+  });
+
+  test('when the voice has downloaded, a notification says so', async ({ page }) => {
+    await page.goto('/?state=words&voice=downloaded#/words/practice?mode=new');
+    await card(page).waitFor();
+    await expect(page.getByText('Голос загружен')).toBeVisible();
   });
 });
 

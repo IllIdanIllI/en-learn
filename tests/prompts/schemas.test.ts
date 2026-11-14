@@ -5,7 +5,7 @@ import { bundledPrompts } from '@/core/llm/bundledPrompts';
 import type { LlmKind } from '@/core/domain';
 import type { DisputeBatchReply, ExplainReply, GeneratedSession, GradeResult, RuleChatReply, RuleDraft, ValidationResult, PhoneticsReply, WordCheckReply, WordsReply } from '@/core/llm/types';
 
-const kinds: LlmKind[] = ['rule_draft', 'rule_chat', 'generate_session', 'validate_session', 'grade', 'dispute', 'explain', 'words', 'word_check', 'phonetics'];
+const kinds: LlmKind[] = ['rule_draft', 'rule_chat', 'generate_session', 'validate_session', 'grade', 'dispute', 'explain', 'words', 'word_check', 'phonetics', 'essay_prompt'];
 const validator = (schema: object) => new Validator(schema, '2019-09', false);
 const fixture = (kind: string, which: 'valid' | 'invalid'): unknown =>
   JSON.parse(readFileSync(`tests/fixtures/llm/${kind}.${which}.json`, 'utf8'));

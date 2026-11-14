@@ -20,6 +20,8 @@ import wordCheckMd from '../../../prompts/word_check.md?raw';
 import wordCheckSchema from '../../../prompts/word_check.schema.json';
 import phoneticsMd from '../../../prompts/phonetics.md?raw';
 import phoneticsSchema from '../../../prompts/phonetics.schema.json';
+import essayPromptMd from '../../../prompts/essay_prompt.md?raw';
+import essayPromptSchema from '../../../prompts/essay_prompt.schema.json';
 
 /** Shared rules put before every system prompt (the app's calls run with --safe-mode, so no CLAUDE.md applies). */
 export const COMMON_RULES = commonMd.trim();
@@ -38,4 +40,5 @@ export const bundledPrompts: Record<LlmKind, PromptFiles> = {
   words: { system: wordsMd, schema: wordsSchema },
   word_check: { system: wordCheckMd, schema: wordCheckSchema },
   phonetics: { system: phoneticsMd, schema: phoneticsSchema },
+  essay_prompt: { system: essayPromptMd, schema: essayPromptSchema },
 };

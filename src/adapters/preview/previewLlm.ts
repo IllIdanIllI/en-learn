@@ -442,6 +442,7 @@ export const previewLlm: Llm = {
       case 'words': data = words(req.userPrompt); break;
       case 'word_check': data = wordCheck(req.userPrompt); break;
       case 'phonetics': data = phonetics(req.userPrompt); break;
+      case 'essay_prompt': data = { prompt: 'Some people think that cities should ban cars from their centres. To what extent do you agree or disagree?' }; break;
     }
     return { ok: true, data, costUsd: 0, durationMs: 5, raw: JSON.stringify(envelope(data, sessionId)), ...(sessionId ? { sessionId } : {}) };
   },

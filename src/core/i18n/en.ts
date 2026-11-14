@@ -149,6 +149,7 @@ export const en = {
   'llm.words': 'Words: exercises',
   'llm.word_check': 'Words: sentence check',
   'llm.phonetics': 'Words: transcriptions',
+  'llm.essay_prompt': 'Writing: new topic',
   'prereq.intro': 'English Exam Coach needs the Claude command line tool, installed and signed in. It was not found in any of these places.',
   'prereq.checked': 'Places checked',
   'prereq.result.missing': 'Not found',

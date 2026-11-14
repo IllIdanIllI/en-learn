@@ -151,6 +151,7 @@ export const ru: Record<keyof typeof en, string> = {
   'llm.words': 'Слова: упражнения',
   'llm.word_check': 'Слова: проверка предложения',
   'llm.phonetics': 'Слова: транскрипции',
+  'llm.essay_prompt': 'Письмо: новая тема',
   'prereq.intro': 'Для работы нужна программа Claude в командной строке: установленная и с выполненным входом. Ни в одном из этих мест её нет.',
   'prereq.checked': 'Проверенные места',
   'prereq.result.missing': 'Не найден',

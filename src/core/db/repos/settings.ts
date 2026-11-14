@@ -39,6 +39,7 @@ export const DEFAULT_SETTINGS: Settings = {
     words: DEFAULT_MODEL,
     word_check: DEFAULT_MODEL,
     phonetics: DEFAULT_MODEL,
+    essay_prompt: DEFAULT_MODEL,
   },
   efforts: {
     rule_draft: 'medium',
@@ -51,6 +52,7 @@ export const DEFAULT_SETTINGS: Settings = {
     words: 'medium',
     word_check: 'medium',
     phonetics: 'low',
+    essay_prompt: 'low',
   },
   budgetUsd: null,
   acceptedShorthands: ['✓'],

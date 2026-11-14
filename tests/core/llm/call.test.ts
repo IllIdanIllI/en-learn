@@ -93,9 +93,9 @@ describe('callStructured', () => {
     const llm = new FakeLlm({ grade: [good({ word: 'a' })], generate_session: [good({ word: 'a' })] });
     const deps = await setup(llm);
     await setSetting(deps.db, 'models', {
-      rule_draft: 'm-r', rule_chat: 'm-c', generate_session: 'm-g', validate_session: 'm-v', grade: 'm-grade', dispute: 'm-d', explain: 'm-e', words: 'm-w', word_check: 'm-wc', phonetics: 'm-p',
+      rule_draft: 'm-r', rule_chat: 'm-c', generate_session: 'm-g', validate_session: 'm-v', grade: 'm-grade', dispute: 'm-d', explain: 'm-e', words: 'm-w', word_check: 'm-wc', phonetics: 'm-p', essay_prompt: 'm-ep',
     });
-    await setSetting(deps.db, 'efforts', { rule_draft: 'low', rule_chat: 'low', generate_session: 'low', validate_session: 'low', grade: 'medium', dispute: 'low', explain: 'low', words: 'low', word_check: 'low', phonetics: 'low' });
+    await setSetting(deps.db, 'efforts', { rule_draft: 'low', rule_chat: 'low', generate_session: 'low', validate_session: 'low', grade: 'medium', dispute: 'low', explain: 'low', words: 'low', word_check: 'low', phonetics: 'low', essay_prompt: 'low' });
     await setSetting(deps.db, 'budgetUsd', 0.5);
     await callStructured(deps, 'grade', 'p', { sessionId: undefined });
     await callStructured(deps, 'generate_session', 'p');
@@ -134,7 +134,7 @@ describe('callStructured', () => {
 });
 
 test('every kind starts its system prompt with the common rules', async () => {
-  const kinds = ['rule_draft', 'rule_chat', 'generate_session', 'validate_session', 'grade', 'dispute', 'explain', 'words', 'word_check', 'phonetics'] as const;
+  const kinds = ['rule_draft', 'rule_chat', 'generate_session', 'validate_session', 'grade', 'dispute', 'explain', 'words', 'word_check', 'phonetics', 'essay_prompt'] as const;
   const llm = new FakeLlm(Object.fromEntries(kinds.map((k) => [k, [good({ word: 'a' })]])));
   const deps = await setup(llm);
   for (const k of kinds) await callStructured(deps, k, 'p');

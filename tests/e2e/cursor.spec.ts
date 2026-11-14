@@ -221,3 +221,10 @@ test('pointer cursor: word card buttons, the Remove confirmation, and a training
   expect(await cursor(page.getByRole('button', { name: 'Нет', exact: true }))).toBe('pointer');
   expect(await wrongCursors(page)).toEqual([]);
 });
+
+test('pointer cursor: the speaker while the voice downloads', async ({ page }) => {
+  await page.goto('/?state=words&voice=downloading#/words/practice?mode=new');
+  await page.locator('[data-card-type]').waitFor();
+  expect(await page.getByRole('button', { name: 'Произнести' }).first().evaluate((el) => getComputedStyle(el).cursor)).toBe('pointer');
+  expect(await wrongCursors(page)).toEqual([]);
+});

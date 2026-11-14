@@ -8,6 +8,7 @@ import type { ClaudeLocation } from '@/core/llm/claude';
 import type { ProgrammeInput, SeedRule } from '@/core/programme/setup';
 import { useDayWatch } from './useDayWatch';
 import { getSettings, type Settings } from '@/core/db/repos/settings';
+import type { VoiceEngine } from '@/ui/voice/engine';
 
 export interface SeedBundle { programme: ProgrammeInput; rules: SeedRule[] }
 
@@ -33,6 +34,8 @@ export interface CoreInit {
   openUrl?: (url: string) => Promise<void>;
   /** Swaps the Dock icon (Night when true); present only on macOS in the real app and in preview. */
   setAppIcon?: (night: boolean) => Promise<void>;
+  /** The Kokoro voice (Tauri) or the preview voice; null leaves only the system voice. */
+  voice?: VoiceEngine | null;
 }
 
 export interface Core {
@@ -55,6 +58,8 @@ export interface Core {
   version: number;
   openUrl?: (url: string) => Promise<void>;
   setAppIcon?: (night: boolean) => Promise<void>;
+  /** The voice engine, or null when only the system voice is used. */
+  voice: VoiceEngine | null;
 }
 
 const CoreContext = createContext<Core | null>(null);
@@ -89,7 +94,7 @@ function useTheme(theme: Settings['theme']): boolean {
 }
 
 export function CoreProvider({ init, children }: { init: CoreInit; children: ReactNode }) {
-  const { runner, loadSeedInput, dataDir, dataDirError, makeLlm, openUrl, setAppIcon } = init;
+  const { runner, loadSeedInput, dataDir, dataDirError, makeLlm, openUrl, setAppIcon, voice = null } = init;
   const [deps, setDeps] = useState(init.deps);
   const [prereq, setPrereq] = useState(init.prereq);
   const [settings, setSettings] = useState(init.settings);
@@ -148,9 +153,9 @@ export function CoreProvider({ init, children }: { init: CoreInit; children: Rea
 
   const value = useMemo<Core>(
     () => ({
-      deps, runner, lang: settings.nativeLanguage, settings, isDark, prereq, loadSeedInput, dataDir, dataDirError, moveDataDir, recheckPrerequisites, refresh, version, openUrl, setAppIcon,
+      deps, runner, lang: settings.nativeLanguage, settings, isDark, prereq, loadSeedInput, dataDir, dataDirError, moveDataDir, recheckPrerequisites, refresh, version, openUrl, setAppIcon, voice,
     }),
-    [deps, runner, settings, isDark, prereq, loadSeedInput, dataDir, dataDirError, moveDataDir, recheckPrerequisites, refresh, version, openUrl, setAppIcon],
+    [deps, runner, settings, isDark, prereq, loadSeedInput, dataDir, dataDirError, moveDataDir, recheckPrerequisites, refresh, version, openUrl, setAppIcon, voice],
   );
   return <CoreContext.Provider value={value}>{children}</CoreContext.Provider>;
 }

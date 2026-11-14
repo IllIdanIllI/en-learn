@@ -4,6 +4,7 @@ import { loadSeed } from '@/core/programme/setup';
 import { checkPrerequisites } from '@/core/prereq';
 import type { Deps, Llm } from '@/core/ports';
 import type { CoreInit } from './CoreProvider';
+import { canSpeak, cancelSpeech, speak } from '@/ui/words/speech';
 
 declare global {
   interface Window {
@@ -51,11 +52,22 @@ export async function bootTauri(): Promise<CoreInit> {
   const clock = new TauriClock();
   clock.configure({ dayStartHour: settings.dayStartHour, overrideDate: settings.dayOverride });
   const deps: Deps = { db, llm, clock, prompts: new TauriPromptStore(dataDir), net: new TauriNet() };
+  const [{ createKokoroEngine, playPcm, unlockAudio }, { TauriVoiceIo }] = await Promise.all([import('@/ui/voice/engine'), import('@/ui/voice/io')]);
+  // The model lives in the app data folder, not the chosen data folder: it is a download, not user data.
+  const voice = createKokoroEngine({
+    io: new TauriVoiceIo(),
+    dir: `${appData}/voice`,
+    makeWorker: () => new Worker(new URL('../voice/kokoro.worker.ts', import.meta.url), { type: 'module' }),
+    system: { canSpeak, speak, cancel: cancelSpeech },
+    play: playPcm,
+    unlock: unlockAudio,
+  });
   return {
     deps,
     runner,
     prereq,
     settings,
+    voice,
     loadSeedInput: () => {
       try {
         return loadSeed(clock.today());
@@ -81,11 +93,13 @@ export async function bootPreview(search: string): Promise<CoreInit> {
   const settings = await getSettings(core.deps.db);
   core.deps.clock.configure({ dayStartHour: settings.dayStartHour, overrideDate: settings.dayOverride });
   const { previewNet } = await import('@/adapters/preview/previewNet');
+  const { previewVoice } = await import('@/ui/voice/previewEngine');
   const deps = { ...core.deps, llm: withFailure(withDelay(core.deps.llm, parsePreviewDelay(search)), parsePreviewFail(search)), net: previewNet };
   return {
     ...core,
     deps,
     settings,
+    voice: previewVoice(search),
     loadSeedInput: () => ({ programme: MINI_PROGRAMME, rules: MINI_RULES }),
     dataDir: '~/Library/Application Support/English Exam Coach',
     setAppIcon: (night) => {

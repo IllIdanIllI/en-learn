@@ -920,6 +920,22 @@ test.describe('two trainings, the word card and its buttons', () => {
     await expect(card(page).locator('.answer').first()).toHaveText('ephemeral');
     await expect(card(page).getByRole('button', { name: 'Произнести' })).toHaveCount(0);
   });
+
+  test('with the Kokoro voice ready, the speakers play through it', async ({ page }) => {
+    await page.goto('/?state=words&voice=ok#/words/practice?mode=new');
+    await card(page).waitFor();
+    const speakers = card(page).getByRole('button', { name: 'Произнести' });
+    await speakers.nth(0).click();
+    await speakers.nth(1).click();
+    expect(await spoken(page)).toEqual(['ephemeral', 'Fame can be ephemeral.']);
+  });
+
+  test('while the voice downloads, the speaker shows the progress and stays pressable', async ({ page }) => {
+    await page.goto('/?state=words&voice=downloading#/words/practice?mode=new');
+    await card(page).waitFor();
+    await expect(card(page).getByRole('img', { name: 'Загрузка голоса: 40%' }).first()).toBeVisible();
+    await expect(card(page).getByRole('button', { name: 'Произнести' }).first()).toBeEnabled();
+  });
 });
 
 test.describe('around the lessons', () => {

@@ -502,6 +502,7 @@ export const en = {
   'words.remove': 'Remove from vocabulary',
   'words.remove.confirm': 'Remove the word from the vocabulary?',
   'words.speak': 'Play',
+  'words.voice.loading': 'Loading voice: {n}%',
   'words.instr.build': 'Build the word letter by letter',
   'words.attempts': 'Attempts: {left} of {total}',
   'words.use.error': 'Could not check: {message}',

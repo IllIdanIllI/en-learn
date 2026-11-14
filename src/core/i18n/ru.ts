@@ -504,6 +504,7 @@ export const ru: Record<keyof typeof en, string> = {
   'words.remove': 'Удалить из словаря',
   'words.remove.confirm': 'Удалить слово из словаря?',
   'words.speak': 'Произнести',
+  'words.voice.loading': 'Загрузка голоса: {n}%',
   'words.instr.build': 'Соберите слово по буквам',
   'words.attempts': 'Попытки: {left} из {total}',
   'words.use.error': 'Не удалось проверить: {message}',

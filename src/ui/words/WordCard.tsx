@@ -5,7 +5,8 @@ import { dictMatches } from '@/core/words/dictionary';
 import type { Word } from '@/core/words/types';
 import { ExternalLink } from '@/ui/components/ExternalLink';
 import { Button } from '@/ui/components/ui/button';
-import { canSpeak, speak, type SpellingVariant } from './speech';
+import { useVoice, useVoiceDownload } from '@/ui/voice/VoiceProvider';
+import { canSpeak, cancelSpeech, speak, type SpellingVariant } from './speech';
 
 export interface WordCardProps {
   word: Word;
@@ -50,25 +51,65 @@ export function DictLine({ word, lang }: { word: Word; lang: Lang }) {
   );
 }
 
+/** A small progress ring over a speaker while the voice model downloads. */
+function VoiceRing({ fraction, lang }: { fraction: number; lang: Lang }) {
+  const radius = 16;
+  const length = 2 * Math.PI * radius;
+  return (
+    <svg
+      role="img"
+      aria-label={t(lang, 'words.voice.loading', { n: Math.round(fraction * 100) })}
+      viewBox="0 0 36 36"
+      className="pointer-events-none absolute inset-0 size-full -rotate-90"
+    >
+      <circle cx="18" cy="18" r={radius} fill="none" stroke="currentColor" strokeOpacity={0.3} strokeWidth={2} />
+      <circle
+        cx="18"
+        cy="18"
+        r={radius}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeDasharray={length}
+        strokeDashoffset={length * (1 - fraction)}
+      />
+    </svg>
+  );
+}
+
 /** A word in the Skyeng layout: the word on a coloured band with its translation, then transcription, definition and example. */
 export function WordCard({ word, lang, spelling, onKnown, onRemove, busy = false }: WordCardProps) {
   const [confirming, setConfirming] = useState(false);
-  const speech = canSpeak();
+  const voice = useVoice();
+  const downloading = useVoiceDownload(voice);
+  // The speakers show with the Kokoro voice, or with the system voice when the browser can speak.
+  const speech = voice !== null || canSpeak();
   // A card that goes away stops its speech, so the word is not read over the next card.
   useEffect(() => () => {
-    if (canSpeak()) window.speechSynthesis.cancel();
-  }, []);
+    if (voice) voice.stop();
+    else if (canSpeak()) cancelSpeech();
+  }, [voice]);
+  // The card's texts are synthesised in the background once the voice is ready, so a press plays at once.
+  useEffect(() => {
+    if (!voice) return;
+    voice.prefetch(word.word, spelling);
+    if (word.example !== '') voice.prefetch(word.example, spelling);
+  }, [voice, word.word, word.example, spelling]);
   const meta = [word.transcription, word.partOfSpeech].filter((p) => p !== '').join(' · ');
   const speaker = (text: string) => (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="shrink-0 text-current hover:bg-white/10"
-      aria-label={t(lang, 'words.speak')}
-      onClick={() => speak(text, spelling)}
-    >
-      <Volume2 aria-hidden />
-    </Button>
+    <span className="relative inline-flex shrink-0">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="shrink-0 text-current hover:bg-white/10"
+        aria-label={t(lang, 'words.speak')}
+        onClick={() => (voice ? voice.speak(text, spelling) : speak(text, spelling))}
+      >
+        <Volume2 aria-hidden />
+      </Button>
+      {downloading !== null && <VoiceRing fraction={downloading} lang={lang} />}
+    </span>
   );
 
   return (

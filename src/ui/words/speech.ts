@@ -5,6 +5,11 @@ export function canSpeak(): boolean {
   return 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
 }
 
+/** Stops the system speech still running. */
+export function cancelSpeech(): void {
+  window.speechSynthesis.cancel();
+}
+
 /** Speaks the text with a system voice of the spelling variant; a new call cancels the speech still running. */
 export function speak(text: string, variant: SpellingVariant): void {
   const synth = window.speechSynthesis;

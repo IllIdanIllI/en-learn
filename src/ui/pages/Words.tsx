@@ -26,6 +26,14 @@ function StageChip({ stage, label }: { stage: Stage; label: string }) {
   );
 }
 
+const IS_MAC = /Mac/.test(navigator.platform) || /Mac/.test(navigator.userAgent);
+
+/** Cmd+F on macOS (Meta alone), Ctrl+F elsewhere (Ctrl alone); Shift or Alt makes it another shortcut. */
+function isSearchShortcut(e: KeyboardEvent): boolean {
+  if (e.key.toLowerCase() !== 'f' || e.shiftKey || e.altKey) return false;
+  return IS_MAC ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
+}
+
 export function Words() {
   const { deps, lang } = useCore();
   const job = useWordsJob();
@@ -59,7 +67,7 @@ export function Words() {
   // Cmd+F (Ctrl+F) searches the list instead of the browser's find, unless a dialog is open.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'f' || document.querySelector('[role=dialog]')) return;
+      if (!isSearchShortcut(e) || document.querySelector('[role=dialog]')) return;
       e.preventDefault();
       const input = searchRef.current;
       input?.focus();

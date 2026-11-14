@@ -61,6 +61,8 @@ describe('normRu and dictMatches', () => {
     expect(dictMatches('утверждение, заявление', ['утверждение'])).toBe(true);
     expect(dictMatches('Лёгкий толчок (локтем)', ['лёгкий толчок'])).toBe(true);
     expect(dictMatches('', ['утверждение'])).toBe(false);
+    expect(dictMatches('принуждать; заставлять', ['заставлять'])).toBe(true);
+    expect(dictMatches('принуждать/заставлять', ['заставлять'])).toBe(true);
   });
 });
 

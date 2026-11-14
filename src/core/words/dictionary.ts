@@ -55,12 +55,12 @@ export function parseKaikki(jsonl: string): string[] {
   return out.slice(0, MAX_TRANSLATIONS);
 }
 
-/** True when one comma-separated item of `translation` equals one of the dictionary items (after normRu). */
+/** True when one item of `translation` (split on commas, semicolons or slashes) equals one of the dictionary items (after normRu). */
 export function dictMatches(translation: string, dict: string[]): boolean {
   const items = new Set(dict.map(normRu).filter((d) => d !== ''));
   return translation
     .replace(/\([^)]*\)/g, '')
-    .split(',')
+    .split(/[,;/]/)
     .map(normRu)
     .some((t) => t !== '' && items.has(t));
 }

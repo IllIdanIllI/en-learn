@@ -1178,18 +1178,18 @@ test.describe('search shortcut and saved confirmation', () => {
     await expect(icon).toHaveAttribute('aria-hidden', 'true');
   });
 
-  for (const key of ['Meta+f', 'Control+f']) {
-    test(`${key} focuses the search field and selects its text`, async ({ page }) => {
-      await page.goto('/?state=words#/words');
-      const search = page.locator('#words-search');
-      await search.fill('устой');
-      await page.locator('h1').click();
-      await page.keyboard.press(key);
-      await expect(search).toBeFocused();
-      const selection = await search.evaluate((el: HTMLInputElement) => ({ start: el.selectionStart, end: el.selectionEnd, length: el.value.length }));
-      expect(selection).toEqual({ start: 0, end: 5, length: 5 });
-    });
-  }
+  // The shortcut is Cmd+F on macOS and Ctrl+F elsewhere; the test runs on the platform it runs on.
+  const searchKey = process.platform === 'darwin' ? 'Meta+f' : 'Control+f';
+  test(`${searchKey} focuses the search field and selects its text`, async ({ page }) => {
+    await page.goto('/?state=words#/words');
+    const search = page.locator('#words-search');
+    await search.fill('устой');
+    await page.locator('h1').click();
+    await page.keyboard.press(searchKey);
+    await expect(search).toBeFocused();
+    const selection = await search.evaluate((el: HTMLInputElement) => ({ start: el.selectionStart, end: el.selectionEnd, length: el.value.length }));
+    expect(selection).toEqual({ start: 0, end: 5, length: 5 });
+  });
 
   test('saving a word shows Saved until a field changes', async ({ page }) => {
     await page.goto('/?state=words#/words');
@@ -1212,7 +1212,7 @@ test.describe('search shortcut and saved confirmation', () => {
     await exercise.getByLabel('Текст', { exact: true }).fill('Edited prompt');
     await exercise.getByRole('button', { name: 'Сохранить' }).click();
     await expect(saved).toHaveText('Сохранено');
-    await exercise.getByLabel('Текст', { exact: true }).fill('Edited again');
+    await exercise.getByLabel('Текст', { exact: true }).fill('Edited once more');
     await expect(saved).toHaveCount(0);
   });
 });

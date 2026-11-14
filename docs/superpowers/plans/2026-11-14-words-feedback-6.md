@@ -340,3 +340,81 @@
 - [ ] `docs/superpowers/handoff.md`: round 6 line, licences (Kokoro model and kokoro-js Apache-2.0; phonemizer npm Apache-2.0 wrapping espeak-ng GPL-3.0), the HTTP plugin deviation.
 - [ ] Spec: note the HTTP-plugin deviation under R9.
 - [ ] Final checks: `yarn typecheck`, `yarn lint`, `yarn vitest run`, `yarn playwright test tests/e2e/words.spec.ts tests/e2e/cursor.spec.ts tests/e2e/csp.spec.ts tests/e2e/settings-day.spec.ts tests/e2e/settings-icon.spec.ts --trace off`.
+
+---
+
+## Binding review notes (Sonnet plan review, 2026-11-14)
+
+These override the tasks above where they differ. Each implementer reads the notes for its task.
+
+**Task 1**
+- Every full `Record<LlmKind, …>` literal and kinds list gains `phonetics`: `scripts/lib/nodeHarness.ts:108`, `tests/core/llm/call.test.ts` (~96, ~98, ~137), `tests/prompts/schemas.test.ts:8`.
+- `tests/prompts/schemas.test.ts` runs per kind, so you must:
+  - add `tests/fixtures/llm/phonetics.valid.json` and `phonetics.invalid.json`;
+  - make the system prompt longer than 500 characters;
+  - end it exactly with `Return only the JSON object that matches the provided schema.`;
+  - give every schema object a `required` list naming all its properties.
+- `inBatches` (`generate.ts`) gains a `size: number` parameter. `generateWords` passes `BATCH_SIZE` and `generatePhonetics` passes `PHONETICS_BATCH` (20, in `constants.ts`).
+
+**Task 2**
+- `planFill(words: Word[], skip: ReadonlySet<number>, opts?: { lang?: Lang; net?: boolean }): FillPlan`. `dict` stays `[]` until Task 6 fills it, and is `[]` when `opts` is absent.
+- `emptied` lists only words of phonetics batches whose call **succeeded** and whose transcription is still empty. Words of a failed batch are never skipped, so Retry works.
+- Busy test: wrap the call as the existing test does: `withJobLock(deps.db, () => runFill(...), null)` (`src/core/session/jobLock.ts` is an in-memory lock; there is no lock row).
+- `startFill`:
+  - It sets `filling.current = true` **synchronously** before any `await`, and resets it in a `finally` (including the empty-plan return).
+  - It does nothing while `filling.current || looping.current`.
+  - `loop` calls `startFill()` only after its own `finally` has set `looping.current = false` (use `queueMicrotask`).
+  - The fill run calls `setVersion(n => n + 1)` when it ends, so the Words list and word page reload.
+
+**Task 3**: no notes.
+
+**Task 4**
+- The Edit button exists only on the intro card and the feedback view. Neither has an active letter or Enter key handler: the build and anagram handlers are off when `locked`, and the intro card has none.
+- Keep the `paused` early return in both window key handlers, with the one-line comment `// The edit panel is open: its typing must not reach the card.`
+- Drop the two e2e checks that cannot fail ("attempts stay 3", "Enter does not advance"). Instead, assert that after closing the panel the card is the same card (same header `k / N`, Edit button focused).
+- Delete: `onDeleted` sets `editing` to null and calls `leaveWord(id, async () => {})`; it does **not** reload. `onClose` reloads only when the word still exists (`listWords(...).find(...)` may be undefined → skip).
+- E2E state: `?state=words`, Words page → "Новые слова" (mode `new`). The first card is a word card.
+- Modal Sheet: pass `modal` (true) and `onInteractOutside={() => onClose()}` to `SheetContent` (the props spread after the default override it). Add an e2e for click outside closes. Update the comment in `sheet.tsx` only where it now misleads (one line: modal use is allowed).
+
+**Task 5**
+- Add direct `cleanRu` tests: `cleanRu('сдать pf trans.') === 'сдать'`, `cleanRu('бро́сить pf the habit') === 'бросить'`, `cleanRu('утвержде́ние') === 'утверждение'`, `cleanRu('pf') === null`.
+- `migrate.test.ts`: every 7 becomes 8 (title and lines ~41, 44, 47, 69, 91). Let `yarn typecheck` find the `Word` object literals needing `dict` (about ten test files).
+- `@tauri-apps/plugin-http`: run `yarn info @tauri-apps/plugin-http versions`, then pin the latest 2.x exactly.
+
+**Task 6**
+- `planFill` gets `dict` ids when `opts.lang === 'ru' && opts.net`. The provider passes `{ lang, net: deps.net !== undefined }`.
+- `runFill` with busy:
+  - A busy lock skips **only** the phonetics step. The dict step still runs.
+  - The result is `{ok:false,busy:true}` only when the dict step had no error. A dict error wins: `{ok:false,busy:false,message,emptied}`.
+  - Progress counts phonetics words done, then `phonetics.length + dict words done`, over `total = both`.
+- Preview seed:
+  - Every seeded word in every state except `words-dict` gets `dict_checked = 'none'`, so ordinary states never show a fill line. `words-fill` words have `transcription: ''`, `partOfSpeech: ''` and `dict 'none'`.
+  - Add `words-fill` (Task 2) and `words-dict` to `PREVIEW_STATES` (`fixtures.ts:23`) with `buildPreview` branches.
+- `previewNet` matches the fixture by `decodeURIComponent` of the URL's last path segment (`give%20up.jsonl` → `give up.jsonl`). Anything else is 404.
+- Exact new line in `prompts/words.md` (replaces the `- translation:` line):
+  `- translation: the main general {{nativeLanguage}} equivalent first, then up to two more common translations, comma-separated, most common first (for example: утверждение, заявление). Do not give rare, figurative or narrow senses unless the word has no other.`
+- The progress label stays "Добавляю транскрипции" (accepted nit).
+
+**Task 7**
+- The worker maps any `https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/<any segment>/<path>` to `files[path]`. kokoro-js and transformers use `main`. kokoro-js's `caches.open` failure is already caught.
+- Dependencies:
+  - Add `@huggingface/transformers` as a direct dependency, pinned to the version kokoro-js resolves.
+  - **Before coding**, inspect the installed `onnxruntime-web` dist and its `exports`. Use the non-JSEP `ort-wasm-simd-threaded.mjs` / `.wasm` via `?url` imports. If `exports` blocks the deep import, add a Vite `resolve.alias` to the file path.
+  - Record the chosen specifiers in the commit message.
+- `download` streams chunk by chunk:
+  - plugin-http `fetch` → `response.body.getReader()` → plugin-fs `open(dest, { write: true, create: true, truncate: true })` → `file.write(chunk)` → `close`. It never buffers the whole file.
+  - fs capabilities to add, scoped `$APPDATA/voice/**`: `fs:allow-read-file`, `fs:allow-open`, `fs:allow-write`, `fs:allow-rename`, plus the existing `mkdir`, `remove`, `stat`, `exists`.
+- Engine contract:
+  - It assigns `worker.onmessage` and `worker.onerror`. Tests drive `worker.onmessage({ data })`.
+  - The init post uses a transfer list of the ArrayBuffers.
+  - The `AudioContext` is created or `resume()`d synchronously inside `speak` (WebKit blocks a later start).
+  - Add the test `speak('x','en-US') posts voice 'af_heart'` (and `en-GB` → `bf_emma`).
+  - `speech.ts` gains `export function cancelSpeech(): void`.
+  - `VoiceProvider` wraps the app's routes in `AppShell.tsx`, next to `WordsJobProvider`.
+- Preview engine:
+  - It is provided **only when `?voice=` is present** (`?voice=ok` records in `window.__spoken`; `?voice=downloading` holds 40%).
+  - Without `?voice` the engine is null, so the existing `SPEECH_STUB` e2e tests and "without speech synthesis there are no speaker buttons" (`words.spec.ts` ~839) stay as they are.
+  - The preview engine appends with `(window.__spoken ??= []).push(...)`.
+- `csp.spec.ts` has a known failure (the HMR socket, see handoff). The requirement is "no new CSP violation". Run it and compare with the known failure; do not list it as must-pass.
+
+**Trailers**: the trailers in Global Constraints are correct for this session. The reviewer's NIT 22 does not apply.

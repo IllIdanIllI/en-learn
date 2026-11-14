@@ -48,6 +48,10 @@ Agreed with the learner in chat on 2026-11-14. Binding where it says something; 
 - The notification host is one component in `AppShell` subscribing to the voice engine; the engine tells it whether files are being fetched (a new `downloading` status is entered only when some file is missing).
 - The preview's `?voice=downloading` keeps working for e2e (it shows the notification at 40%); a new `?voice=downloaded` shows the success notification.
 
+## Changes at the final review
+- Fill progress is logged at 10% steps (plus first and last), not every step, and the previous run keeps at least 400 of the 1000 entries; identical consecutive entries are merged as ` ×N`; entry texts are one line of at most 300 characters. All to keep the previous run's evidence after a restart.
+- `clip=` means a previous clip was still playing at the press (read before it is stopped). Sidebar clicks also log `click-done` when the click event arrives.
+
 ## R4. Follow-up (not in this round)
 - The learner uses the app with R1–R3, reproduces items 1–3 if they happen, and sends the copied log. Items 1–3 are then fixed from that evidence in a new round.
 

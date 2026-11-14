@@ -2,6 +2,7 @@ import type { SpellingVariant } from '@/ui/words/speech';
 import { ensureVoiceFiles } from './download';
 import { VOICE_BY_VARIANT, VOICE_FILES } from './files';
 import type { VoiceIo } from './io';
+import { outline } from './outline';
 
 export type VoiceStatus = 'idle' | 'downloading' | 'loading' | 'ready' | 'failed';
 
@@ -23,10 +24,13 @@ export interface KokoroDeps {
   /** The folder holding the voice files (`<appData>/voice`). */
   dir: string;
   makeWorker: () => Worker;
-  system: { canSpeak(): boolean; speak(text: string, variant: SpellingVariant): void; cancel(): void };
-  play: (pcm: Float32Array, rate: number) => { stop(): void };
+  system: { canSpeak(): boolean; speak(text: string, variant: SpellingVariant): void; cancel(): void; speaking(): boolean };
+  /** Plays the clip; `onEnd` runs when it ends, stopped or not. */
+  play: (pcm: Float32Array, rate: number, onEnd: () => void) => { stop(): void };
   /** Called synchronously on every press, so WebKit lets the later playback start. */
   unlock?: () => void;
+  /** The debug log; it never changes what the engine does. */
+  log?: (kind: string, text: string) => void;
 }
 
 interface Clip {
@@ -56,9 +60,25 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
   const listeners = new Set<() => void>();
   const notify = () => listeners.forEach((fn) => fn());
   const setStatus = (next: VoiceStatus) => {
+    if (next !== status) log(`status ${next}`);
     status = next;
     notify();
   };
+
+  // The debug log. A failing log never reaches the caller.
+  const log = (text: string) => {
+    try {
+      deps.log?.('voice', text);
+    } catch {
+      // Logging is best effort.
+    }
+  };
+  const logError = (message: string) => log(`error ${message.slice(0, 200)}`);
+  // The last whole 10% of the download logged in this load; 0% is never logged.
+  let lastPercent = 0;
+  // The clip that is playing, by id: a stopped clip's late end must not clear the mark of the clip that replaced it.
+  let clipSeq = 0;
+  let clipPlaying: number | null = null;
 
   let worker: Worker | null = null;
   // Requests sent to the worker and not answered yet, by request id.
@@ -93,7 +113,22 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
     cancel: () => {
       if (deps.system.canSpeak()) deps.system.cancel();
     },
+    speaking: () => deps.system.canSpeak() && deps.system.speaking() === true,
   };
+
+  /** Starts a clip and logs it; `system` is whether the system voice was speaking when the press came. */
+  function playClip(text: string, clip: Clip, systemSpeaking: boolean): { stop(): void } {
+    const id = ++clipSeq;
+    const clipWasPlaying = clipPlaying !== null;
+    clipPlaying = id;
+    log(
+      `play "${text}" ${clip.pcm.length} samples ${clip.rate}Hz ${(clip.pcm.length / clip.rate).toFixed(2)}s ${outline(clip.pcm)} system=${systemSpeaking ? 'yes' : 'no'} clip=${clipWasPlaying ? 'yes' : 'no'}`,
+    );
+    return deps.play(clip.pcm, clip.rate, () => {
+      log(`end "${text}"`);
+      if (clipPlaying === id) clipPlaying = null;
+    });
+  }
 
   function onMessage(w: Worker, data: WorkerOut) {
     if (worker !== w) return;
@@ -106,6 +141,7 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       request.entry.clip = { pcm: data.pcm, rate: data.rate };
       request.entry.resolve(request.entry.clip);
     } else if (data.id !== undefined) {
+      logError(data.message);
       // One sentence failed: only its entry is dropped, so its press falls back to the system voice and the worker stays.
       const request = waiting.get(data.id);
       if (!request) return;
@@ -113,15 +149,22 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       if (cache.get(request.key) === request.entry) cache.delete(request.key);
       request.entry.reject(new Error(data.message));
     } else {
+      logError(data.message);
       fail(new Error(data.message));
     }
   }
 
   async function load() {
+    lastPercent = 0;
     setStatus('downloading');
     try {
       await ensureVoiceFiles(deps.io, deps.dir, (f) => {
         fraction = f;
+        const percent = Math.floor(f * 10) * 10;
+        if (percent > lastPercent) {
+          lastPercent = percent;
+          log(`status downloading ${percent}%`);
+        }
         notify();
       });
       setStatus('loading');
@@ -131,7 +174,9 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       worker = w;
       w.onmessage = (e: MessageEvent<WorkerOut>) => onMessage(w, e.data);
       w.onerror = () => {
-        if (worker === w) fail(new Error('voice worker crashed'));
+        if (worker !== w) return;
+        logError('voice worker crashed');
+        fail(new Error('voice worker crashed'));
       };
       w.postMessage({ type: 'init', files }, Object.values(files));
     } catch (e) {
@@ -176,23 +221,29 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       press = token;
       stopPlayback();
       if (status !== 'ready') {
+        log(`press "${text}" ${variant} system-not-ready`);
         system.speak(text, variant);
         if (status === 'idle' || status === 'failed') void load();
         return;
       }
+      const systemSpeaking = system.speaking();
       system.cancel();
       const entry = request(text, variant, false);
       if (entry.clip) {
-        playing = deps.play(entry.clip.pcm, entry.clip.rate);
+        log(`press "${text}" ${variant} kokoro-cached`);
+        playing = playClip(text, entry.clip, systemSpeaking);
         return;
       }
+      log(`press "${text}" ${variant} kokoro-wait`);
       entry.promise.then(
         (clip) => {
           if (press !== token) return;
-          playing = deps.play(clip.pcm, clip.rate);
+          playing = playClip(text, clip, systemSpeaking);
         },
         () => {
-          if (press === token) system.speak(text, variant);
+          if (press !== token) return;
+          log(`press "${text}" ${variant} system-fallback`);
+          system.speak(text, variant);
         },
       );
     },
@@ -201,6 +252,7 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       request(text, variant, true);
     },
     stop() {
+      log('stop');
       press = ++seq;
       stopPlayback();
       system.cancel();
@@ -223,13 +275,14 @@ export function unlockAudio(): void {
 }
 
 /** Plays mono PCM through the shared context. */
-export function playPcm(pcm: Float32Array, rate: number): { stop(): void } {
+export function playPcm(pcm: Float32Array, rate: number, onEnd: () => void): { stop(): void } {
   const ctx = sharedContext();
   const buffer = ctx.createBuffer(1, pcm.length, rate);
   buffer.getChannelData(0).set(pcm);
   const source = ctx.createBufferSource();
   source.buffer = buffer;
   source.connect(ctx.destination);
+  source.onended = onEnd;
   source.start();
   return {
     stop() {

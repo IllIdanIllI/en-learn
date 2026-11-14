@@ -32,6 +32,9 @@ let workers: FakeWorker[];
 let spoken: { text: string; variant: string }[];
 let cancels: number;
 let plays: { first: number; rate: number }[];
+let ends: (() => void)[];
+let logs: [string, string][];
+let speakingNow: boolean;
 let stops: number;
 let unlocks: number;
 let sizeCalls: number;
@@ -66,9 +69,11 @@ function makeEngine(io: VoiceIo = completeIo()): VoiceEngine {
       cancel: () => {
         cancels += 1;
       },
+      speaking: () => speakingNow,
     },
-    play: (samples, rate) => {
+    play: (samples, rate, onEnd) => {
       plays.push({ first: samples[0]!, rate });
+      ends.push(onEnd);
       return {
         stop: () => {
           stops += 1;
@@ -78,7 +83,29 @@ function makeEngine(io: VoiceIo = completeIo()): VoiceEngine {
     unlock: () => {
       unlocks += 1;
     },
+    log: (kind, text) => {
+      logs.push([kind, text]);
+    },
   });
+}
+
+/** The model file is missing, so the first press downloads it; `fractions` are the progress steps the download reports. */
+function downloadingIo(fractions: number[]): VoiceIo {
+  const model = VOICE_FILES[0]!;
+  const io = completeIo();
+  const written = new Set<string>();
+  return {
+    ...io,
+    size: async (path) => {
+      if (path === `/app/voice/${model.path}`) return null;
+      if (path === `/app/voice/${model.path}.part`) return written.has(path) ? model.size : null;
+      return io.size(path);
+    },
+    download: async (_url, dest, onBytes) => {
+      for (const f of fractions) onBytes(Math.round(f * model.size));
+      written.add(dest);
+    },
+  };
 }
 
 /** An engine whose model is loaded: the first press fell back to the system voice and the init reply came. */
@@ -95,6 +122,9 @@ beforeEach(() => {
   spoken = [];
   cancels = 0;
   plays = [];
+  ends = [];
+  logs = [];
+  speakingNow = false;
   stops = 0;
   unlocks = 0;
   sizeCalls = 0;
@@ -309,5 +339,119 @@ describe('KokoroEngine', () => {
     const engine = makeEngine();
     engine.speak('lucid', 'en-GB');
     expect(unlocks).toBe(1);
+  });
+
+  test('a press before ready logs system-not-ready', () => {
+    const engine = makeEngine();
+    engine.speak('pivotal', 'en-GB');
+    expect(logs).toContainEqual(['voice', 'press "pivotal" en-GB system-not-ready']);
+  });
+
+  test('a ready press logs kokoro-wait, then the clip start with a 20-character outline', async () => {
+    const engine = await readyEngine();
+    engine.speak('pivotal', 'en-GB');
+    expect(logs).toContainEqual(['voice', 'press "pivotal" en-GB kokoro-wait']);
+    const clip = new Float32Array(24000);
+    clip[0] = 0.5;
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: clip, rate: 24000 });
+    await flush();
+    expect(logs.at(-1)).toEqual(['voice', `play "pivotal" 24000 samples 24000Hz 1.00s #${'.'.repeat(19)} system=no clip=no`]);
+  });
+
+  test('the clip start line says system=yes when the system voice was speaking at the press', async () => {
+    const engine = await readyEngine();
+    speakingNow = true;
+    engine.speak('pivotal', 'en-GB');
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(1), rate: 24000 });
+    await flush();
+    expect(logs.at(-1)![1]).toMatch(/ system=yes clip=no$/);
+  });
+
+  test('a second press of the same text logs kokoro-cached', async () => {
+    const engine = await readyEngine();
+    engine.speak('pivotal', 'en-GB');
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(1), rate: 24000 });
+    await flush();
+    engine.speak('pivotal', 'en-GB');
+    expect(logs).toContainEqual(['voice', 'press "pivotal" en-GB kokoro-cached']);
+  });
+
+  test('a press while the first clip has not ended logs clip=yes', async () => {
+    const engine = await readyEngine();
+    engine.speak('first', 'en-US');
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(1), rate: 24000 });
+    await flush();
+    engine.speak('second', 'en-US');
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(2), rate: 24000 });
+    await flush();
+    expect(stops).toBe(1);
+    expect(logs.at(-1)![1]).toMatch(/ system=no clip=yes$/);
+  });
+
+  test('the end callback logs end, and a later clip says clip=no', async () => {
+    const engine = await readyEngine();
+    engine.speak('pivotal', 'en-GB');
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(1), rate: 24000 });
+    await flush();
+    ends[0]!();
+    expect(logs.at(-1)).toEqual(['voice', 'end "pivotal"']);
+    engine.speak('pivotal', 'en-GB');
+    expect(logs.at(-1)![1]).toMatch(/ clip=no$/);
+  });
+
+  test('a stopped clip still logs its end, but does not clear the mark of the clip that replaced it', async () => {
+    const engine = await readyEngine();
+    engine.speak('first', 'en-US');
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(1), rate: 24000 });
+    await flush();
+    engine.speak('second', 'en-US');
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(2), rate: 24000 });
+    await flush();
+    ends[0]!();
+    expect(logs.at(-1)).toEqual(['voice', 'end "first"']);
+    engine.speak('third', 'en-US');
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(3), rate: 24000 });
+    await flush();
+    expect(logs.at(-1)![1]).toMatch(/ clip=yes$/);
+  });
+
+  test('stop logs stop', async () => {
+    const engine = await readyEngine();
+    engine.stop();
+    expect(logs.at(-1)).toEqual(['voice', 'stop']);
+  });
+
+  test('a rejected request logs system-fallback', async () => {
+    const engine = await readyEngine();
+    engine.speak('lucid', 'en-US');
+    workers[0]!.reply({ type: 'error', id: workers[0]!.request().id, message: 'bad input' });
+    await flush();
+    expect(logs).toContainEqual(['voice', 'press "lucid" en-US system-fallback']);
+  });
+
+  test('a worker error logs its first 200 characters', async () => {
+    const engine = await readyEngine();
+    engine.speak('lucid', 'en-US');
+    workers[0]!.reply({ type: 'error', id: workers[0]!.request().id, message: 'x'.repeat(300) });
+    expect(logs).toContainEqual(['voice', `error ${'x'.repeat(200)}`]);
+  });
+
+  test('download progress logs each 10% step once, and no 0%', async () => {
+    const engine = makeEngine(downloadingIo([0.05, 0.12, 0.13, 0.31]));
+    engine.speak('pivotal', 'en-GB');
+    await flush();
+    const percent = logs.map(([, text]) => text).filter((text) => text.startsWith('status downloading '));
+    expect(percent.filter((text) => text === 'status downloading 10%')).toHaveLength(1);
+    expect(percent.filter((text) => text === 'status downloading 30%')).toHaveLength(1);
+    expect(percent).not.toContain('status downloading 0%');
+    expect(percent).not.toContain('status downloading 13%');
+  });
+
+  test('a download of the model logs the status changes in order', async () => {
+    const engine = makeEngine(downloadingIo([0.5]));
+    engine.speak('pivotal', 'en-GB');
+    await flush();
+    const statuses = logs.map(([, text]) => text).filter((text) => text.startsWith('status ') && !text.includes('%'));
+    expect(statuses).toEqual(['status downloading', 'status loading']);
   });
 });

@@ -1,3 +1,5 @@
+import { logDebug } from '@/ui/debug/debugLog';
+
 export type SpellingVariant = 'en-GB' | 'en-US';
 
 /** Whether this browser can speak; the speaker buttons are not shown when it cannot. */
@@ -20,5 +22,6 @@ export function speak(text: string, variant: SpellingVariant): void {
   const tag = (lang: string) => lang.replace('_', '-').toLowerCase();
   const voice = synth.getVoices().find((v) => tag(v.lang).startsWith(tag(variant)));
   if (voice) utterance.voice = voice;
+  logDebug('voice', voice ? `system "${text}" ${variant} voice=${voice.name} (${voice.lang})` : `system "${text}" ${variant} voice=default`);
   synth.speak(utterance);
 }

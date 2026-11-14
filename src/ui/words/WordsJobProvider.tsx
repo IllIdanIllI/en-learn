@@ -5,6 +5,7 @@ import { planFill, runFill } from '@/core/words/fill';
 import { listWords } from '@/core/db/repos/words';
 import { useCore } from '@/ui/app/CoreProvider';
 import type { GenError } from '@/ui/today/StartSession';
+import { logDebug } from '@/ui/debug/debugLog';
 
 type Progress = { done: number; total: number };
 
@@ -132,16 +133,30 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
       const plan = planFill(await listWords(depsRef.current.db), skip.current, { lang: langRef.current, net: depsRef.current.net !== undefined });
       setFillError(null);
       if (plan.phonetics.length + plan.dict.length === 0) return;
+      logDebug('words', `fill start phonetics=${plan.phonetics.length} dict=${plan.dict.length}`);
       try {
-        const res = await runFill(depsRef.current, plan, (done, total) => setFill({ done, total }), () => looping.current);
+        const res = await runFill(
+          depsRef.current,
+          plan,
+          (done, total) => {
+            setFill({ done, total });
+            logDebug('words', `fill ${done}/${total}`);
+          },
+          () => looping.current,
+        );
         for (const id of res.emptied) skip.current.add(id);
+        if (res.ok) logDebug('words', 'fill end ok');
+        else if (res.busy) logDebug('words', 'fill end busy');
+        else logDebug('words', `fill end error ${res.message}`);
         // A busy lock is not an error: the words stay empty and the next visit runs them.
         if (!res.ok && !res.busy) setFillError(res.message);
       } finally {
         setVersion((n) => n + 1);
       }
     } catch (e) {
-      setFillError(e instanceof Error ? e.message : String(e));
+      const message = e instanceof Error ? e.message : String(e);
+      logDebug('words', `fill end error ${message}`);
+      setFillError(message);
     } finally {
       setFill(null);
       filling.current = false;

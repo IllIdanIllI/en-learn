@@ -17,6 +17,7 @@ import { ImportPanel } from '@/ui/words/ImportPanel';
 import { WordForm } from '@/ui/words/WordForm';
 import { WordsSummary } from '@/ui/words/WordsSummary';
 import { useWordsJob } from '@/ui/words/WordsJobProvider';
+import { logDebug } from '@/ui/debug/debugLog';
 
 type Panel = 'add' | 'import' | null;
 
@@ -50,6 +51,7 @@ export function Words() {
   const [addError, setAddError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const loaded = useLoaded(async () => {
+    logDebug('words', 'list reload');
     const { wordsExtraNew } = await getSettings(deps.db);
     return { views: await loadWordViews(deps.db), overview: await wordsOverview(deps.db, today, extraNewFor(wordsExtraNew, today)) };
   }, `${job.version}-${reload}`);

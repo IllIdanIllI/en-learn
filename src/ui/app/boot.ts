@@ -67,9 +67,10 @@ export async function bootTauri(): Promise<CoreInit> {
     io: new TauriVoiceIo(),
     dir: `${appData}/voice`,
     makeWorker: () => new Worker(new URL('../voice/kokoro.worker.ts', import.meta.url), { type: 'module' }),
-    system: { canSpeak, speak, cancel: cancelSpeech },
+    system: { canSpeak, speak, cancel: cancelSpeech, speaking: () => window.speechSynthesis.speaking },
     play: playPcm,
     unlock: unlockAudio,
+    log: logDebug,
   });
   return {
     deps,

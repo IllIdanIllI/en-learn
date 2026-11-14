@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Check } from 'lucide-react';
 import { t } from '@/core/i18n';
 import { DuplicateWord, insertWord, listWords, updateWord } from '@/core/db/repos/words';
@@ -35,9 +35,9 @@ export function WordForm({ word, onSaved, onCancel }: { word?: Word; onSaved: ()
   const [saving, setSaving] = useState(false);
   const { saved, markSaved, clear } = useSavedFlag();
   // The fill fields the learner typed in; an untouched blank one keeps the stored value on save.
-  const touched = useRef<Set<FillField>>(new Set());
+  const [touched, setTouched] = useState<ReadonlySet<FillField>>(new Set());
   const touching = (key: FillField, set: (v: string) => void) => (v: string) => {
-    touched.current.add(key);
+    setTouched((cur) => (cur.has(key) ? cur : new Set(cur).add(key)));
     set(v);
   };
 
@@ -62,7 +62,7 @@ export function WordForm({ word, onSaved, onCancel }: { word?: Word; onSaved: ()
     try {
       if (word) {
         const stored = (await listWords(deps.db)).find((w) => w.id === word.id);
-        await updateWord(deps.db, word.id, stored === undefined ? fields : keepUntouchedBlanks(fields, stored, touched.current));
+        await updateWord(deps.db, word.id, stored === undefined ? fields : keepUntouchedBlanks(fields, stored, touched));
         markSaved();
       } else {
         const id = await insertWord(deps.db, fields, deps.clock.now());

@@ -1,0 +1,52 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "wordOk",
+    "wordNote",
+    "errors"
+  ],
+  "properties": {
+    "wordOk": {
+      "type": "boolean"
+    },
+    "wordNote": {
+      "type": "string"
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fragment",
+          "fix",
+          "topicKey",
+          "suggestedTopic",
+          "ruleSection",
+          "explanation"
+        ],
+        "properties": {
+          "fragment": {
+            "type": "string"
+          },
+          "fix": {
+            "type": "string"
+          },
+          "topicKey": {
+            "type": "string"
+          },
+          "suggestedTopic": {
+            "type": "string"
+          },
+          "ruleSection": {
+            "type": "string"
+          },
+          "explanation": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

@@ -15,14 +15,22 @@ describe('settings repo', () => {
         grade: 'claude-sonnet-5-5',
         dispute: 'claude-sonnet-5-5',
         explain: 'claude-sonnet-5-5',
+        words: 'claude-sonnet-5-5',
+        word_check: 'claude-sonnet-5-5',
+        phonetics: 'claude-sonnet-5-5',
       },
-      efforts: { rule_draft: 'medium', rule_chat: 'medium', generate_session: 'medium', validate_session: 'medium', grade: 'high', dispute: 'medium', explain: 'medium' },
+      efforts: { rule_draft: 'medium', rule_chat: 'medium', generate_session: 'medium', validate_session: 'medium', grade: 'high', dispute: 'medium', explain: 'medium', words: 'medium', word_check: 'medium', phonetics: 'low' },
       budgetUsd: null,
       acceptedShorthands: ['✓'],
       spellingVariant: 'british',
       theme: 'dark',
       design: 'grove',
+      appIcon: 'light',
       closedSessions: [],
+      dayStartHour: 5,
+      dayOverride: null,
+      wordsExtraNew: null,
+      wordsStatsOpen: false,
     });
   });
 
@@ -46,6 +54,7 @@ describe('settings repo', () => {
     const s = await getSettings(db);
     expect(s.models.grade).toBe('m-x');
     expect(s.models.dispute).toBe('claude-sonnet-5-5');
+    expect(s.models.phonetics).toBe('claude-sonnet-5-5');
   });
 
   test('a row without efforts loads the defaults; a partial efforts object merges over them', async () => {
@@ -56,5 +65,6 @@ describe('settings repo', () => {
     const s = await getSettings(db);
     expect(s.efforts.grade).toBe('low');
     expect(s.efforts.dispute).toBe('medium');
+    expect(s.efforts.phonetics).toBe('low');
   });
 });

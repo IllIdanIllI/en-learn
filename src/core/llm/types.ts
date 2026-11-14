@@ -68,3 +68,31 @@ export interface DisputeReply {
 export interface DisputeBatchReply { replies: (DisputeReply & { ref: string })[] }
 
 export interface ExplainReply { explanation: string }
+
+export interface GeneratedWord {
+  word: string;
+  definition: string;
+  translation: string;
+  example: string;
+  synonyms: string[];
+  /** IPA between slashes. */
+  transcription: string;
+  /** English: noun, verb, adjective, adverb, phrasal verb, idiom, ... */
+  partOfSpeech: string;
+  gaps: { sentence: string; answer: string; translation: string }[];
+  collocations: { phrase: string; answer: string }[];
+  forms: { sentence: string; cue: string; answer: string }[];
+  confusables: { sentence: string; options: string[]; answer: string; reason: string }[];
+  translations: { text: string; answers: string[] }[];
+}
+
+export interface WordsReply { words: GeneratedWord[] }
+
+export interface PhoneticsReply { words: { word: string; transcription: string; partOfSpeech: string }[] }
+
+/** '' = none, as in the writing path. */
+export interface WordCheckReply {
+  wordOk: boolean;
+  wordNote: string;
+  errors: { fragment: string; fix: string; topicKey: string; suggestedTopic: string; ruleSection: string; explanation: string }[];
+}

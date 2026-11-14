@@ -59,3 +59,16 @@ describe('shell capability call shapes', () => {
     }
   }
 });
+
+describe('opener capability', () => {
+  const opener = caps.permissions.filter((p) => (typeof p === 'string' ? p : p.identifier).startsWith('opener:'));
+
+  test('opener allows https only', () => {
+    expect(opener).toEqual([{ identifier: 'opener:allow-open-url', allow: [{ url: 'https://*' }] }]);
+  });
+
+  test('no opener:default and no other opener permission', () => {
+    const ids = opener.map((p) => (typeof p === 'string' ? p : p.identifier));
+    expect(ids).toEqual(['opener:allow-open-url']);
+  });
+});

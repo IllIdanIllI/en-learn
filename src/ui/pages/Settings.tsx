@@ -4,6 +4,7 @@ import { t, type MessageKey } from '@/core/i18n';
 import type { Effort, LlmKind } from '@/core/domain';
 import { CLAUDE_LOCATIONS } from '@/core/llm/claude';
 import { MoveRefused, moveTarget } from '@/core/dataFolder';
+import { formatTitleDate } from '@/core/dates';
 import { Button } from '@/ui/components/ui/button';
 import { setSetting, type Settings as SettingsData } from '@/core/db/repos/settings';
 import { FieldInput } from '@/ui/components/ui/field-input';
@@ -13,10 +14,13 @@ import { FieldError } from '@/ui/components/FieldError';
 import { Segmented } from '@/ui/components/Segmented';
 import { useCore } from '@/ui/app/CoreProvider';
 import { Notice } from '@/ui/today/chips';
+import { DebugLogSection } from '@/ui/debug/DebugLogSection';
+import { VoiceStatusRow } from '@/ui/voice/VoiceStatusRow';
 
 const MODELS = ['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-opus-5-5'];
 const EFFORTS: Effort[] = ['low', 'medium', 'high'];
-const KINDS: LlmKind[] = ['rule_draft', 'rule_chat', 'generate_session', 'validate_session', 'grade', 'dispute', 'explain'];
+const HOURS = Array.from({ length: 13 }, (_, h) => h);
+const KINDS: LlmKind[] = ['rule_draft', 'rule_chat', 'generate_session', 'validate_session', 'grade', 'dispute', 'explain', 'words', 'word_check', 'phonetics'];
 
 function Row({ label, htmlFor, hint, children }: { label: string; htmlFor?: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -40,7 +44,7 @@ const parseBudget = (raw: string): number | null | 'invalid' => {
 };
 
 export function Settings() {
-  const { deps, lang, settings, prereq, dataDir, dataDirError, moveDataDir, refresh } = useCore();
+  const { deps, lang, settings, prereq, dataDir, dataDirError, moveDataDir, refresh, setAppIcon } = useCore();
   const [saved, setSaved] = useState(false);
   const timer = useRef<number | undefined>(undefined);
   const [budget, setBudget] = useState(settings.budgetUsd === null ? '' : String(settings.budgetUsd));
@@ -48,6 +52,7 @@ export function Settings() {
   const [failed, setFailed] = useState(false);
   const [moving, setMoving] = useState(false);
   const [moveError, setMoveError] = useState<string | null>(null);
+  const [confirmingDay, setConfirmingDay] = useState(false);
 
   const changeDataDir = async () => {
     if (!moveDataDir) return;
@@ -71,7 +76,7 @@ export function Settings() {
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
-  const save = async <K extends keyof SettingsData>(key: K, value: SettingsData[K]) => {
+  const save = async <K extends keyof SettingsData>(key: K, value: SettingsData[K]): Promise<boolean> => {
     try {
       await setSetting(deps.db, key, value);
       setFailed(false);
@@ -79,9 +84,11 @@ export function Settings() {
       setSaved(true);
       window.clearTimeout(timer.current);
       timer.current = window.setTimeout(() => setSaved(false), 2000);
+      return true;
     } catch (e) {
       console.error('setting not saved', e);
       setFailed(true);
+      return false;
     }
   };
 
@@ -91,6 +98,8 @@ export function Settings() {
     setBudgetInvalid(parsed === 'invalid');
     if (parsed !== 'invalid') void save('budgetUsd', parsed);
   };
+
+  const canStartNewDay = deps.clock.canStartNewDay();
 
   const claude = prereq === null
     ? t(lang, 'settings.claudeUnchecked')
@@ -151,6 +160,51 @@ export function Settings() {
             onChange={(v) => void save('design', v)}
           />
         </Row>
+        <Row label={t(lang, 'settings.dayStart')} htmlFor="settings-day-start" hint={t(lang, 'settings.dayStartHint')}>
+          <Select
+            id="settings-day-start"
+            value={String(settings.dayStartHour)}
+            onValueChange={(v) => void save('dayStartHour', Number(v))}
+            options={HOURS.map((h) => ({ value: String(h), label: `${String(h).padStart(2, '0')}:00` }))}
+            className="w-28"
+          />
+        </Row>
+        {settings.dayStartHour > 0 && (
+          <Row label={t(lang, 'settings.newDay')} hint={canStartNewDay ? undefined : t(lang, 'settings.newDay.started')}>
+            {confirmingDay ? (
+              <span className="flex items-center gap-2 pt-1 text-sm">
+                {t(lang, 'settings.newDay.confirm', { date: formatTitleDate(deps.clock.calendarDate(), lang) })}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setConfirmingDay(false);
+                    void save('dayOverride', deps.clock.calendarDate());
+                  }}
+                >
+                  {t(lang, 'settings.newDay.yes')}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setConfirmingDay(false)}>{t(lang, 'settings.newDay.no')}</Button>
+              </span>
+            ) : (
+              <Button variant="secondary" disabled={!canStartNewDay} onClick={() => setConfirmingDay(true)}>
+                {t(lang, 'settings.newDay')}
+              </Button>
+            )}
+          </Row>
+        )}
+        {setAppIcon && (
+          <Row label={t(lang, 'settings.appIcon')} hint={t(lang, 'settings.appIconHint')}>
+            <Segmented
+              label={t(lang, 'settings.appIcon')}
+              value={settings.appIcon}
+              options={(['light', 'night'] as const).map((v) => ({ value: v, label: t(lang, `settings.appIcon.${v}` as MessageKey) }))}
+              onChange={(v) =>
+                void save('appIcon', v).then((ok) => (ok ? setAppIcon(v === 'night') : undefined)).catch((e: unknown) => console.error('app icon not changed', e))
+              }
+            />
+          </Row>
+        )}
         <Row label={t(lang, 'settings.budget')} htmlFor="settings-budget" hint={t(lang, 'settings.budgetHint')}>
           <FieldInput
             id="settings-budget"
@@ -219,6 +273,12 @@ export function Settings() {
           {t(lang, 'page.setup')}
         </Link>
       </p>
+      <div className="mt-10">
+        <Row label={t(lang, 'settings.voice')}>
+          <VoiceStatusRow />
+        </Row>
+      </div>
+      <DebugLogSection />
     </>
   );
 }

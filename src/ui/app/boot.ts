@@ -4,10 +4,27 @@ import { loadSeed } from '@/core/programme/setup';
 import { checkPrerequisites } from '@/core/prereq';
 import type { Deps, Llm } from '@/core/ports';
 import type { CoreInit } from './CoreProvider';
+import { canSpeak, cancelSpeech, speak } from '@/ui/words/speech';
+import { logDebug } from '@/ui/debug/debugLog';
+
+declare global {
+  interface Window {
+    /** Preview only: the last value passed to `setAppIcon`, for tests. */
+    __appIcon?: boolean;
+  }
+}
 
 /** Real app: Tauri adapters, SQLite file, the installed `claude` CLI. */
 export async function bootTauri(): Promise<CoreInit> {
-  const [{ appDataDir, appConfigDir, homeDir }, { openTauriDb }, { readDataDir, moveDataDir }, { ensureCliDir }, { TauriClock }, { TauriProcessRunner }, { TauriPromptStore }, { ClaudeCli }] =
+  let version = 'unknown';
+  try {
+    const { getVersion } = await import('@tauri-apps/api/app');
+    version = await getVersion();
+  } catch {
+    // The version is only for the debug log; boot goes on without it.
+  }
+  logDebug('run', `tauri ${version} ${navigator.userAgent}`);
+  const [{ appDataDir, appConfigDir, homeDir }, { openTauriDb }, { readDataDir, moveDataDir }, { ensureCliDir }, { TauriClock }, { TauriProcessRunner }, { TauriPromptStore }, { ClaudeCli }, { openUrl }, { invoke }, { TauriNet }] =
     await Promise.all([
       import('@tauri-apps/api/path'),
       import('@/adapters/tauri/db'),
@@ -17,6 +34,9 @@ export async function bootTauri(): Promise<CoreInit> {
       import('@/adapters/tauri/processRunner'),
       import('@/adapters/tauri/promptStore'),
       import('@/adapters/tauri/claudeCli'),
+      import('@tauri-apps/plugin-opener'),
+      import('@tauri-apps/api/core'),
+      import('@/adapters/tauri/net'),
     ]);
   const [appData, appConfig, home] = await Promise.all([appDataDir(), appConfigDir(), homeDir()]);
   let custom: string | null = null;
@@ -30,6 +50,7 @@ export async function bootTauri(): Promise<CoreInit> {
   const db = await openTauriDb(custom);
   await startApp({ db });
 
+  const settings = await getSettings(db);
   const cliDir = await ensureCliDir(appData);
   const runner = new TauriProcessRunner();
   const prereq = await checkPrerequisites(runner);
@@ -38,12 +59,25 @@ export async function bootTauri(): Promise<CoreInit> {
     ? new ClaudeCli(runner, prereq.location, cliDir, home)
     : { call: () => Promise.reject(new Error('claude is not available')) };
   const clock = new TauriClock();
-  const deps: Deps = { db, llm, clock, prompts: new TauriPromptStore(dataDir) };
+  clock.configure({ dayStartHour: settings.dayStartHour, overrideDate: settings.dayOverride });
+  const deps: Deps = { db, llm, clock, prompts: new TauriPromptStore(dataDir), net: new TauriNet() };
+  const [{ createKokoroEngine, playPcm, unlockAudio }, { TauriVoiceIo }] = await Promise.all([import('@/ui/voice/engine'), import('@/ui/voice/io')]);
+  // The model lives in the app data folder, not the chosen data folder: it is a download, not user data.
+  const voice = createKokoroEngine({
+    io: new TauriVoiceIo(),
+    dir: `${appData}/voice`,
+    makeWorker: () => new Worker(new URL('../voice/kokoro.worker.ts', import.meta.url), { type: 'module' }),
+    system: { canSpeak, speak, cancel: cancelSpeech, speaking: () => window.speechSynthesis.speaking },
+    play: playPcm,
+    unlock: unlockAudio,
+    log: logDebug,
+  });
   return {
     deps,
     runner,
     prereq,
-    settings: await getSettings(db),
+    settings,
+    voice,
     loadSeedInput: () => {
       try {
         return loadSeed(clock.today());
@@ -56,21 +90,33 @@ export async function bootTauri(): Promise<CoreInit> {
     moveDataDir: (target) => moveDataDir({ appDataDir: appData, appConfigDir: appConfig, home, custom }, target, () => db.close()),
     reopenDb: () => openTauriDb(custom),
     makeLlm: (location) => new ClaudeCli(runner, location, cliDir, home),
+    openUrl: (url) => openUrl(url),
+    ...(navigator.userAgent.includes('Mac') ? { setAppIcon: (night: boolean) => invoke<void>('set_app_icon', { night }) } : {}),
   };
 }
 
 /** Browser preview: sql.js, canned LLM, fixed clock; `?state=` picks the fixture. */
 export async function bootPreview(search: string): Promise<CoreInit> {
-  const { buildPreview, parsePreviewState, parsePreviewDelay, parsePreviewFail, withDelay, withFailure } = await import('@/adapters/preview/fixtures');
+  logDebug('run', `preview ${navigator.userAgent}`);
+  const { buildPreview, parsePreviewState, parsePreviewDelay, parsePreviewEarly, parsePreviewFail, withDelay, withFailure } = await import('@/adapters/preview/fixtures');
   const { MINI_PROGRAMME, MINI_RULES } = await import('@/adapters/preview/miniSeed');
-  const core = await buildPreview(parsePreviewState(search));
-  const deps = { ...core.deps, llm: withFailure(withDelay(core.deps.llm, parsePreviewDelay(search)), parsePreviewFail(search)) };
+  const core = await buildPreview(parsePreviewState(search), { early: parsePreviewEarly(search) });
+  const settings = await getSettings(core.deps.db);
+  core.deps.clock.configure({ dayStartHour: settings.dayStartHour, overrideDate: settings.dayOverride });
+  const { previewNet } = await import('@/adapters/preview/previewNet');
+  const { previewVoice } = await import('@/ui/voice/previewEngine');
+  const deps = { ...core.deps, llm: withFailure(withDelay(core.deps.llm, parsePreviewDelay(search)), parsePreviewFail(search)), net: previewNet };
   return {
     ...core,
     deps,
-    settings: await getSettings(core.deps.db),
+    settings,
+    voice: previewVoice(search),
     loadSeedInput: () => ({ programme: MINI_PROGRAMME, rules: MINI_RULES }),
     dataDir: '~/Library/Application Support/English Exam Coach',
+    setAppIcon: (night) => {
+      window.__appIcon = night;
+      return Promise.resolve();
+    },
   };
 }
 

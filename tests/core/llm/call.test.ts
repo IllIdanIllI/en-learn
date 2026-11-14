@@ -93,9 +93,9 @@ describe('callStructured', () => {
     const llm = new FakeLlm({ grade: [good({ word: 'a' })], generate_session: [good({ word: 'a' })] });
     const deps = await setup(llm);
     await setSetting(deps.db, 'models', {
-      rule_draft: 'm-r', rule_chat: 'm-c', generate_session: 'm-g', validate_session: 'm-v', grade: 'm-grade', dispute: 'm-d', explain: 'm-e',
+      rule_draft: 'm-r', rule_chat: 'm-c', generate_session: 'm-g', validate_session: 'm-v', grade: 'm-grade', dispute: 'm-d', explain: 'm-e', words: 'm-w', word_check: 'm-wc', phonetics: 'm-p',
     });
-    await setSetting(deps.db, 'efforts', { rule_draft: 'low', rule_chat: 'low', generate_session: 'low', validate_session: 'low', grade: 'medium', dispute: 'low', explain: 'low' });
+    await setSetting(deps.db, 'efforts', { rule_draft: 'low', rule_chat: 'low', generate_session: 'low', validate_session: 'low', grade: 'medium', dispute: 'low', explain: 'low', words: 'low', word_check: 'low', phonetics: 'low' });
     await setSetting(deps.db, 'budgetUsd', 0.5);
     await callStructured(deps, 'grade', 'p', { sessionId: undefined });
     await callStructured(deps, 'generate_session', 'p');
@@ -110,6 +110,20 @@ describe('callStructured', () => {
     expect((await rows(deps))[0]!.model).toBe('m-grade');
   });
 
+  test('words gets the long timeout and {{spellingVariant}} is replaced', async () => {
+    const llm = new FakeLlm({ words: [good({ word: 'a' })] });
+    const deps = await setup(llm);
+    deps.prompts = { load: async () => ({ system: 'Use {{spellingVariant}} spelling.', schema }) };
+    await callStructured(deps, 'words', 'p');
+    expect(llm.calls[0]!.timeoutMs).toBe(300000);
+    expect(llm.calls[0]!.systemPrompt).toBe(`${COMMON_RULES}\n\nUse British spelling.`);
+    await setSetting(deps.db, 'spellingVariant', 'american');
+    const llm2 = new FakeLlm({ words: [good({ word: 'a' })] });
+    deps.llm = llm2;
+    await callStructured(deps, 'words', 'p');
+    expect(llm2.calls[0]!.systemPrompt).toBe(`${COMMON_RULES}\n\nUse American spelling.`);
+  });
+
   test('English native language is applied', async () => {
     const llm = new FakeLlm({ dispute: [good({ word: 'a' })] });
     const deps = await setup(llm);
@@ -120,7 +134,7 @@ describe('callStructured', () => {
 });
 
 test('every kind starts its system prompt with the common rules', async () => {
-  const kinds = ['rule_draft', 'rule_chat', 'generate_session', 'validate_session', 'grade', 'dispute', 'explain'] as const;
+  const kinds = ['rule_draft', 'rule_chat', 'generate_session', 'validate_session', 'grade', 'dispute', 'explain', 'words', 'word_check', 'phonetics'] as const;
   const llm = new FakeLlm(Object.fromEntries(kinds.map((k) => [k, [good({ word: 'a' })]])));
   const deps = await setup(llm);
   for (const k of kinds) await callStructured(deps, k, 'p');

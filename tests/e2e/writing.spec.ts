@@ -80,9 +80,9 @@ test.describe('writing page, rate chart and error bank "Other"', () => {
   test('sidebar: Письмо sits after Банк ошибок', async ({ page }) => {
     await page.goto('/?state=writing-graded#/today');
     const links = page.getByRole('navigation').getByRole('link');
-    await expect(links).toHaveCount(6);
+    await expect(links).toHaveCount(7);
     const names = await links.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
-    expect(names).toEqual(['Сегодня', 'Прогресс', 'Правила', 'Банк ошибок', 'Письмо', 'Настройки']);
+    expect(names).toEqual(['Сегодня', 'Прогресс', 'Правила', 'Банк ошибок', 'Письмо', 'Слова', 'Настройки']);
   });
 
   test('a checked text is listed with its rate; the row expands to the underlined text, read-only', async ({ page }) => {

@@ -6,7 +6,9 @@ import type { PrereqResult } from '@/core/prereq';
 import { recheck } from './recheck';
 import type { ClaudeLocation } from '@/core/llm/claude';
 import type { ProgrammeInput, SeedRule } from '@/core/programme/setup';
+import { useDayWatch } from './useDayWatch';
 import { getSettings, type Settings } from '@/core/db/repos/settings';
+import type { VoiceEngine } from '@/ui/voice/engine';
 
 export interface SeedBundle { programme: ProgrammeInput; rules: SeedRule[] }
 
@@ -28,6 +30,12 @@ export interface CoreInit {
   reopenDb?: () => Promise<Db>;
   /** Builds the real Llm once a `claude` location works; absent in preview, where a recheck changes nothing. */
   makeLlm?: (location: ClaudeLocation) => Llm;
+  /** Opens an https URL in the system browser; absent in preview, where the anchor works normally. */
+  openUrl?: (url: string) => Promise<void>;
+  /** Swaps the Dock icon (Night when true); present only on macOS in the real app and in preview. */
+  setAppIcon?: (night: boolean) => Promise<void>;
+  /** The Kokoro voice (Tauri) or the preview voice; null leaves only the system voice. */
+  voice?: VoiceEngine | null;
 }
 
 export interface Core {
@@ -48,6 +56,10 @@ export interface Core {
   /** Re-reads settings and bumps `version`; pages that load data depend on `version`. */
   refresh(): void;
   version: number;
+  openUrl?: (url: string) => Promise<void>;
+  setAppIcon?: (night: boolean) => Promise<void>;
+  /** The voice engine, or null when only the system voice is used. */
+  voice: VoiceEngine | null;
 }
 
 const CoreContext = createContext<Core | null>(null);
@@ -82,7 +94,7 @@ function useTheme(theme: Settings['theme']): boolean {
 }
 
 export function CoreProvider({ init, children }: { init: CoreInit; children: ReactNode }) {
-  const { runner, loadSeedInput, dataDir, dataDirError, makeLlm } = init;
+  const { runner, loadSeedInput, dataDir, dataDirError, makeLlm, openUrl, setAppIcon, voice = null } = init;
   const [deps, setDeps] = useState(init.deps);
   const [prereq, setPrereq] = useState(init.prereq);
   const [settings, setSettings] = useState(init.settings);
@@ -91,12 +103,15 @@ export function CoreProvider({ init, children }: { init: CoreInit; children: Rea
   const refresh = useCallback(() => {
     getSettings(deps.db).then(
       (s) => {
+        deps.clock.configure({ dayStartHour: s.dayStartHour, overrideDate: s.dayOverride });
         setSettings(s);
         setVersion((v) => v + 1);
       },
       (e: unknown) => console.error('refresh failed', e),
     );
   }, [deps]);
+
+  useDayWatch(deps.clock, refresh);
 
   const recheckPrerequisites = useCallback(async () => {
     if (!makeLlm) return prereq;
@@ -138,9 +153,9 @@ export function CoreProvider({ init, children }: { init: CoreInit; children: Rea
 
   const value = useMemo<Core>(
     () => ({
-      deps, runner, lang: settings.nativeLanguage, settings, isDark, prereq, loadSeedInput, dataDir, dataDirError, moveDataDir, recheckPrerequisites, refresh, version,
+      deps, runner, lang: settings.nativeLanguage, settings, isDark, prereq, loadSeedInput, dataDir, dataDirError, moveDataDir, recheckPrerequisites, refresh, version, openUrl, setAppIcon, voice,
     }),
-    [deps, runner, settings, isDark, prereq, loadSeedInput, dataDir, dataDirError, moveDataDir, recheckPrerequisites, refresh, version],
+    [deps, runner, settings, isDark, prereq, loadSeedInput, dataDir, dataDirError, moveDataDir, recheckPrerequisites, refresh, version, openUrl, setAppIcon, voice],
   );
   return <CoreContext.Provider value={value}>{children}</CoreContext.Provider>;
 }

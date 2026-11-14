@@ -1,7 +1,7 @@
 import type { Llm, LlmRequest, LlmResult } from '@/core/ports';
 import { MINI_RULES } from './miniSeed';
 import type {
-  DisputeBatchReply, ExplainReply, GeneratedBlock, GeneratedItem, GeneratedParagraph, GeneratedSession, GradeResult, RuleChatReply, RuleDraft, ValidationResult,
+  DisputeBatchReply, ExplainReply, GeneratedBlock, GeneratedItem, GeneratedParagraph, GeneratedSession, GradeResult, PhoneticsReply, RuleChatReply, RuleDraft, ValidationResult, WordCheckReply, WordsReply,
 } from '@/core/llm/types';
 
 /** Canned, valid model outputs for preview mode. They are derived from the request text so they pass the code checks. */
@@ -376,6 +376,49 @@ const dispute = (userPrompt: string): DisputeBatchReply => ({
   })),
 });
 
+const phonetics = (userPrompt: string): PhoneticsReply => ({
+  words: [...userPrompt.matchAll(/^### (.+)$/gm)].map((m) => ({ word: m[1]!, transcription: `/${m[1]}/`, partOfSpeech: 'noun' })),
+});
+
+const words = (userPrompt: string): WordsReply => ({
+  words: [...userPrompt.matchAll(/^### (.+)$/gm)].map((m) => {
+    const w = m[1]!;
+    return {
+      word: w,
+      definition: `a short definition of ${w}`,
+      translation: 'перевод',
+      example: `I use ${w} in an example.`,
+      synonyms: ['alternative', 'similar'],
+      transcription: `/${w}/`,
+      partOfSpeech: 'noun',
+      gaps: [
+        { sentence: 'I like ___ a lot.', answer: w, translation: 'Мне это очень нравится.' },
+        { sentence: 'We talked about ___ yesterday.', answer: w, translation: 'Вчера мы говорили об этом.' },
+        { sentence: 'She could not forget ___.', answer: w, translation: 'Она не могла этого забыть.' },
+      ],
+      collocations: [{ phrase: 'a good ___', answer: w }, { phrase: 'the main ___', answer: w }],
+      forms: [],
+      confusables: [],
+      translations: [
+        { text: 'Это слово мне нравится.', answers: [`I like the word ${w}.`, `I like this word, ${w}.`] },
+        { text: 'Мы часто используем это слово.', answers: [`We often use ${w}.`, `We often use the word ${w}.`] },
+      ],
+    };
+  }),
+});
+
+const wordCheck = (userPrompt: string): WordCheckReply => {
+  const sentence = /^Learner sentence:\n(.*)$/m.exec(userPrompt)?.[1] ?? '';
+  const first = sentence.split(/\s+/).filter((x) => x !== '');
+  return {
+    wordOk: true,
+    wordNote: 'Слово употреблено верно.',
+    errors: first.length >= 3
+      ? [{ fragment: first[0]!, fix: first[0]!, topicKey: '', suggestedTopic: 'word choice', ruleSection: '', explanation: 'Пример замечания в режиме предпросмотра.' }]
+      : [],
+  };
+};
+
 /** Shaped like the CLI's JSON envelope so the Progress details show real numbers. */
 const envelope = (data: unknown, sessionId?: string) => ({
   ...(sessionId ? { session_id: sessionId } : {}),
@@ -396,6 +439,9 @@ export const previewLlm: Llm = {
       case 'rule_chat': ({ reply: data, sessionId } = ruleChat(req.userPrompt, req.resume ?? null)); break;
       case 'dispute': data = dispute(req.userPrompt); break;
       case 'explain': data = { explanation: 'Перед гласным звуком нужен артикль an: an old friend.' } satisfies ExplainReply; break;
+      case 'words': data = words(req.userPrompt); break;
+      case 'word_check': data = wordCheck(req.userPrompt); break;
+      case 'phonetics': data = phonetics(req.userPrompt); break;
     }
     return { ok: true, data, costUsd: 0, durationMs: 5, raw: JSON.stringify(envelope(data, sessionId)), ...(sessionId ? { sessionId } : {}) };
   },

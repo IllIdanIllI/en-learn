@@ -8,7 +8,7 @@ test('shell renders sidebar', async ({ page }) => {
   for (const label of ['Сегодня', 'Прогресс', 'Правила', 'Банк ошибок', 'Настройки']) {
     await expect(nav.getByText(label)).toBeVisible();
   }
-  await expect(nav.getByRole('link')).toHaveCount(6);
+  await expect(nav.getByRole('link')).toHaveCount(7);
   await page.screenshot({ path: `${SHOTS}/shell-no_session.png` });
 });
 
@@ -16,7 +16,7 @@ test('shell collapses to icons below 1100px', async ({ page }) => {
   await page.setViewportSize({ width: 1000, height: 700 });
   await page.goto('/#/today');
   const nav = page.getByRole('navigation');
-  await expect(nav.getByRole('link')).toHaveCount(6);
+  await expect(nav.getByRole('link')).toHaveCount(7);
   await expect(nav.getByText('Сегодня')).toBeHidden();
   expect((await nav.boundingBox())?.width).toBe(56);
   await page.screenshot({ path: `${SHOTS}/shell-collapsed.png` });
@@ -63,7 +63,7 @@ test('settings page', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 1100 });
   await page.goto('/?state=no_session#/settings');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  await expect(page.locator('button[data-model-kind]')).toHaveCount(7);
+  await expect(page.locator('button[data-model-kind]')).toHaveCount(10);
   await expect(page.locator('#settings-budget')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Настройка программы' })).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/settings.png` });
@@ -103,7 +103,7 @@ test('settings changes save immediately', async ({ page }) => {
 
 test('an effort select saves', async ({ page }) => {
   await page.goto('/?state=no_session#/settings');
-  await expect(page.locator('button[data-effort-kind]')).toHaveCount(7);
+  await expect(page.locator('button[data-effort-kind]')).toHaveCount(10);
   const trigger = page.locator('#effort-grade');
   await expect(trigger).toHaveText('Высокое');
   await trigger.click();

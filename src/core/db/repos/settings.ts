@@ -1,5 +1,5 @@
 import type { Db } from '@/core/ports';
-import type { Effort, LlmKind } from '@/core/domain';
+import type { Effort, ISODate, LlmKind } from '@/core/domain';
 
 export interface Settings {
   nativeLanguage: 'ru' | 'en';
@@ -10,8 +10,18 @@ export interface Settings {
   spellingVariant: 'british' | 'american';
   theme: 'dark' | 'light' | 'system';
   design: 'grove' | 'lamp';
+  /** Dock icon on macOS while the app runs; the bundled icon is always Light. */
+  appIcon: 'light' | 'night';
   /** Ids of sessions the learner closed; the last 30 are kept. */
   closedSessions: number[];
+  /** Whole hours 0-12: the app's day starts at this local hour. */
+  dayStartHour: number;
+  /** Calendar date set by "Start a new day"; null when unset. */
+  dayOverride: ISODate | null;
+  /** Extra new words the learner added for one date; ignored on other dates. */
+  wordsExtraNew: { date: ISODate; extra: number } | null;
+  /** The Words page's details panel is open. */
+  wordsStatsOpen: boolean;
 }
 
 const DEFAULT_MODEL = 'claude-sonnet-5-5';
@@ -26,6 +36,9 @@ export const DEFAULT_SETTINGS: Settings = {
     grade: DEFAULT_MODEL,
     dispute: DEFAULT_MODEL,
     explain: DEFAULT_MODEL,
+    words: DEFAULT_MODEL,
+    word_check: DEFAULT_MODEL,
+    phonetics: DEFAULT_MODEL,
   },
   efforts: {
     rule_draft: 'medium',
@@ -35,13 +48,21 @@ export const DEFAULT_SETTINGS: Settings = {
     grade: 'high',
     dispute: 'medium',
     explain: 'medium',
+    words: 'medium',
+    word_check: 'medium',
+    phonetics: 'low',
   },
   budgetUsd: null,
   acceptedShorthands: ['✓'],
   spellingVariant: 'british',
   theme: 'dark',
   design: 'grove',
+  appIcon: 'light',
   closedSessions: [],
+  dayStartHour: 5,
+  dayOverride: null,
+  wordsExtraNew: null,
+  wordsStatsOpen: false,
 };
 
 export async function getSettings(db: Db): Promise<Settings> {

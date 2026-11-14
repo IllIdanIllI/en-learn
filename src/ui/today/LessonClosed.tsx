@@ -11,9 +11,11 @@ import { Loader, type LoaderView } from './Loader';
 const NONE: AddRound = { review: false, formats: [], spelling: false, writing: false, rewrite: false };
 
 /** Today after the lesson is closed: what the learner can do next. */
-export function LessonClosed({ lang, sessionId, loader, showingResults, onToggleResults, onAdd, children }: {
+export function LessonClosed({ lang, sessionId, loader, showingResults, onToggleResults, onAdd, afterHeader, children }: {
   lang: Lang; sessionId: number; loader: LoaderView | null; showingResults: boolean; onToggleResults: () => void; onAdd: (round: AddRound) => void;
   /** Extra actions in the card, e.g. solving skipped questions. */
+  /** Rendered right under the heading. */
+  afterHeader?: ReactNode;
   children?: ReactNode;
 }) {
   const { deps } = useCore();
@@ -54,6 +56,7 @@ export function LessonClosed({ lang, sessionId, loader, showingResults, onToggle
   return (
     <section>
       <h1 className="headline">{t(lang, 'today.closed')}</h1>
+      {afterHeader}
       <div className="mt-6 flex items-center gap-3">
         <Button variant="secondary" aria-expanded={showingResults} disabled={adding} onClick={onToggleResults}>
           {t(lang, showingResults ? 'today.hideResults' : 'today.showResults')}

@@ -14,6 +14,12 @@ import disputeSchema from '../../../prompts/dispute.schema.json';
 import commonMd from '../../../prompts/common.md?raw';
 import explainMd from '../../../prompts/explain.md?raw';
 import explainSchema from '../../../prompts/explain.schema.json';
+import wordsMd from '../../../prompts/words.md?raw';
+import wordsSchema from '../../../prompts/words.schema.json';
+import wordCheckMd from '../../../prompts/word_check.md?raw';
+import wordCheckSchema from '../../../prompts/word_check.schema.json';
+import phoneticsMd from '../../../prompts/phonetics.md?raw';
+import phoneticsSchema from '../../../prompts/phonetics.schema.json';
 
 /** Shared rules put before every system prompt (the app's calls run with --safe-mode, so no CLAUDE.md applies). */
 export const COMMON_RULES = commonMd.trim();
@@ -29,4 +35,7 @@ export const bundledPrompts: Record<LlmKind, PromptFiles> = {
   grade: { system: gradeMd, schema: gradeSchema },
   dispute: { system: disputeMd, schema: disputeSchema },
   explain: { system: explainMd, schema: explainSchema },
+  words: { system: wordsMd, schema: wordsSchema },
+  word_check: { system: wordCheckMd, schema: wordCheckSchema },
+  phonetics: { system: phoneticsMd, schema: phoneticsSchema },
 };

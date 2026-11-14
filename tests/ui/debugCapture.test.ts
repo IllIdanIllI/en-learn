@@ -40,11 +40,11 @@ function fakeElement(win: Window & typeof globalThis, over: { tag: string; label
 
 describe('describeClick', () => {
   test('pins the line format, label before text, sidebar and dialog flags', () => {
-    expect(describeClick({ tag: 'A', label: 'Слова', text: 'Слова', inSidebar: true }, 'auto', false)).toBe('click a "Слова" sidebar body=auto dialog=no');
+    expect(describeClick({ tag: 'A', label: 'Слова', text: 'Слова', inSidebar: true }, 'auto', false)).toBe('a "Слова" sidebar body=auto dialog=no');
   });
 
   test('uses the text when there is no label, cut to 30 characters', () => {
-    expect(describeClick({ tag: 'BUTTON', label: null, text: 'a'.repeat(40), inSidebar: false }, 'none', true)).toBe(`click button "${'a'.repeat(30)}" body=none dialog=yes`);
+    expect(describeClick({ tag: 'BUTTON', label: null, text: 'a'.repeat(40), inSidebar: false }, 'none', true)).toBe(`button "${'a'.repeat(30)}" body=none dialog=yes`);
   });
 });
 
@@ -82,9 +82,9 @@ describe('click capture', () => {
     const { win, log } = withDom();
     const el = fakeElement(win, { tag: 'A', label: 'Слова', text: 'Слова', inNav: true });
     fire(win, 'pointerdown', el);
-    expect(log).toHaveBeenLastCalledWith('click', 'click a "Слова" sidebar body=auto dialog=no');
+    expect(log).toHaveBeenLastCalledWith('click', 'a "Слова" sidebar body=auto dialog=no');
     fire(win, 'click', el);
-    expect(log).toHaveBeenLastCalledWith('click-done', 'click a "Слова" sidebar body=auto dialog=no');
+    expect(log).toHaveBeenLastCalledWith('click-done', 'a "Слова" sidebar body=auto dialog=no');
   });
 
   test('a click outside the sidebar logs only on pointerdown', () => {

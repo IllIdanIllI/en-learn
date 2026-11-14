@@ -226,7 +226,7 @@ Y. **Debug tools (round 7).**
       Expected: the Web Inspector opens, and its Console shows no Content Security Policy errors.
    3. Action: Settings, Debug log: press Copy, Show, Clear.
       Expected: Copy shows "Скопировано"; Show lists the log with `--- this run ---`; Clear makes the count `Записей: 0`.
-   4. Action: on Today, press Cmd+Shift+L.
+   4. Action: on Today, press Cmd+Option+L.
       Expected: the toast "Журнал скопирован" appears.
    5. Action: quit and start the app again, then Settings, Debug log, Show.
       Expected: the log starts with `--- previous run ---`.

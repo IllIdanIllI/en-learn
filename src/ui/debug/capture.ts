@@ -5,10 +5,10 @@ export interface ClickTarget {
   inSidebar: boolean;
 }
 
-/** One line for a click: what was hit, whether it is in the sidebar, the body's pointer-events and whether a dialog is open. */
+/** One line for a click (logged as kind `click`): what was hit, whether it is in the sidebar, the body's pointer-events and whether a dialog is open. */
 export function describeClick(target: ClickTarget, bodyPointerEvents: string, dialogOpen: boolean): string {
   const name = (target.label || target.text).replace(/\s+/g, ' ').trim().slice(0, 30);
-  return `click ${target.tag.toLowerCase()} "${name}"${target.inSidebar ? ' sidebar' : ''} body=${bodyPointerEvents} dialog=${dialogOpen ? 'yes' : 'no'}`;
+  return `${target.tag.toLowerCase()} "${name}"${target.inSidebar ? ' sidebar' : ''} body=${bodyPointerEvents} dialog=${dialogOpen ? 'yes' : 'no'}`;
 }
 
 /** Reports a stall when a 100 ms tick comes more than 200 ms late. */

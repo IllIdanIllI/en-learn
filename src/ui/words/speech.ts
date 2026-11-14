@@ -1,4 +1,5 @@
 import { logDebug } from '@/ui/debug/debugLog';
+import { chooseSystemVoice } from '@/ui/words/systemVoice';
 
 export type SpellingVariant = 'en-GB' | 'en-US';
 
@@ -18,9 +19,7 @@ export function speak(text: string, variant: SpellingVariant): void {
   synth.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = variant;
-  // Tags are compared normalised: `en_GB` (macOS) matches `en-GB`, and the case does not matter.
-  const tag = (lang: string) => lang.replace('_', '-').toLowerCase();
-  const voice = synth.getVoices().find((v) => tag(v.lang).startsWith(tag(variant)));
+  const voice = chooseSystemVoice(synth.getVoices(), variant);
   if (voice) utterance.voice = voice;
   logDebug('voice', voice ? `system "${text}" ${variant} voice=${voice.name} (${voice.lang})` : `system "${text}" ${variant} voice=default`);
   synth.speak(utterance);

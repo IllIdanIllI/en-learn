@@ -24,10 +24,10 @@ test('Copy puts the log on the clipboard and shows Скопировано', asyn
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('--- this run ---');
 });
 
-test('Cmd+Shift+L on Today copies the log and shows a toast', async ({ page, context }) => {
+test('Cmd+Option+L (Ctrl+Alt+L here) on Today copies the log and shows a toast', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('/?state=words#/today');
   await page.locator('main').waitFor();
-  await page.keyboard.press('ControlOrMeta+Shift+L');
+  await page.keyboard.press('Control+Alt+KeyL');
   await expect(page.getByText('Журнал скопирован')).toBeVisible();
 });

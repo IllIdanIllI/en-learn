@@ -13,14 +13,13 @@ export async function copyText(text: string): Promise<boolean> {
   }
 }
 
-/** Cmd+Shift+L on macOS, Ctrl+Shift+L elsewhere; Alt makes it another shortcut, and a held key does not repeat it. */
+/** Cmd+Option+L on macOS, Ctrl+Alt+L elsewhere; Shift makes it another shortcut, and a held key does not repeat it. Matches `code`, since Option changes `key` on the Mac. */
 export function isCopyLogShortcut(
-  e: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'shiftKey' | 'altKey'> & { repeat?: boolean },
+  e: Pick<KeyboardEvent, 'code' | 'key' | 'metaKey' | 'ctrlKey' | 'shiftKey' | 'altKey'> & { repeat?: boolean },
   mac: boolean,
 ): boolean {
-  if (e.repeat) return false;
-  if (e.key.toLowerCase() !== 'l' || !e.shiftKey || e.altKey) return false;
-  return mac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
+  if (e.repeat || e.code !== 'KeyL' || e.shiftKey) return false;
+  return mac ? e.metaKey && e.altKey && !e.ctrlKey : e.ctrlKey && e.altKey && !e.metaKey;
 }
 
 /** Copies the debug log from anywhere in the app, also while a text field has focus. */

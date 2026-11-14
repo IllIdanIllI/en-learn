@@ -237,3 +237,16 @@ Y. **Debug tools (round 7).**
    8. Action: copy the log before using the app for long or restarting twice.
       Expected: a second restart replaces the previous run, so the earlier one is gone.
    If it fails: record the notice text, the Console error and the Settings screenshot.
+
+## Words: voice status (round 8)
+
+Z. **Settings voice row.**
+   1. Action: start the app with an empty voice folder, open Settings, and press a speaker on a word.
+      Expected: the Settings row "Голос" shows "Загрузка: N%" while the files download, then "Запускается", then "Готов".
+   2. Action: copy the debug log (Settings, Debug log, Copy) after that press.
+      Expected: the `load` and `worker` step lines run up to `ready`, with no time-out line.
+   3. Action: in a run where the voice does not start within 20 s, open Settings.
+      Expected: the row shows "Не работает: start timed out after 20 s at: <step>. Звучит системный голос." and a "Повторить" button. Pressing it shows "Запускается", then "Готов".
+   4. Action: read the "Системный голос:" line, then switch Settings, spelling variant, to American.
+      Expected: the line names an American voice (en-US), or "по умолчанию" when none matches.
+   If it fails: record the row text, the debug log tail and a Settings screenshot.

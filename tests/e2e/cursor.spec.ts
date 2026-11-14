@@ -64,6 +64,13 @@ test('pointer cursor: Retry of a failed transcription fill', async ({ page }) =>
   expect(await retry.evaluate((el) => getComputedStyle(el).cursor)).toBe('pointer');
 });
 
+test('pointer cursor: Retry of a failed voice start in Settings', async ({ page }) => {
+  await page.goto('/?voice=failed#/settings');
+  const retry = page.getByRole('button', { name: 'Повторить', exact: true });
+  await retry.waitFor();
+  expect(await retry.evaluate((el) => getComputedStyle(el).cursor)).toBe('pointer');
+});
+
 test('pointer cursor: anagram tiles, a placed letter and Skip', async ({ page }) => {
   await page.goto('/?state=words#/words/practice?mode=review');
   const card = page.locator('[data-card-type]');

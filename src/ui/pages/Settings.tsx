@@ -15,6 +15,7 @@ import { Segmented } from '@/ui/components/Segmented';
 import { useCore } from '@/ui/app/CoreProvider';
 import { Notice } from '@/ui/today/chips';
 import { DebugLogSection } from '@/ui/debug/DebugLogSection';
+import { VoiceStatusRow } from '@/ui/voice/VoiceStatusRow';
 
 const MODELS = ['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-opus-5-5'];
 const EFFORTS: Effort[] = ['low', 'medium', 'high'];
@@ -272,6 +273,11 @@ export function Settings() {
           {t(lang, 'page.setup')}
         </Link>
       </p>
+      <div className="mt-10">
+        <Row label={t(lang, 'settings.voice')}>
+          <VoiceStatusRow />
+        </Row>
+      </div>
       <DebugLogSection />
     </>
   );

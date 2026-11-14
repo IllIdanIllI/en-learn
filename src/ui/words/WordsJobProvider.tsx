@@ -130,11 +130,11 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
       // A generation started meanwhile (for example by the name fix) goes first; its end starts the fill again.
       if (looping.current) return;
       const plan = planFill(await listWords(depsRef.current.db), skip.current, { lang: langRef.current, net: depsRef.current.net !== undefined });
+      setFillError(null);
       if (plan.phonetics.length + plan.dict.length === 0) return;
       try {
-        setFillError(null);
         const res = await runFill(depsRef.current, plan, (done, total) => setFill({ done, total }), () => looping.current);
-        for (const id of 'emptied' in res ? res.emptied : []) skip.current.add(id);
+        for (const id of res.emptied) skip.current.add(id);
         // A busy lock is not an error: the words stay empty and the next visit runs them.
         if (!res.ok && !res.busy) setFillError(res.message);
       } finally {

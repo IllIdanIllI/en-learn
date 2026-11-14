@@ -125,8 +125,9 @@ export async function updateWord(db: Db, id: number, f: WordFields): Promise<voi
   );
 }
 
-export async function setDict(db: Db, id: number, translations: string[], checked: Exclude<DictChecked, ''>): Promise<void> {
-  await db.execute('UPDATE word SET dict_translations = ?, dict_checked = ? WHERE id = ?', [JSON.stringify(translations), checked, id]);
+/** Stores a dictionary result for the spelling it was looked up under; a word renamed since is left alone. */
+export async function setDict(db: Db, id: number, translations: string[], checked: Exclude<DictChecked, ''>, forWord: string): Promise<void> {
+  await db.execute('UPDATE word SET dict_translations = ?, dict_checked = ? WHERE id = ? AND word = ?', [JSON.stringify(translations), checked, id, forWord]);
 }
 
 export async function setGeneration(db: Db, id: number, g: Generation): Promise<void> {

@@ -72,7 +72,7 @@ async function seedWords(deps: Deps, done: boolean, list: PreviewWord[] = PREVIE
     insertReview(deps.db, { wordId, cardType: 'gap', exerciseId: null, answeredAt: `${date}T12:00:00.000Z`, date, result: 'correct', counted: true, text: '' });
   for (const w of list) {
     const id = await insertWord(deps.db, { word: w.word, translation: w.translation, definition: w.definition, example: w.example, synonyms: w.synonyms, transcription: w.transcription, partOfSpeech: w.partOfSpeech, link: '', added: w.added }, now);
-    if (checkDict) await setDict(deps.db, id, [], 'none');
+    if (checkDict) await setDict(deps.db, id, [], 'none', w.word);
     await replaceExercises(deps.db, id, exercisesOf(w));
     await setGeneration(deps.db, id, 'ready');
     for (const date of w.reviews) await review(id, date);
@@ -80,7 +80,7 @@ async function seedWords(deps: Deps, done: boolean, list: PreviewWord[] = PREVIE
   }
   if (list !== PREVIEW_WORDS) return;
   const failed = await insertWord(deps.db, { word: FAILED_WORD, translation: '', definition: '', example: '', synonyms: [], transcription: '', partOfSpeech: '', link: '', added: '2026-10-19' }, now);
-  if (checkDict) await setDict(deps.db, failed, [], 'none');
+  if (checkDict) await setDict(deps.db, failed, [], 'none', FAILED_WORD);
   await setGeneration(deps.db, failed, 'failed');
 }
 

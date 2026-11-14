@@ -118,7 +118,7 @@ describe('runFill', () => {
     const ids = await readyWords(deps, ...Array.from({ length: 25 }, (_, i) => `w${i}`));
     let asked = 0;
     const res = await runFill(deps, { phonetics: ids, dict: [] }, () => {}, () => ++asked > 1);
-    expect(res).toEqual({ ok: false, busy: true });
+    expect(res).toEqual({ ok: false, busy: true, emptied: [] });
     expect(llm.calls).toHaveLength(1);
     const rows = await listWords(deps.db);
     expect(rows.filter((w) => ids.includes(w.id)).slice(20).every((w) => w.transcription === '')).toBe(true);
@@ -131,7 +131,7 @@ describe('runFill', () => {
     let release!: () => void;
     const held = withJobLock(deps.db, () => new Promise<void>((r) => (release = r)), undefined);
     const res = await runFill(deps, { phonetics: [id!], dict: [] }, () => {});
-    expect(res).toEqual({ ok: false, busy: true });
+    expect(res).toEqual({ ok: false, busy: true, emptied: [] });
     expect(llm.calls).toHaveLength(0);
     expect((await listWords(deps.db))[0]!.transcription).toBe('');
     release();
@@ -211,7 +211,7 @@ describe('runFill', () => {
       let release!: () => void;
       const held = withJobLock(deps.db, () => new Promise<void>((r) => (release = r)), undefined);
       const res = await runFill(deps, planFill(await listWords(deps.db), new Set(), ruOpts), () => {});
-      expect(res).toEqual({ ok: false, busy: true });
+      expect(res).toEqual({ ok: false, busy: true, emptied: [] });
       expect(llm.calls).toHaveLength(0);
       const row = (await listWords(deps.db)).find((w) => w.id === a)!;
       expect(row.transcription).toBe('');
@@ -230,6 +230,57 @@ describe('runFill', () => {
       expect(res).toEqual({ ok: false, busy: false, message: 'offline', emptied: [] });
       release();
       await held;
+    });
+
+    test('yieldTo is asked before each lookup; a yes stops the step quietly and the rest stay unchecked', async () => {
+      const deps = await setup(new FakeLlm({ phonetics: [phon()] }));
+      const ids = await readyWords(deps, 'alpha', 'beta', 'gamma', 'delta');
+      const seen: string[] = [];
+      deps.net = netOf({}, seen);
+      let asked = 0;
+      const res = await runFill(deps, { phonetics: [], dict: ids }, () => {}, () => ++asked > 2);
+      expect(res).toEqual({ ok: false, busy: true, emptied: [] });
+      expect(seen).toEqual(['alpha', 'beta']);
+      const rows = await listWords(deps.db);
+      expect(rows.filter((w) => ids.includes(w.id)).map((w) => w.dict.checked)).toEqual(['none', 'none', '', '']);
+    });
+
+    test('three lookups in a row that throw stop the step with the error; the words after them stay unchecked', async () => {
+      const deps = await setup(new FakeLlm({ phonetics: [phon()] }));
+      await readyWords(deps, 'alpha', 'beta', 'gamma', 'delta', 'epsilon');
+      const seen: string[] = [];
+      deps.net = netOf({ alpha: new Error('offline'), beta: new Error('offline'), gamma: new Error('offline') }, seen);
+      const res = await runFill(deps, planFill(await listWords(deps.db), new Set(), ruOpts), () => {});
+      expect(res).toEqual({ ok: false, busy: false, message: 'offline', emptied: [] });
+      expect(seen).toEqual(['alpha', 'beta', 'gamma']);
+      const rows = await listWords(deps.db);
+      expect(rows.map((w) => w.dict.checked)).toEqual(['', '', '', '', '']);
+    });
+
+    test('a lookup that succeeds resets the count of throwing lookups', async () => {
+      const deps = await setup(new FakeLlm({ phonetics: [phon()] }));
+      await readyWords(deps, 'alpha', 'beta', 'gamma', 'delta', 'epsilon');
+      deps.net = netOf({ alpha: new Error('offline'), beta: new Error('offline'), gamma: entry('гамма'), delta: new Error('offline') });
+      const res = await runFill(deps, planFill(await listWords(deps.db), new Set(), ruOpts), () => {});
+      expect(res).toEqual({ ok: false, busy: false, message: 'offline', emptied: [] });
+      const rows = await listWords(deps.db);
+      expect(rows.map((w) => w.dict.checked)).toEqual(['', '', 'found', '', 'none']);
+    });
+
+    test('a word renamed between its lookup and the write keeps an empty dict', async () => {
+      const deps = await setup(new FakeLlm({ phonetics: [phon()] }));
+      const [a] = await readyWords(deps, 'alpha');
+      deps.net = {
+        getText: async () => {
+          await deps.db.execute('UPDATE word SET word = ? WHERE id = ?', ['omega', a]);
+          return { status: 200, text: entry('альфа') };
+        },
+      };
+      const res = await runFill(deps, planFill(await listWords(deps.db), new Set(), ruOpts), () => {});
+      expect(res).toEqual({ ok: true, emptied: [] });
+      const row = (await listWords(deps.db)).find((w) => w.id === a)!;
+      expect(row.word).toBe('omega');
+      expect(row.dict).toEqual({ translations: [], checked: '' });
     });
 
     test('en: no lookups and dict stays empty', async () => {

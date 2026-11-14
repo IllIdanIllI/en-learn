@@ -203,14 +203,22 @@ describe('words repo: dictionary fields', () => {
   test('setDict writes both fields', async () => {
     const db = await createTestDb();
     const id = await insertWord(db, fields('assertion'), '2026-11-04T09:00:00Z');
-    await setDict(db, id, ['утверждение'], 'found');
+    await setDict(db, id, ['утверждение'], 'found', 'assertion');
     expect((await listWords(db))[0]!.dict).toEqual({ translations: ['утверждение'], checked: 'found' });
+  });
+
+  test('setDict for a spelling the word no longer has is a no-op', async () => {
+    const db = await createTestDb();
+    const id = await insertWord(db, fields('assertion'), '2026-11-04T09:00:00Z');
+    await updateWord(db, id, fields('assertions'));
+    await setDict(db, id, ['утверждение'], 'found', 'assertion');
+    expect((await listWords(db))[0]!.dict).toEqual({ translations: [], checked: '' });
   });
 
   test('updateWord with the same spelling (other case or spacing) keeps dict', async () => {
     const db = await createTestDb();
     const id = await insertWord(db, fields('assertion'), '2026-11-04T09:00:00Z');
-    await setDict(db, id, ['утверждение'], 'found');
+    await setDict(db, id, ['утверждение'], 'found', 'assertion');
     await updateWord(db, id, fields(' Assertion ', { definition: 'changed' }));
     expect((await listWords(db))[0]).toMatchObject({ definition: 'changed', dict: { translations: ['утверждение'], checked: 'found' } });
   });
@@ -218,7 +226,7 @@ describe('words repo: dictionary fields', () => {
   test('updateWord with a changed spelling resets dict', async () => {
     const db = await createTestDb();
     const id = await insertWord(db, fields('assertion'), '2026-11-04T09:00:00Z');
-    await setDict(db, id, ['утверждение'], 'found');
+    await setDict(db, id, ['утверждение'], 'found', 'assertion');
     await updateWord(db, id, fields('assertions'));
     expect((await listWords(db))[0]).toMatchObject({ word: 'assertions', dict: { translations: [], checked: '' } });
   });
@@ -227,7 +235,7 @@ describe('words repo: dictionary fields', () => {
     const db = await createTestDb();
     const id = await insertWord(db, fields('supersede'), '2026-11-04T09:00:00Z');
     await setGeneration(db, id, 'ready');
-    await setDict(db, id, ['заменять'], 'found');
+    await setDict(db, id, ['заменять'], 'found', 'supersede');
     const reply: PhoneticsReply = { words: [{ word: 'supersede', transcription: '/ˌsuːpəˈsiːd/', partOfSpeech: 'verb' }] };
     const llm = new FakeLlm({ phonetics: [{ ok: true, data: reply, costUsd: 0, durationMs: 1, raw: '{}' }] });
     const deps: Deps = { db, llm, clock: new FixedClock('2026-11-04'), prompts: { load: async (kind) => bundledPrompts[kind] } };

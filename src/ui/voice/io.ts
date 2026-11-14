@@ -1,6 +1,21 @@
 import { fetch } from '@tauri-apps/plugin-http';
 import { exists, mkdir, open, readFile, remove, rename, stat } from '@tauri-apps/plugin-fs';
 
+/** A download that gets no chunk for this long is stalled: it rejects, and the `.part` cleanup takes over. */
+const STALL_MS = 30_000;
+
+/** Reads the next chunk, or rejects (and cancels the stream) when none arrives within STALL_MS. */
+function readChunk(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<ReadableStreamReadResult<Uint8Array>> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const stalled = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error('download stalled: no data for 30 s'));
+      reader.cancel().catch(() => undefined);
+    }, STALL_MS);
+  });
+  return Promise.race([reader.read(), stalled]).finally(() => clearTimeout(timer));
+}
+
 /** File access for the voice files. Paths are absolute; `download` creates the parent folders. */
 export interface VoiceIo {
   /** Size in bytes, or null when the file is missing. */
@@ -28,7 +43,7 @@ export class TauriVoiceIo implements VoiceIo {
       const reader = res.body.getReader();
       let written = 0;
       for (;;) {
-        const { done, value } = await reader.read();
+        const { done, value } = await readChunk(reader);
         if (done) break;
         await file.write(value);
         written += value.byteLength;

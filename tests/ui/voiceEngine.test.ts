@@ -36,18 +36,23 @@ let stops: number;
 let unlocks: number;
 let sizeCalls: number;
 
-function makeEngine(): VoiceEngine {
+/** Every file is already on disk, so a press goes straight to loading. */
+function completeIo(): VoiceIo {
+  return {
+    size: async (path) => {
+      sizeCalls += 1;
+      return VOICE_FILES.find((f) => path === `/app/voice/${f.path}`)!.size;
+    },
+    download: async () => {},
+    rename: async () => {},
+    remove: async () => {},
+    read: async () => new ArrayBuffer(8),
+  };
+}
+
+function makeEngine(io: VoiceIo = completeIo()): VoiceEngine {
   return createKokoroEngine({
-    io: {
-      size: async (path) => {
-        sizeCalls += 1;
-        return VOICE_FILES.find((f) => path === `/app/voice/${f.path}`)!.size;
-      },
-      download: async () => {},
-      rename: async () => {},
-      remove: async () => {},
-      read: async () => new ArrayBuffer(8),
-    } satisfies VoiceIo,
+    io,
     dir: '/app/voice',
     makeWorker: () => {
       const w = new FakeWorker();
@@ -212,6 +217,52 @@ describe('KokoroEngine', () => {
     await flush();
     expect(plays).toEqual([]);
     expect(spoken.at(-1)).toEqual({ text: 'lucid', variant: 'en-US' });
+  });
+
+  test('an interrupted download means failed, and the next presses retry until one completes', async () => {
+    let downloadCalls = 0;
+    const onDisk = new Map<string, number>();
+    const io: VoiceIo = {
+      size: async (path) => onDisk.get(path) ?? null,
+      download: async (url, dest, onBytes) => {
+        downloadCalls += 1;
+        if (downloadCalls <= 2) throw new Error('network dropped');
+        const path = url.slice(url.indexOf('/resolve/') + '/resolve/'.length).replace(/^[^/]+\//, '');
+        const size = VOICE_FILES.find((f) => f.path === path)!.size;
+        onDisk.set(dest, size);
+        onBytes(size);
+      },
+      rename: async (from, to) => {
+        onDisk.set(to, onDisk.get(from)!);
+        onDisk.delete(from);
+      },
+      remove: async (path) => {
+        onDisk.delete(path);
+      },
+      read: async () => new ArrayBuffer(8),
+    };
+    const engine = makeEngine(io);
+
+    engine.speak('first', 'en-GB');
+    await flush();
+    expect(engine.status()).toBe('failed');
+    expect(workers).toHaveLength(0);
+    expect(spoken).toEqual([{ text: 'first', variant: 'en-GB' }]);
+
+    engine.speak('second', 'en-GB');
+    await flush();
+    expect(downloadCalls).toBe(2);
+    expect(engine.status()).toBe('failed');
+    expect(workers).toHaveLength(0);
+    expect(spoken.at(-1)).toEqual({ text: 'second', variant: 'en-GB' });
+
+    engine.speak('third', 'en-GB');
+    await flush();
+    expect(engine.status()).toBe('loading');
+    expect(spoken.at(-1)).toEqual({ text: 'third', variant: 'en-GB' });
+    workers[0]!.reply({ type: 'ready' });
+    expect(engine.status()).toBe('ready');
+    expect(plays).toEqual([]);
   });
 
   test('a press unlocks audio synchronously', () => {

@@ -6,7 +6,7 @@ import { bundledPrompts } from '@/core/llm/bundledPrompts';
 import { insertReview, insertWord, listExercises, listReviews, listWordErrors, replaceExercises, setGeneration } from '@/core/db/repos/words';
 import {
   addExtraNew, buildPractice, checkUseIt, dropWord, extraCardFor, isTest, loadWordViews, markKnown, recordAnswer, stageChanges,
-  testPosition, wordsOverview, type PracticeCard,
+  testPosition, wordsOverview, withWord, type PracticeCard,
 } from '@/core/words/practice';
 import { getSettings } from '@/core/db/repos/settings';
 import { extraNewFor } from '@/core/words/queue';
@@ -225,6 +225,15 @@ describe('training helpers', () => {
   test('dropWord removes only the word\'s cards after the given index', () => {
     const cards = [pc(1, 'intro'), pc(1, 'choice'), pc(2, 'choice'), pc(1, 'build')];
     expect(dropWord(cards, 1, 1)).toEqual([cards[0], cards[1], cards[2]]);
+  });
+
+  test('withWord replaces the word on its cards only', () => {
+    const cards = [pc(1, 'intro'), pc(1, 'choice'), pc(2, 'choice')];
+    const fresh = { ...fields('alpha'), id: 1, translation: 'проверка' } as Word;
+    const out = withWord(cards, fresh);
+    expect(out.map((c) => c.word)).toEqual([fresh, fresh, cards[2]!.word]);
+    expect(out.map((c) => c.card)).toEqual(cards.map((c) => c.card));
+    expect(out[2]).toBe(cards[2]);
   });
 
   test('markKnown saves one counted review of type known', async () => {

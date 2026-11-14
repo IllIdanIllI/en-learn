@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, LoaderCircle, X } from 'lucide-react';
+import { Check, LoaderCircle, Pencil, X } from 'lucide-react';
 import { t } from '@/core/i18n';
 import type { WordCheckReply } from '@/core/llm/types';
 import { buildResult, checkTranslation, checkTyped, clueOf, normalise, resultFor, spellingsOf, withSpaces } from '@/core/words/check';
@@ -28,6 +28,10 @@ export interface CardProps {
   onRemove?: () => void;
   /** A result or a removal is being saved: the word card's buttons are off. */
   busy?: boolean;
+  /** Opens the word's edit panel (the intro card and the feedback have the button). */
+  onEdit: () => void;
+  /** The edit panel is open: the card's keys are off. */
+  paused?: boolean;
 }
 
 type Feedback = { result: ReviewResult; text: string; use?: WordCheckReply; skipped?: boolean };
@@ -58,7 +62,7 @@ function Sentence({ text }: { text: string }) {
   return <p className="reading mt-3">{text}</p>;
 }
 
-function FeedbackView({ pc, fb, spelling }: { pc: PracticeCard; fb: Feedback; spelling: SpellingVariant }) {
+function FeedbackView({ pc, fb, spelling, onEdit }: { pc: PracticeCard; fb: Feedback; spelling: SpellingVariant; onEdit: () => void }) {
   const { lang } = useCore();
   const ok = fb.result !== 'wrong';
   const { word } = pc;
@@ -72,6 +76,10 @@ function FeedbackView({ pc, fb, spelling }: { pc: PracticeCard; fb: Feedback; sp
         {fb.text.trim() !== '' && <p className="text-muted-foreground">{t(lang, 'words.yourAnswer', { text: fb.text })}</p>}
       </div>
       <WordCard word={word} lang={lang} spelling={spelling} />
+      <Button variant="ghost" className="justify-self-start" onClick={onEdit}>
+        <Pencil aria-hidden />
+        {t(lang, 'words.edit')}
+      </Button>
       <div className="grid gap-1.5">
         {fb.skipped && (pc.card.exercise?.answers.length ?? 0) > 0 && (
           <p>{t(lang, 'words.rightAnswer', { text: (pc.card.exercise?.answers ?? []).join(' / ') })}</p>
@@ -98,8 +106,8 @@ function FeedbackView({ pc, fb, spelling }: { pc: PracticeCard; fb: Feedback; sp
 }
 
 /** The word card of a new word: not a test, so it has no result, no Skip and no Check; Дальше moves on. */
-function IntroView({ pc, spelling, busy, onNext, onKnown, onRemove }: {
-  pc: PracticeCard; spelling: SpellingVariant; busy: boolean; onNext: () => void; onKnown?: () => void; onRemove?: () => void;
+function IntroView({ pc, spelling, busy, onNext, onKnown, onRemove, onEdit }: {
+  pc: PracticeCard; spelling: SpellingVariant; busy: boolean; onNext: () => void; onKnown?: () => void; onRemove?: () => void; onEdit: () => void;
 }) {
   const { lang } = useCore();
   const { word } = pc;
@@ -110,6 +118,10 @@ function IntroView({ pc, spelling, busy, onNext, onKnown, onRemove }: {
   return (
     <div data-card-type="intro" className="grid gap-5">
       <WordCard word={word} lang={lang} spelling={spelling} busy={busy} onKnown={onKnown} onRemove={onRemove} />
+      <Button variant="ghost" className="justify-self-start" onClick={onEdit}>
+        <Pencil aria-hidden />
+        {t(lang, 'words.edit')}
+      </Button>
       <p>
         <ExternalLink href={wordLink(word.word, word.link)} className="text-primary underline underline-offset-2">
           {t(lang, 'words.openLink')}
@@ -164,7 +176,7 @@ function Slots({ word, letters, locked, onReturn }: { word: string; letters: str
   );
 }
 
-export function CardView({ pc, spelling, onResult, onNext, onKnown, onRemove, busy = false }: CardProps) {
+export function CardView({ pc, spelling, onResult, onNext, onKnown, onRemove, busy = false, onEdit, paused = false }: CardProps) {
   const { deps, lang } = useCore();
   const { card, word } = pc;
   const type = card.type;
@@ -253,6 +265,8 @@ export function CardView({ pc, spelling, onResult, onNext, onKnown, onRemove, bu
   useEffect(() => {
     if (type !== 'anagram' || locked) return;
     const onKey = (e: KeyboardEvent) => {
+      // The edit panel is open: its typing must not reach the card.
+      if (paused) return;
       if (e.ctrlKey || e.metaKey || e.altKey || e.key === ' ') return;
       if (e.key === 'Backspace') {
         e.preventDefault();
@@ -313,6 +327,8 @@ export function CardView({ pc, spelling, onResult, onNext, onKnown, onRemove, bu
   useEffect(() => {
     if (type !== 'build' || locked) return;
     const onKey = (e: KeyboardEvent) => {
+      // The edit panel is open: its typing must not reach the card.
+      if (paused) return;
       if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || finished.current) return;
       const ch = typedChar(e);
       if (ch === null) return;
@@ -378,7 +394,7 @@ export function CardView({ pc, spelling, onResult, onNext, onKnown, onRemove, bu
 
   // No hooks below this line: the intro card has no answer of its own.
   if (type === 'intro') {
-    return <IntroView pc={pc} spelling={spelling} busy={busy} onNext={onNext} onKnown={onKnown} onRemove={onRemove} />;
+    return <IntroView pc={pc} spelling={spelling} busy={busy} onNext={onNext} onKnown={onKnown} onRemove={onRemove} onEdit={onEdit} />;
   }
 
   const clue = clueOf(word, lang);
@@ -544,7 +560,7 @@ export function CardView({ pc, spelling, onResult, onNext, onKnown, onRemove, bu
       {SKIP_ALONE.includes(type) && !locked && (
         <div className="mt-4">{skipButton}</div>
       )}
-      {feedback && <FeedbackView pc={pc} fb={feedback} spelling={spelling} />}
+      {feedback && <FeedbackView pc={pc} fb={feedback} spelling={spelling} onEdit={onEdit} />}
       {saveError !== null && <Notice className="mt-3">{t(lang, 'words.saveError', { message: saveError })}</Notice>}
       {feedback && (
         <div className="mt-4">

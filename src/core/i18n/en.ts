@@ -469,6 +469,8 @@ export const en = {
   'word.notFound': 'Word not found',
   'words.regenerate': 'Regenerate',
   'words.delete': 'Delete',
+  'words.edit': 'Edit word',
+  'words.edit.close': 'Close',
   'words.delete.confirm': 'Delete?',
   'words.delete.yes': 'Yes',
   'words.delete.no': 'No',

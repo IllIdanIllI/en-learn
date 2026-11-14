@@ -816,6 +816,81 @@ test.describe('two trainings, the word card and its buttons', () => {
     await expect(row(page, word)).toHaveCount(0);
   });
 
+  test('Edit word on the intro card opens the word in a dialog titled with the word', async ({ page }) => {
+    await openPractice(page);
+    await card(page).getByRole('button', { name: 'Изменить слово' }).click();
+    await expect(page.getByRole('dialog', { name: 'ephemeral' })).toBeVisible();
+  });
+
+  test('a change saved in the edit panel shows on the same card after Esc, and focus returns to Edit word', async ({ page }) => {
+    await openPractice(page);
+    const edit = card(page).getByRole('button', { name: 'Изменить слово' });
+    await edit.click();
+    const dialog = page.getByRole('dialog', { name: 'ephemeral' });
+    await dialog.getByLabel('Перевод', { exact: true }).fill('проверка');
+    await dialog.locator('form').getByRole('button', { name: 'Сохранить', exact: true }).click();
+    await expect(dialog.getByRole('status')).toHaveText('Сохранено');
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(card(page).getByText('проверка', { exact: true })).toBeVisible();
+    await expect(edit).toBeFocused();
+  });
+
+  test('the feedback after an answer has Edit word too', async ({ page }) => {
+    await openPractice(page);
+    await answer(page);
+    const c = card(page);
+    await expect(c).toHaveAttribute('data-card-type', 'choice');
+    await skipOf(c).click();
+    await c.getByRole('button', { name: 'Изменить слово' }).click();
+    await expect(page.getByRole('dialog', { name: 'ephemeral' })).toBeVisible();
+  });
+
+  test('typing in the edit panel on a build card after its feedback leaves the card as it was', async ({ page }) => {
+    await openPractice(page);
+    await playUntil(page, 'ephemeral', 'build');
+    const c = card(page);
+    await failBuild(c, 'ephemeral');
+    const edit = c.getByRole('button', { name: 'Изменить слово' });
+    await expect(edit).toBeVisible();
+    const header = page.locator('header span.tabular');
+    const position = await header.innerText();
+    await edit.click();
+    const dialog = page.getByRole('dialog', { name: 'ephemeral' });
+    await dialog.getByLabel('Перевод', { exact: true }).click();
+    await page.keyboard.type('abc');
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(header).toHaveText(position);
+    await expect(edit).toBeFocused();
+  });
+
+  test('a click outside the edit panel closes it', async ({ page }) => {
+    await openPractice(page);
+    await card(page).getByRole('button', { name: 'Изменить слово' }).click();
+    const dialog = page.getByRole('dialog', { name: 'ephemeral' });
+    await expect(dialog).toBeVisible();
+    await page.mouse.click(40, 300);
+    await expect(dialog).toHaveCount(0);
+  });
+
+  test('Delete in the edit panel closes it, and the word\'s tests leave the training', async ({ page }) => {
+    await page.goto('/?state=words-limit#/words');
+    await addNew(page).click();
+    await card(page).waitFor();
+    const word = await wordOfCard(page);
+    const header = page.locator('header span.tabular');
+    await expect(header).toHaveText('1 / 30');
+    await card(page).getByRole('button', { name: 'Изменить слово' }).click();
+    const dialog = page.getByRole('dialog', { name: word });
+    await dialog.getByRole('button', { name: 'Удалить', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Да', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(header).toHaveText('1 / 27');
+    const seen = await runToEnd(page);
+    expect(seen.some((x) => x.word === word)).toBe(false);
+  });
+
   test('the word card shows transcription, part of speech, translation, definition and the example with the word in bold', async ({ page }) => {
     await openPractice(page);
     const c = card(page);

@@ -471,6 +471,8 @@ export const ru: Record<keyof typeof en, string> = {
   'word.notFound': 'Слово не найдено',
   'words.regenerate': 'Создать заново',
   'words.delete': 'Удалить',
+  'words.edit': 'Изменить слово',
+  'words.edit.close': 'Закрыть',
   'words.delete.confirm': 'Удалить?',
   'words.delete.yes': 'Да',
   'words.delete.no': 'Нет',

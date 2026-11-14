@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { deleteWord } from '@/core/db/repos/words';
+import { deleteWord, listWords } from '@/core/db/repos/words';
 import { getSettings } from '@/core/db/repos/settings';
 import { t } from '@/core/i18n';
 import { insertRetry } from '@/core/words/plan';
 import { extraNewFor } from '@/core/words/queue';
 import {
   addExtraNew, buildPractice, dropWord, extraCardFor, loadWordViews, markKnown, recordAnswer, stageChanges, testPosition,
-  wordsOverview, type PracticeCard, type PracticeMode,
+  withWord, wordsOverview, type PracticeCard, type PracticeMode,
 } from '@/core/words/practice';
 import type { ReviewResult, Stage } from '@/core/words/types';
 import { useCore } from '@/ui/app/CoreProvider';
@@ -15,6 +15,7 @@ import { Button, buttonVariants } from '@/ui/components/ui/button';
 import { Notice } from '@/ui/today/chips';
 import { CardView } from '@/ui/words/CardView';
 import { PracticeEnd } from '@/ui/words/PracticeEnd';
+import { WordEditPanel } from '@/ui/words/WordEditPanel';
 import type { SpellingVariant } from '@/ui/words/speech';
 
 type Ended = { correct: number; total: number; up: { word: string; stage: Stage }[]; down: { word: string; stage: Stage }[]; more: number; canAddNew: boolean };
@@ -34,6 +35,8 @@ function Practice({ mode, onContinue, onAddNew }: { mode: PracticeMode; onContin
   const [nextDue, setNextDue] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [ended, setEnded] = useState<Ended | null>(null);
+  // The word whose edit panel is open, from its card.
+  const [editing, setEditing] = useState<number | null>(null);
   const started = useRef(false);
   // Guards Already know and Remove against a second press before the first one is saved.
   const busy = useRef(false);
@@ -103,6 +106,25 @@ function Practice({ mode, onContinue, onAddNew }: { mode: PracticeMode; onContin
       busy.current = false;
       setPending(false);
     }
+  };
+
+  // Closing the edit panel: the word's cards show its saved fields. A word deleted in the panel is left to onDeleted.
+  const closeEdit = async () => {
+    const id = editing;
+    if (id === null) return;
+    try {
+      const fresh = (await listWords(deps.db)).find((w) => w.id === id);
+      if (fresh) setCards((cur) => (cur ? withWord(cur, fresh) : cur));
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setEditing(null);
+    }
+  };
+
+  const deletedInEdit = (id: number) => {
+    setEditing(null);
+    void leaveWord(id, async () => {});
   };
 
   const onResult = async (pc: PracticeCard, at: number, result: ReviewResult, text: string, recorded: boolean) => {
@@ -175,9 +197,12 @@ function Practice({ mode, onContinue, onAddNew }: { mode: PracticeMode; onContin
           onNext={() => advance(cards, index)}
           onKnown={() => void leaveWord(pc.wordId, () => markKnown(deps, pc.wordId))}
           onRemove={() => void leaveWord(pc.wordId, () => deleteWord(deps.db, pc.wordId).then(() => undefined))}
+          onEdit={() => setEditing(pc.wordId)}
+          paused={editing !== null}
         />
         {saveError !== null && <Notice className="mt-3">{t(lang, 'words.saveError', { message: saveError })}</Notice>}
       </div>
+      <WordEditPanel wordId={editing} onClose={() => void closeEdit()} onDeleted={deletedInEdit} />
     </>
   );
 }

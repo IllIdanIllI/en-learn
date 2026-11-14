@@ -136,6 +136,11 @@ export function testPosition(cards: PracticeCard[], index: number): { k: number;
   return { k: cards.slice(0, index).filter(isTest).length + 1, n: cards.filter(isTest).length };
 }
 
+// Puts the word's saved fields on its cards; the other cards stay as they are.
+export function withWord(cards: PracticeCard[], word: Word): PracticeCard[] {
+  return cards.map((c) => (c.wordId === word.id ? { ...c, word } : c));
+}
+
 // Removes the word's cards after index from (the word is now known, so its later cards are not needed).
 export function dropWord(cards: PracticeCard[], from: number, wordId: number): PracticeCard[] {
   return cards.filter((c, i) => i <= from || c.wordId !== wordId);

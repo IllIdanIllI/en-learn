@@ -60,8 +60,8 @@ function ExerciseEditor({ exercise, onSaved }: { exercise: WordExercise; onSaved
   );
 }
 
-/** A word page's body: the word's fields, its exercises, and a bottom row with Back, Regenerate and Delete (with an inline confirmation). */
-export function WordDetails({ view, onChanged, onDeleted, backTo }: { view: WordView; onChanged: () => void; onDeleted: () => void; backTo: string }) {
+/** A word's body: the word's fields, its exercises, and a bottom row with Back (only when backTo is given), Regenerate and Delete (with an inline confirmation). */
+export function WordDetails({ view, onChanged, onDeleted, backTo }: { view: WordView; onChanged: () => void; onDeleted: () => void; backTo?: string }) {
   const { deps, lang } = useCore();
   const job = useWordsJob();
   const [confirming, setConfirming] = useState(false);
@@ -93,7 +93,7 @@ export function WordDetails({ view, onChanged, onDeleted, backTo }: { view: Word
       </section>
       {error !== null && <Notice>{t(lang, 'words.saveError', { message: error })}</Notice>}
       <div className="flex flex-wrap items-center gap-2">
-        <Link to={backTo} className={buttonVariants({ variant: 'ghost' })}>{t(lang, 'word.back')}</Link>
+        {backTo !== undefined && <Link to={backTo} className={buttonVariants({ variant: 'ghost' })}>{t(lang, 'word.back')}</Link>}
         <Button variant="secondary" disabled={job.running} onClick={() => job.run([word.id])}>{t(lang, 'words.regenerate')}</Button>
         {confirming ? (
           <span className="flex items-center gap-2 text-sm">

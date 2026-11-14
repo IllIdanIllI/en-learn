@@ -135,6 +135,23 @@ test('pointer cursor: words with the details panel open', async ({ page }) => {
   expect(await wrongCursors(page)).toEqual([]);
 });
 
+test('pointer cursor: the edit word panel from a training card', async ({ page }) => {
+  await page.goto('/?state=words#/words/practice?mode=new');
+  const card = page.locator('[data-card-type]');
+  await card.waitFor();
+  const cursor = (locator: ReturnType<typeof card.locator>) => locator.evaluate((el) => getComputedStyle(el).cursor);
+  const edit = card.getByRole('button', { name: 'Изменить слово' });
+  expect(await cursor(edit)).toBe('pointer');
+  await edit.click();
+  const dialog = page.getByRole('dialog', { name: 'ephemeral' });
+  await expect(dialog).toBeVisible();
+  expect(await cursor(dialog.getByRole('button', { name: 'Закрыть', exact: true }))).toBe('pointer');
+  expect(await cursor(dialog.getByRole('button', { name: 'Удалить', exact: true }))).toBe('pointer');
+  await dialog.getByLabel('Перевод', { exact: true }).fill('проверка');
+  expect(await cursor(dialog.locator('form').getByRole('button', { name: 'Сохранить', exact: true }))).toBe('pointer');
+  expect(await wrongCursors(page)).toEqual([]);
+});
+
 test('pointer cursor: settings with a new day available', async ({ page }) => {
   await page.goto('/?state=graded&early=1#/settings');
   await page.getByRole('button', { name: 'Начать новый день' }).waitFor();

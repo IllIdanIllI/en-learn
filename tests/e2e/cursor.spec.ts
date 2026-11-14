@@ -135,6 +135,15 @@ test('pointer cursor: words with the details panel open', async ({ page }) => {
   expect(await wrongCursors(page)).toEqual([]);
 });
 
+test('pointer cursor: the Wiktionary link of the dictionary line', async ({ page }) => {
+  await page.goto('/?state=words-dict#/words');
+  await page.getByRole('link', { name: 'assertion', exact: true }).click();
+  const link = page.getByRole('link', { name: 'Wiktionary' });
+  await expect(link).toBeVisible();
+  expect(await link.evaluate((el) => getComputedStyle(el).cursor)).toBe('pointer');
+  expect(await wrongCursors(page)).toEqual([]);
+});
+
 test('pointer cursor: the edit word panel from a training card', async ({ page }) => {
   await page.goto('/?state=words#/words/practice?mode=new');
   const card = page.locator('[data-card-type]');

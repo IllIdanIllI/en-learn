@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Check, Volume2, X } from 'lucide-react';
+import { AlertTriangle, Check, Volume2, X } from 'lucide-react';
 import { t, type Lang } from '@/core/i18n';
+import { dictMatches } from '@/core/words/dictionary';
 import type { Word } from '@/core/words/types';
+import { ExternalLink } from '@/ui/components/ExternalLink';
 import { Button } from '@/ui/components/ui/button';
 import { canSpeak, speak, type SpellingVariant } from './speech';
 
@@ -21,6 +23,31 @@ function Example({ text, word }: { text: string; word: string }) {
   const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const parts = word.trim() === '' ? [text] : text.split(new RegExp(`(\\b${escaped}\\b)`, 'gi'));
   return <>{parts.map((part, i) => (i % 2 === 1 ? <strong key={i}>{part}</strong> : part))}</>;
+}
+
+/** The dictionary line under a word: its kaikki translations, and a warning when the translation is not among them. Russian only. */
+export function DictLine({ word, lang }: { word: Word; lang: Lang }) {
+  if (lang !== 'ru' || word.dict.checked !== 'found') return null;
+  const warn = word.translation.trim() !== '' && !dictMatches(word.translation, word.dict.translations);
+  return (
+    <div className="grid gap-1 text-sm text-muted-foreground">
+      <p>
+        {t(lang, 'words.dict', { list: word.dict.translations.join(', ') })}{' '}
+        <ExternalLink
+          href={`https://en.wiktionary.org/wiki/${encodeURIComponent(word.word.replaceAll(' ', '_'))}`}
+          className="text-primary underline underline-offset-2"
+        >
+          {t(lang, 'words.dict.link')}
+        </ExternalLink>
+      </p>
+      {warn && (
+        <p className="flex items-center gap-1.5 text-destructive">
+          <AlertTriangle aria-hidden className="size-4 shrink-0" />
+          {t(lang, 'words.dict.warn')}
+        </p>
+      )}
+    </div>
+  );
 }
 
 /** A word in the Skyeng layout: the word on a coloured band with its translation, then transcription, definition and example. */
@@ -65,6 +92,7 @@ export function WordCard({ word, lang, spelling, onKnown, onRemove, busy = false
           {speech && speaker(word.example)}
         </div>
       )}
+      <DictLine word={word} lang={lang} />
       {onKnown !== undefined && (
         <div>
           <Button variant="ghost" disabled={busy} onClick={onKnown}>

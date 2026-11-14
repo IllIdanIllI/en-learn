@@ -1119,6 +1119,41 @@ test.describe('transcription fill on a Words visit', () => {
   });
 });
 
+test.describe('dictionary line on a Words visit', () => {
+  test('assertion shows its line and the warning, compel its line without the warning', async ({ page }) => {
+    await page.goto('/?state=words-dict#/words');
+    await row(page, 'assertion').getByRole('link', { name: 'assertion', exact: true }).click();
+    await expect(page.getByText('Словарь: утверждение')).toBeVisible();
+    await expect(page.getByText('Перевода нет в словаре, проверьте')).toBeVisible();
+    await page.getByRole('link', { name: 'Назад к словам' }).click();
+    await row(page, 'compel').getByRole('link', { name: 'compel', exact: true }).click();
+    await expect(page.getByText('Словарь: собирать, подчинять')).toBeVisible();
+    await expect(page.getByText('Перевода нет в словаре, проверьте')).toHaveCount(0);
+  });
+
+  test('the intro card of a new training shows the line and the warning of assertion', async ({ page }) => {
+    await page.goto('/?state=words-dict#/words');
+    await row(page, 'assertion').getByRole('link', { name: 'assertion', exact: true }).click();
+    await expect(page.getByText('Словарь: утверждение')).toBeVisible();
+    await page.evaluate(() => { location.hash = '#/words/practice?mode=new'; });
+    await card(page).waitFor();
+    if ((await card(page).getByText('assertion', { exact: true }).count()) === 0) await next(page).click();
+    await expect(card(page).getByText('Словарь: утверждение')).toBeVisible();
+    await expect(card(page).getByText('Перевода нет в словаре, проверьте')).toBeVisible();
+  });
+
+  test('in English neither line shows', async ({ page }) => {
+    await page.goto('/?state=words-dict#/words');
+    await row(page, 'assertion').getByRole('link', { name: 'assertion', exact: true }).click();
+    await expect(page.getByText('Словарь: утверждение')).toBeVisible();
+    await page.evaluate(() => { location.hash = '#/settings'; });
+    await page.getByRole('radio', { name: 'English' }).click();
+    await page.evaluate(() => { location.hash = '#/words'; });
+    await row(page, 'assertion').getByRole('link', { name: 'assertion', exact: true }).click();
+    await expect(page.getByText(/Dictionary: |Translation not in the dictionary|Словарь/)).toHaveCount(0);
+  });
+});
+
 test.describe('search shortcut and saved confirmation', () => {
   test('the search field has a search icon inside its wrapper', async ({ page }) => {
     await page.goto('/?state=words#/words');

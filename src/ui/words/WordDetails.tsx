@@ -9,6 +9,7 @@ import { useCore } from '@/ui/app/CoreProvider';
 import { Button, buttonVariants } from '@/ui/components/ui/button';
 import { Textarea } from '@/ui/components/ui/textarea';
 import { Notice } from '@/ui/today/chips';
+import { DictLine } from './WordCard';
 import { WordForm } from './WordForm';
 import { useSavedFlag } from './useSavedFlag';
 import { useWordsJob } from './WordsJobProvider';
@@ -81,6 +82,7 @@ export function WordDetails({ view, onChanged, onDeleted, backTo }: { view: Word
   return (
     <div className="grid gap-6 py-2">
       <WordForm key={word.id} word={word} onSaved={onChanged} />
+      <DictLine word={word} lang={lang} />
       <section>
         <h2 className="title">{t(lang, 'words.exercises')}</h2>
         {exercises.length === 0 ? (

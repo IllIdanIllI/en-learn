@@ -11,7 +11,7 @@ Translations are written in {{nativeLanguage}}. Definitions, examples, synonyms 
 # Fields to fill
 
 - definition: one short English sentence in plain words, without using the word itself.
-- translation: the {{nativeLanguage}} equivalent, one to three words.
+- translation: the main general {{nativeLanguage}} equivalent first, then up to two more common translations, comma-separated, most common first (for example: утверждение, заявление). Do not give rare, figurative or narrow senses unless the word has no other.
 - example: one natural English sentence that uses the word.
 - synonyms: two to four English words or phrases.
 - transcription: the IPA of the word between slashes, for example /ˈsʌbstəns/. Pronounce the word as {{spellingVariant}} English does: British is Received Pronunciation, American is General American.

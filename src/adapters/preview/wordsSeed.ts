@@ -160,6 +160,32 @@ export const PHRASE_WORDS: PreviewWord[] = [
   },
 ];
 
+/**
+ * The `words-dict` state: two ready words with a transcription and no dictionary check, so the fill run of the Words page
+ * looks them up in the recorded kaikki replies. `assertion` has a translation the dictionary does not list (the warning);
+ * `compel` has one it does.
+ */
+export const DICT_WORDS: PreviewWord[] = [
+  {
+    word: 'assertion', transcription: '/əˈsɜːrʃn/', partOfSpeech: 'noun', translation: 'голословное утверждение', definition: 'a confident statement that something is true, often without proof', example: 'His assertion that he was innocent was never proved.',
+    synonyms: ['claim'], added: '2026-10-18', reviews: [],
+    gaps: ['Her ___ was supported by no evidence.', 'The ___ that he was innocent went unproven.'],
+    collocations: ['a bold ___', 'a false ___'],
+    form: { sentence: 'She ___ her innocence.', cue: 'assert', answer: 'asserted' },
+    confusable: { sentence: 'The ___ was backed by facts.', options: ['assertion', 'assumption'], reason: 'An assertion is a claim stated as true; an assumption is taken for granted.' },
+    translations: [{ text: 'Его утверждение было ложным.', answers: ['His assertion was false.'] }, { text: 'Она повторила своё утверждение.', answers: ['She repeated her assertion.'] }],
+  },
+  {
+    word: 'compel', transcription: '/kəmˈpel/', partOfSpeech: 'verb', translation: 'принуждать', definition: 'to force someone to do something', example: 'The law compels employers to pay a fair wage.',
+    synonyms: ['force'], added: '2026-10-18', reviews: [],
+    gaps: ['Nothing could ___ him to lie.', 'The storm ___ us to stay indoors.'],
+    collocations: ['a strong ___ to act', 'strongly ___'],
+    form: { sentence: 'The coach ___ us to train daily.', cue: 'compel', answer: 'compelled' },
+    confusable: { sentence: 'The new law will ___ the company to pay.', options: ['compel', 'compact'], reason: 'Compel means force; compact means small or dense.' },
+    translations: [{ text: 'Закон принуждает компании платить.', answers: ['The law compels companies to pay.'] }, { text: 'Его принудили уйти.', answers: ['He was compelled to leave.'] }],
+  },
+];
+
 /** Like PREVIEW_WORD_ANSWERS, for the cards of PHRASE_WORDS. */
 export const PHRASE_WORD_ANSWERS: Record<string, string> = answersOf(PHRASE_WORDS);
 

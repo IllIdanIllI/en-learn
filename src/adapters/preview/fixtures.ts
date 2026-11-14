@@ -12,18 +12,18 @@ import { generateSession } from '@/core/session/generate';
 import { gradeSession } from '@/core/grading/grade';
 import { closeSession, listGradingItems, getSessionByDate } from '@/core/db/repos/sessions';
 import { findOrCreateSpellingWord } from '@/core/db/repos/spelling';
-import { insertReview, insertWord, replaceExercises, setGeneration } from '@/core/db/repos/words';
+import { insertReview, insertWord, replaceExercises, setDict, setGeneration } from '@/core/db/repos/words';
 import { createSqlJsDb } from './sqljsDb';
 import { previewLlm } from './previewLlm';
 import { MINI_PROGRAMME, MINI_RULES } from './miniSeed';
-import { exercisesOf, FAILED_WORD, FILL_WORDS, LIMIT_WORDS, PHRASE_WORDS, PREVIEW_WORDS, type PreviewWord } from './wordsSeed';
+import { DICT_WORDS, exercisesOf, FAILED_WORD, FILL_WORDS, LIMIT_WORDS, PHRASE_WORDS, PREVIEW_WORDS, type PreviewWord } from './wordsSeed';
 
 export { LIMIT_WORD_ANSWERS, PHRASE_WORD_ANSWERS, PREVIEW_WORD_ANSWERS } from './wordsSeed';
 
 export const PREVIEW_STATES = [
   'empty', 'no_session', 'generated', 'questions', 'graded', 'progress', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing',
   'earlier_session', 'progress_archived', 'closed', 'open-round', 'round-graded', 'skipped', 'skipped-round', 'fireflies',
-  'spot', 'spot-graded', 'writing', 'writing-graded', 'rewrite', 'words', 'words-done', 'words-limit', 'words-phrase', 'words-fill',
+  'spot', 'spot-graded', 'writing', 'writing-graded', 'rewrite', 'words', 'words-done', 'words-limit', 'words-phrase', 'words-fill', 'words-dict',
 ] as const;
 export type PreviewState = (typeof PREVIEW_STATES)[number];
 
@@ -62,13 +62,17 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-/** Seeds the words through the repo, not the LLM; `done` also answers every ready word today. */
-async function seedWords(deps: Deps, done: boolean, list: PreviewWord[] = PREVIEW_WORDS): Promise<void> {
+/**
+ * Seeds the words through the repo, not the LLM; `done` also answers every ready word today. Each word gets the dictionary
+ * check `checkDict` names ('none' unless the state leaves the check to the fill run), so only `words-dict` shows a dictionary line.
+ */
+async function seedWords(deps: Deps, done: boolean, list: PreviewWord[] = PREVIEW_WORDS, checkDict = true): Promise<void> {
   const now = deps.clock.now();
   const review = (wordId: number, date: ISODate) =>
     insertReview(deps.db, { wordId, cardType: 'gap', exerciseId: null, answeredAt: `${date}T12:00:00.000Z`, date, result: 'correct', counted: true, text: '' });
   for (const w of list) {
     const id = await insertWord(deps.db, { word: w.word, translation: w.translation, definition: w.definition, example: w.example, synonyms: w.synonyms, transcription: w.transcription, partOfSpeech: w.partOfSpeech, link: '', added: w.added }, now);
+    if (checkDict) await setDict(deps.db, id, [], 'none');
     await replaceExercises(deps.db, id, exercisesOf(w));
     await setGeneration(deps.db, id, 'ready');
     for (const date of w.reviews) await review(id, date);
@@ -76,6 +80,7 @@ async function seedWords(deps: Deps, done: boolean, list: PreviewWord[] = PREVIE
   }
   if (list !== PREVIEW_WORDS) return;
   const failed = await insertWord(deps.db, { word: FAILED_WORD, translation: '', definition: '', example: '', synonyms: [], transcription: '', partOfSpeech: '', link: '', added: '2026-10-19' }, now);
+  if (checkDict) await setDict(deps.db, failed, [], 'none');
   await setGeneration(deps.db, failed, 'failed');
 }
 
@@ -266,6 +271,7 @@ export async function buildPreview(state: PreviewState, options: { early?: boole
   if (state === 'words-limit') await seedWords(deps, false, LIMIT_WORDS);
   if (state === 'words-phrase') await seedWords(deps, false, PHRASE_WORDS);
   if (state === 'words-fill') await seedWords(deps, false, FILL_WORDS);
+  if (state === 'words-dict') await seedWords(deps, false, DICT_WORDS, false);
   if (state === 'fireflies') {
     // Yesterday's lesson was played, so the sidebar garden has fireflies; today has no session yet.
     clock.set('2026-10-19');

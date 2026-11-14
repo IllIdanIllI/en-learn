@@ -9,6 +9,7 @@ import { planFill, runFill } from '@/core/words/fill';
 import type { Deps, LlmResult } from '@/core/ports';
 import type { PhoneticsReply } from '@/core/llm/types';
 import type { Word, WordFields } from '@/core/words/types';
+import type { Net } from '@/core/ports';
 
 const good = (data: unknown): LlmResult<unknown> => ({ ok: true, data, costUsd: 0, durationMs: 1, raw: '{}' });
 const fail: LlmResult<unknown> = { ok: false, code: 'not_signed_in', message: 'sign in', costUsd: 0, durationMs: 1, raw: '' };
@@ -52,6 +53,24 @@ describe('planFill', () => {
       word({ id: 6, transcription: '  ' }),
     ];
     expect(planFill(words, new Set([5]))).toEqual({ phonetics: [1, 6], dict: [] });
+  });
+
+  test('ru with a net: dict is the ready words not checked yet, skipped ones included, blank ones left out', () => {
+    const words = [
+      word({ id: 1 }),
+      word({ id: 2, transcription: '/x/', dict: { translations: [], checked: 'none' } }),
+      word({ id: 3, generation: 'pending' }),
+      word({ id: 4, word: '   ', transcription: '/x/' }),
+      word({ id: 5, transcription: '/x/', dict: { translations: ['a'], checked: 'found' } }),
+      word({ id: 6, transcription: '/y/' }),
+    ];
+    expect(planFill(words, new Set([1]), { lang: 'ru', net: true })).toEqual({ phonetics: [], dict: [1, 6] });
+  });
+
+  test('en, or no net: dict stays empty', () => {
+    const words = [word({ id: 1 })];
+    expect(planFill(words, new Set(), { lang: 'en', net: true }).dict).toEqual([]);
+    expect(planFill(words, new Set(), { lang: 'ru', net: false }).dict).toEqual([]);
   });
 });
 
@@ -117,5 +136,119 @@ describe('runFill', () => {
     expect((await listWords(deps.db))[0]!.transcription).toBe('');
     release();
     await held;
+  });
+
+  describe('dictionary step', () => {
+    const entry = (ru: string) => JSON.stringify({ translations: [{ code: 'ru', word: ru }] });
+    /** Replies by the last path segment of the URL; a value that is an Error is thrown, a missing one is 404. */
+    const netOf = (replies: Record<string, string | Error>, seen: string[] = []): Net => ({
+      getText: async (url) => {
+        const key = decodeURIComponent(url.split('/').pop()!.replace(/\.jsonl$/, ''));
+        seen.push(key);
+        const r = replies[key];
+        if (r instanceof Error) throw r;
+        return r === undefined ? { status: 404, text: '' } : { status: 200, text: r };
+      },
+    });
+    const ruOpts = { lang: 'ru' as const, net: true };
+
+    test('ru: the dict words are looked up after the phonetics, and progress counts both steps', async () => {
+      const llm = new FakeLlm({ phonetics: [phon()] });
+      const seenTranscriptions: string[] = [];
+      const deps = await setup(llm);
+      const [a, b] = await readyWords(deps, 'alpha', 'beta');
+      deps.net = {
+        getText: async () => {
+          seenTranscriptions.push((await listWords(deps.db)).find((w) => w.id === a)!.transcription);
+          return { status: 404, text: '' };
+        },
+      };
+      const progress: [number, number][] = [];
+      const plan = planFill(await listWords(deps.db), new Set(), ruOpts);
+      const res = await runFill(deps, plan, (d, t) => progress.push([d, t]));
+      expect(res).toEqual({ ok: true, emptied: [] });
+      expect(seenTranscriptions).toEqual(['/ˈsuːpəsiːd/', '/ˈsuːpəsiːd/']);
+      expect(progress).toEqual([[0, 4], [2, 4], [3, 4], [4, 4]]);
+      expect(plan.dict).toEqual([a, b]);
+    });
+
+    test('a 404 sets none, a found reply sets its translations', async () => {
+      const deps = await setup(new FakeLlm({ phonetics: [phon()] }));
+      const [a, b] = await readyWords(deps, 'alpha', 'give up');
+      deps.net = netOf({ 'give up': entry('сдаваться') });
+      const res = await runFill(deps, planFill(await listWords(deps.db), new Set(), ruOpts), () => {});
+      expect(res).toEqual({ ok: true, emptied: [] });
+      const rows = await listWords(deps.db);
+      expect(rows.find((w) => w.id === a)!.dict).toEqual({ translations: [], checked: 'none' });
+      expect(rows.find((w) => w.id === b)!.dict).toEqual({ translations: ['сдаваться'], checked: 'found' });
+    });
+
+    test('a thrown lookup leaves the word unchecked, reports its message, and the other words are still written', async () => {
+      const deps = await setup(new FakeLlm({ phonetics: [phon()] }));
+      const [a, b] = await readyWords(deps, 'alpha', 'beta');
+      deps.net = netOf({ alpha: new Error('network down') });
+      const res = await runFill(deps, planFill(await listWords(deps.db), new Set(), ruOpts), () => {});
+      expect(res).toEqual({ ok: false, busy: false, message: 'network down', emptied: [] });
+      const rows = await listWords(deps.db);
+      expect(rows.find((w) => w.id === a)!.dict.checked).toBe('');
+      expect(rows.find((w) => w.id === b)!.dict.checked).toBe('none');
+    });
+
+    test('a malformed reply is a thrown error too: the word stays unchecked', async () => {
+      const deps = await setup(new FakeLlm({ phonetics: [phon()] }));
+      const [a] = await readyWords(deps, 'alpha');
+      deps.net = netOf({ alpha: '{not json' });
+      const res = await runFill(deps, planFill(await listWords(deps.db), new Set(), ruOpts), () => {});
+      expect(res.ok).toBe(false);
+      expect((await listWords(deps.db)).find((w) => w.id === a)!.dict.checked).toBe('');
+    });
+
+    test('the dict step runs while another job holds the lock: only the phonetics step is busy', async () => {
+      const llm = new FakeLlm({ phonetics: [phon()] });
+      const deps = await setup(llm);
+      const [a] = await readyWords(deps, 'alpha');
+      deps.net = netOf({ alpha: entry('альфа') });
+      let release!: () => void;
+      const held = withJobLock(deps.db, () => new Promise<void>((r) => (release = r)), undefined);
+      const res = await runFill(deps, planFill(await listWords(deps.db), new Set(), ruOpts), () => {});
+      expect(res).toEqual({ ok: false, busy: true });
+      expect(llm.calls).toHaveLength(0);
+      const row = (await listWords(deps.db)).find((w) => w.id === a)!;
+      expect(row.transcription).toBe('');
+      expect(row.dict).toEqual({ translations: ['альфа'], checked: 'found' });
+      release();
+      await held;
+    });
+
+    test('a dict error wins over a busy phonetics step', async () => {
+      const deps = await setup(new FakeLlm({ phonetics: [phon()] }));
+      await readyWords(deps, 'alpha');
+      deps.net = netOf({ alpha: new Error('offline') });
+      let release!: () => void;
+      const held = withJobLock(deps.db, () => new Promise<void>((r) => (release = r)), undefined);
+      const res = await runFill(deps, planFill(await listWords(deps.db), new Set(), ruOpts), () => {});
+      expect(res).toEqual({ ok: false, busy: false, message: 'offline', emptied: [] });
+      release();
+      await held;
+    });
+
+    test('en: no lookups and dict stays empty', async () => {
+      const deps = await setup(new FakeLlm({ phonetics: [phon()] }));
+      await readyWords(deps, 'alpha');
+      const seen: string[] = [];
+      deps.net = netOf({}, seen);
+      const plan = planFill(await listWords(deps.db), new Set(), { lang: 'en', net: true });
+      expect(plan.dict).toEqual([]);
+      expect(await runFill(deps, plan, () => {})).toEqual({ ok: true, emptied: [] });
+      expect(seen).toEqual([]);
+    });
+
+    test('no net: no lookups', async () => {
+      const deps = await setup(new FakeLlm({ phonetics: [phon()] }));
+      await readyWords(deps, 'alpha');
+      const plan = planFill(await listWords(deps.db), new Set(), { lang: 'ru', net: false });
+      expect(plan.dict).toEqual([]);
+      expect(await runFill(deps, plan, () => {})).toEqual({ ok: true, emptied: [] });
+    });
   });
 });

@@ -34,11 +34,13 @@ const Context = createContext<WordsJobValue | null>(null);
 
 /** Holds the words generation job above the routes, so leaving the Words page neither loses it nor starts a second one. */
 export function WordsJobProvider({ children }: { children: ReactNode }) {
-  const { deps } = useCore();
+  const { deps, lang } = useCore();
   const depsRef = useRef(deps);
+  const langRef = useRef(lang);
   useEffect(() => {
     depsRef.current = deps;
-  }, [deps]);
+    langRef.current = lang;
+  }, [deps, lang]);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState<GenError | null>(null);
   const [busy, setBusy] = useState(false);
@@ -68,7 +70,7 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
         setProgress({ done: 0, total: ids.length });
         let stop = false;
         try {
-          // A fill yields at its next batch boundary, so this waits for one batch at most.
+          // A fill yields at its next transcription batch; its dictionary step may still run, and this waits for that too.
           if (fillPromise.current) await fillPromise.current;
           const res = await generateWords(depsRef.current, ids, (done, total) => setProgress({ done, total }));
           if (!res.ok) {
@@ -127,8 +129,8 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
       await fixNames();
       // A generation started meanwhile (for example by the name fix) goes first; its end starts the fill again.
       if (looping.current) return;
-      const plan = planFill(await listWords(depsRef.current.db), skip.current);
-      if (plan.phonetics.length === 0) return;
+      const plan = planFill(await listWords(depsRef.current.db), skip.current, { lang: langRef.current, net: depsRef.current.net !== undefined });
+      if (plan.phonetics.length + plan.dict.length === 0) return;
       try {
         setFillError(null);
         const res = await runFill(depsRef.current, plan, (done, total) => setFill({ done, total }), () => looping.current);

@@ -167,3 +167,38 @@ i18n keys (ru / en, exact):
 ### After the tasks (lead)
 - Final whole-branch review (Sonnet), fixes, then the lead runs typecheck, lint, full vitest, and e2e `words cursor settings-day settings-icon settings-debug csp screenshots`.
 - Update `docs/superpowers/handoff.md` (round 7 line; R4 waits for the learner's log) and the Mac checklist (download notification on an empty voice folder; a log after a few presses shows `press`/`play` lines with outlines).
+
+## Binding review notes (plan review, 2026-11-14)
+
+These override the task text where they differ. Each task's implementer must read the notes for its task.
+
+**Task 1**
+- `debugLog.ts` must be safe in node: the storage lookup is in try/catch, and `typeof window === 'undefined'`, a missing `localStorage` or a throw all mean `null` storage. Create the store lazily on first use (`logDebug` or `debugLog` access), so importing the module (from `speech.ts` in Task 3) never touches `window`.
+- `capture.ts` does not import `debugLog.ts`. Signature becomes `installDebugCapture(win: Window, log: (kind: string, text: string) => void, flush: () => void): void`; `main.tsx` passes `logDebug` and `() => debugLog.flush()`.
+- Idempotency is marked on the `win` object itself (`win.__debugCapture = true`), not a module flag. The code uses only `win.console`, `win.setInterval`, `win.document`, `win.addEventListener`, `win.performance` (no globals). The fake `win` in tests records `setInterval` callbacks without running them; error and rejection events are plain `Event`s with `message`/`reason` assigned (node has no `ErrorEvent`/`PromiseRejectionEvent`). The `pointerdown` handler does nothing unless `e.target instanceof win.Element` (guard with `typeof win.Element === 'function'`).
+- Stall detector: `last` is set at creation; a tick while `win.document.hidden` only resets `last`; a `visibilitychange` resets `last`. Add a test: a 900 ms gap while hidden reports nothing.
+- `console.error` entry text: each argument `Error` → `message`, string → itself, other → `JSON.stringify` in try/catch with `String(arg)` fallback; joined with spaces, cut to 300 characters. The wrapper body is in try/catch, never calls `console.error` itself, and always calls the original.
+- `flush()` writes only when something changed since the last write (dirty flag; `clear()` sets it).
+- `bootTauri`: `getVersion()` is in try/catch, falling back to `unknown`; boot never fails because of the log.
+
+**Task 2**
+- `useSavedFlag(ms = SHOW_MS)`: the default keeps `WordForm` and `WordDetails` unchanged.
+- The count line is a snapshot read on mount, on Show, after Copy and after Clear. After Clear it reads exactly `Записей: 0`; the e2e asserts that.
+- `isCopyLogShortcut` compares `e.key.toLowerCase() === 'l'`. The shortcut e2e also calls `grantPermissions(['clipboard-read','clipboard-write'])`.
+
+**Task 3**
+- `system=` is the value of the engine's guarded `system.speaking()` read in `speak()` **before** `system.cancel()`, kept with the press and printed when that press's clip starts.
+- `clip=`: each played clip gets an id; `onEnd` clears the "playing" mark only if it is the current clip's id. `end <t>` is logged for every clip, stopped ones included.
+- Percent logging: the last logged bucket starts at 0 in each `load()`; a bucket `floor(p*10)*10` is logged only when greater than the last (so `0%` is never logged). The test values stand.
+- `outline`: cell `i` covers samples `[floor(i*n/cells), floor((i+1)*n/cells))`; an empty cell is `.`.
+- The engine tests that expect `downloading` must use a fake `io` with a missing file (they stay valid after Task 4).
+
+**Task 4**
+- `load()` sets a synchronous `loading` flag (or the status `loading`) at its start, so a press during the size checks never starts a second load; `setStatus` ignores an unchanged status. With every file present the statuses seen are exactly `loading`, `ready`.
+- `load()` resets `fraction = 0` and `lastError = null`; `fail()` sets `lastError` before `setStatus('failed')`.
+- The host updates `prev` on every notify (also `downloading → downloading`) and resets `lastPercent` to `null` whenever the status is not `downloading`.
+- `VoiceEngine.lastError()` is implemented by `previewEngine` and every fake engine in tests.
+- Preview `?voice=downloaded`: `status` is mutable; the 300 ms timer starts on the first `subscribe`, once (StrictMode subscribes twice).
+- E2E finds toasts with `page.getByText(...)`.
+
+**Trailers:** the Global Constraints trailers (Claude Opus 5.5) are correct as written, whatever a subagent's own harness says.

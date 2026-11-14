@@ -984,3 +984,23 @@ test.describe('a page per word', () => {
     await expect(page.getByLabel('Текст').first()).toBeVisible();
   });
 });
+
+test.describe('transcription fill on a Words visit', () => {
+  test('the fill shows its progress, then the words have their transcriptions', async ({ page }) => {
+    await page.goto('/?state=words-fill&delay=300#/words');
+    await expect(page.getByText('Добавляю транскрипции: 0 из 3')).toBeVisible();
+    await expect(page.getByText('Добавляю транскрипции')).toHaveCount(0, { timeout: 10_000 });
+    await row(page, 'diligent').getByRole('link', { name: 'diligent', exact: true }).click();
+    await expect(page.getByLabel('Транскрипция')).toHaveValue('/diligent/');
+  });
+
+  test('a failed fill shows its message and Retry; trainings and Regenerate stay enabled', async ({ page }) => {
+    await page.goto('/?state=words-fill&fail=cli_error#/words');
+    const notice = page.getByRole('alert').filter({ hasText: 'Не удалось добавить транскрипции' });
+    await expect(notice).toContainText('Preview failure');
+    await expect(notice.getByRole('button', { name: 'Повторить' })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Новые слова/ })).toBeVisible();
+    await row(page, 'diligent').getByRole('link', { name: 'diligent', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Создать заново' })).toBeEnabled();
+  });
+});

@@ -16,14 +16,14 @@ import { insertReview, insertWord, replaceExercises, setGeneration } from '@/cor
 import { createSqlJsDb } from './sqljsDb';
 import { previewLlm } from './previewLlm';
 import { MINI_PROGRAMME, MINI_RULES } from './miniSeed';
-import { exercisesOf, FAILED_WORD, LIMIT_WORDS, PHRASE_WORDS, PREVIEW_WORDS, type PreviewWord } from './wordsSeed';
+import { exercisesOf, FAILED_WORD, FILL_WORDS, LIMIT_WORDS, PHRASE_WORDS, PREVIEW_WORDS, type PreviewWord } from './wordsSeed';
 
 export { LIMIT_WORD_ANSWERS, PHRASE_WORD_ANSWERS, PREVIEW_WORD_ANSWERS } from './wordsSeed';
 
 export const PREVIEW_STATES = [
   'empty', 'no_session', 'generated', 'questions', 'graded', 'progress', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing',
   'earlier_session', 'progress_archived', 'closed', 'open-round', 'round-graded', 'skipped', 'skipped-round', 'fireflies',
-  'spot', 'spot-graded', 'writing', 'writing-graded', 'rewrite', 'words', 'words-done', 'words-limit', 'words-phrase',
+  'spot', 'spot-graded', 'writing', 'writing-graded', 'rewrite', 'words', 'words-done', 'words-limit', 'words-phrase', 'words-fill',
 ] as const;
 export type PreviewState = (typeof PREVIEW_STATES)[number];
 
@@ -265,6 +265,7 @@ export async function buildPreview(state: PreviewState, options: { early?: boole
   if (state === 'words' || state === 'words-done') await seedWords(deps, state === 'words-done');
   if (state === 'words-limit') await seedWords(deps, false, LIMIT_WORDS);
   if (state === 'words-phrase') await seedWords(deps, false, PHRASE_WORDS);
+  if (state === 'words-fill') await seedWords(deps, false, FILL_WORDS);
   if (state === 'fireflies') {
     // Yesterday's lesson was played, so the sidebar garden has fireflies; today has no session yet.
     clock.set('2026-10-19');

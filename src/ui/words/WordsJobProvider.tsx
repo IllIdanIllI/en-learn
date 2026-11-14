@@ -1,7 +1,7 @@
 import { createContext, useCallback, useEffect, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
-import { generatePhonetics, generateWords } from '@/core/words/generate';
+import { generateWords } from '@/core/words/generate';
 import { fixSavedWordNames } from '@/core/words/name';
-import { wordsMissingPhonetics } from '@/core/words/phonetics';
+import { planFill, runFill } from '@/core/words/fill';
 import { listWords } from '@/core/db/repos/words';
 import { useCore } from '@/ui/app/CoreProvider';
 import type { GenError } from '@/ui/today/StartSession';
@@ -21,8 +21,13 @@ interface WordsJobValue {
   clearNotices(): void;
   /** Increments when a job ends, so a page reads its state again. */
   version: number;
-  /** Silent phonetics run for ready words without a transcription; once per app run, after the name fix. */
-  startPhonetics(): void;
+  /** The visible fill run (empty transcriptions); null when it is not running. */
+  fill: Progress | null;
+  /** The message of a fill run that failed; Retry clears it and runs the fill again. */
+  fillError: string | null;
+  /** Starts the fill run unless one runs or a generation runs; once the name fix is done. */
+  startFill(): void;
+  retryFill(): void;
 }
 
 const Context = createContext<WordsJobValue | null>(null);
@@ -39,30 +44,23 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [active, setActive] = useState<ReadonlySet<number>>(new Set());
   const [version, setVersion] = useState(0);
+  const [fill, setFill] = useState<Progress | null>(null);
+  const [fillError, setFillError] = useState<string | null>(null);
   const queue = useRef<number[]>([]);
-  // Phonetics run: runs after the queue is empty, never shown in `active` (its words stay ready).
-  const phonetics = useRef<number[]>([]);
   const looping = useRef(false);
   const current = useRef<number[]>([]);
-  const phoneticsStarted = useRef(false);
-  // The name fix runs once per app start; the phonetics run waits for it so its queue goes first.
+  const filling = useRef(false);
+  // Words the fill run left without a transcription, or that a failed call could not fill: not tried again in this app run.
+  const skip = useRef<Set<number>>(new Set());
+  // The name fix runs once per app start; the fill run waits for it so its queue goes first.
   const nameFix = useRef<Promise<void> | null>(null);
+  // loop calls startFill after it ends; startFill is defined below loop, so loop reaches it through this ref.
+  const startFillRef = useRef<() => void>(() => undefined);
 
   const loop = useCallback(async () => {
     looping.current = true;
     try {
-      while (queue.current.length > 0 || phonetics.current.length > 0) {
-        if (queue.current.length === 0) {
-          // Silent: no progress, so the Words page does not show "Creating exercises" or lock Regenerate.
-          const ids = phonetics.current.splice(0);
-          try {
-            await generatePhonetics(depsRef.current, ids);
-          } catch {
-            // The words keep what they have; the next start runs them once more.
-          }
-          setVersion((n) => n + 1);
-          continue;
-        }
+      while (queue.current.length > 0) {
         const ids = queue.current.splice(0);
         current.current = ids;
         setProgress({ done: 0, total: ids.length });
@@ -81,10 +79,7 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
           setError({ message: e instanceof Error ? e.message : String(e) });
         }
         current.current = [];
-        if (stop) {
-          queue.current = [];
-          phonetics.current = [];
-        }
+        if (stop) queue.current = [];
         const left = new Set(queue.current);
         setActive(left);
         setVersion((n) => n + 1);
@@ -92,6 +87,8 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
     } finally {
       looping.current = false;
       setProgress(null);
+      // After this finally, so startFill sees the generation as finished.
+      queueMicrotask(() => startFillRef.current());
     }
   }, []);
 
@@ -103,14 +100,6 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
       setBusy(false);
       setError(null);
       setActive((prev) => new Set([...prev, ...fresh]));
-      if (!looping.current) void loop();
-    },
-    [loop],
-  );
-  const runPhonetics = useCallback(
-    (ids: number[]) => {
-      if (ids.length === 0) return;
-      phonetics.current.push(...ids);
       if (!looping.current) void loop();
     },
     [loop],
@@ -128,33 +117,56 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
     }
     return nameFix.current;
   }, [run]);
-  const startPhonetics = useCallback(() => {
-    // Once per app run: a second call (StrictMode, or a later visit of the Words page) does nothing.
-    if (phoneticsStarted.current) return;
-    phoneticsStarted.current = true;
-    void (async () => {
+
+  const fillLoop = useCallback(async () => {
+    try {
+      await fixNames();
+      const plan = planFill(await listWords(depsRef.current.db), skip.current);
+      if (plan.phonetics.length === 0) return;
       try {
-        await fixNames();
-        runPhonetics(wordsMissingPhonetics(await listWords(depsRef.current.db)));
-      } catch {
-        // The words keep what they have; the next visit of the Words page in a later app run runs them once more.
+        setFillError(null);
+        const res = await runFill(depsRef.current, plan, (done, total) => setFill({ done, total }));
+        for (const id of 'emptied' in res ? res.emptied : []) skip.current.add(id);
+        // A busy lock is not an error: the words stay empty and the next visit runs them.
+        if (!res.ok && !res.busy) setFillError(res.message);
+      } finally {
+        setVersion((n) => n + 1);
       }
-    })();
-  }, [fixNames, runPhonetics]);
+    } catch (e) {
+      setFillError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setFill(null);
+      filling.current = false;
+    }
+  }, [fixNames]);
+  const startFill = useCallback(() => {
+    if (filling.current || looping.current) return;
+    // Set before the first await, so a second call (StrictMode, a quick revisit) returns at once.
+    filling.current = true;
+    void fillLoop();
+  }, [fillLoop]);
+  const retryFill = useCallback(() => {
+    setFillError(null);
+    startFill();
+  }, [startFill]);
+  useEffect(() => {
+    startFillRef.current = startFill;
+  }, [startFill]);
+
   const clearNotices = useCallback(() => {
     setBusy(false);
     setError(null);
   }, []);
 
-  // Saved words with a bracketed tail are renamed once per app start, then regenerated. The phonetics run is not started
-  // here: the Words page calls startPhonetics on its first visit, so a lesson started at app start is not blocked by it.
+  // Saved words with a bracketed tail are renamed once per app start, then regenerated. The fill run is not started here:
+  // the Words page calls startFill on its visits, so a lesson started at app start is not blocked by it.
   useEffect(() => {
     void fixNames();
   }, [fixNames]);
 
   const value = useMemo(
-    () => ({ running: progress !== null, progress, error, busy, active, run, clearNotices, version, startPhonetics }),
-    [progress, error, busy, active, run, clearNotices, version, startPhonetics],
+    () => ({ running: progress !== null, progress, error, busy, active, run, clearNotices, version, fill, fillError, startFill, retryFill }),
+    [progress, error, busy, active, run, clearNotices, version, fill, fillError, startFill, retryFill],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

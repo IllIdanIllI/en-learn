@@ -44,7 +44,7 @@ const CASES: [string, string][] = [
   ['progress', 'progress'], ['writing-graded', 'progress'], ['graded', 'rules'], ['graded', 'errors'],
   ['writing-graded', 'errors'], ['writing-graded', 'writing'], ['graded', 'settings'], ['prereq_missing', 'prerequisites'],
   ['words', 'words'], ['words', 'words/practice?mode=new'], ['words', 'words/practice?mode=review'], ['words-done', 'words/practice'], ['words-limit', 'words'],
-  ['words', 'words/1'], ['words', 'words/abc'],
+  ['words', 'words/1'], ['words', 'words/abc'], ['words-fill', 'words'],
 ];
 
 for (const [state, route] of CASES) {
@@ -56,6 +56,13 @@ for (const [state, route] of CASES) {
     expect(await wrongCursors(page)).toEqual([]);
   });
 }
+
+test('pointer cursor: Retry of a failed transcription fill', async ({ page }) => {
+  await page.goto('/?state=words-fill&fail=cli_error#/words');
+  const retry = page.getByRole('button', { name: 'Повторить', exact: true });
+  await retry.waitFor();
+  expect(await retry.evaluate((el) => getComputedStyle(el).cursor)).toBe('pointer');
+});
 
 test('pointer cursor: anagram tiles, a placed letter and Skip', async ({ page }) => {
   await page.goto('/?state=words#/words/practice?mode=review');

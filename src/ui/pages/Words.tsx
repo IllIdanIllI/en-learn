@@ -28,10 +28,10 @@ function StageChip({ stage, label }: { stage: Stage; label: string }) {
 export function Words() {
   const { deps, lang } = useCore();
   const job = useWordsJob();
-  const { startPhonetics } = job;
+  const { startFill } = job;
   const today = deps.clock.today();
-  // Silent phonetics run for words without a transcription; once per app run (the provider guards it).
-  useEffect(() => startPhonetics(), [startPhonetics]);
+  // Every visit fills the words without a transcription; the provider runs at most one fill at a time.
+  useEffect(() => startFill(), [startFill]);
   const [reload, setReload] = useState(0);
   const [panel, setPanel] = useState<Panel>(null);
   const [params, setParams] = useSearchParams();
@@ -104,6 +104,17 @@ export function Words() {
         <p className="mt-3 text-sm text-muted-foreground" aria-live="polite">
           {t(lang, 'words.progress', { done: job.progress.done, total: job.progress.total })}
         </p>
+      )}
+      {job.fill && (
+        <p className="mt-3 text-sm text-muted-foreground" aria-live="polite">
+          {t(lang, 'words.fill.progress', { done: job.fill.done, total: job.fill.total })}
+        </p>
+      )}
+      {job.fillError && (
+        <Notice className="mt-3">
+          {t(lang, 'words.fill.error', { message: job.fillError })}
+          <Button size="sm" variant="outline" onClick={job.retryFill}>{t(lang, 'words.fill.retry')}</Button>
+        </Notice>
       )}
       <div className="mt-6 flex flex-wrap items-end gap-3">
         <Button variant="secondary" aria-expanded={panel === 'add'} onClick={() => togglePanel('add')}>{t(lang, 'words.add')}</Button>

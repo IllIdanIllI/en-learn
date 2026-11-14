@@ -163,6 +163,40 @@ export const PHRASE_WORDS: PreviewWord[] = [
 /** Like PREVIEW_WORD_ANSWERS, for the cards of PHRASE_WORDS. */
 export const PHRASE_WORD_ANSWERS: Record<string, string> = answersOf(PHRASE_WORDS);
 
+/**
+ * The `words-fill` state: three ready never-reviewed words with no transcription or part of speech, which the fill run of
+ * the Words page adds (the preview phonetics reply gives every word the same transcription and "noun").
+ */
+export const FILL_WORDS: PreviewWord[] = [
+  {
+    word: 'diligent', transcription: '', partOfSpeech: '', translation: 'усердный', definition: 'careful and hard-working', example: 'She is diligent about her homework.',
+    synonyms: ['hard-working'], added: '2026-10-18', reviews: [],
+    gaps: ['He is a ___ student who never misses a class.', 'Keep a ___ eye on the budget.'],
+    collocations: ['a ___ worker', 'very ___'],
+    form: { sentence: 'She studied ___ all year.', cue: 'diligent', answer: 'diligently' },
+    confusable: { sentence: 'A ___ search found the missing key.', options: ['diligent', 'negligent'], reason: 'Diligent means careful; negligent means careless.' },
+    translations: [{ text: 'Он усердный работник.', answers: ['He is a diligent worker.'] }, { text: 'Она усердно учится.', answers: ['She studies diligently.'] }],
+  },
+  {
+    word: 'frugal', transcription: '', partOfSpeech: '', translation: 'экономный', definition: 'using money or resources carefully', example: 'A frugal lifestyle saves a lot of money.',
+    synonyms: ['thrifty'], added: '2026-10-18', reviews: [],
+    gaps: ['They led a ___ life after the move.', 'A ___ meal cost very little.'],
+    collocations: ['a ___ budget', 'very ___'],
+    form: { sentence: 'She spends her money ___.', cue: 'frugal', answer: 'frugally' },
+    confusable: { sentence: 'A ___ meal for one person.', options: ['frugal', 'fragile'], reason: 'Frugal means thrifty; fragile means easily broken.' },
+    translations: [{ text: 'Они живут экономно.', answers: ['They live frugally.'] }, { text: 'Экономный бюджет.', answers: ['A frugal budget.'] }],
+  },
+  {
+    word: 'austere', transcription: '', partOfSpeech: '', translation: 'строгий', definition: 'severe in manner, or plain and simple', example: 'The monastery had an austere design.',
+    synonyms: ['stern', 'plain'], added: '2026-10-18', reviews: [],
+    gaps: ['The judge was ___ and showed no mercy.', 'The room was ___ and bare.'],
+    collocations: ['an ___ style', 'strikingly ___'],
+    form: { sentence: 'He lived ___ for many years.', cue: 'austere', answer: 'austerely' },
+    confusable: { sentence: 'The ___ climate made farming hard.', options: ['austere', 'austerity'], reason: 'Austere is the adjective here.' },
+    translations: [{ text: 'Суровая обстановка.', answers: ['An austere atmosphere.'] }, { text: 'Он суровый человек.', answers: ['He is an austere man.'] }],
+  },
+];
+
 const LIMIT_NAMES = [
   'brisk', 'gentle', 'vivid', 'humble', 'sturdy', 'eager', 'swift', 'calm', 'bold', 'frail', 'noble',
   'rustic', 'clever', 'stern', 'lively', 'modest', 'fierce', 'tidy', 'jolly', 'prudent', 'serene',

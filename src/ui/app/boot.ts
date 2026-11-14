@@ -14,7 +14,7 @@ declare global {
 
 /** Real app: Tauri adapters, SQLite file, the installed `claude` CLI. */
 export async function bootTauri(): Promise<CoreInit> {
-  const [{ appDataDir, appConfigDir, homeDir }, { openTauriDb }, { readDataDir, moveDataDir }, { ensureCliDir }, { TauriClock }, { TauriProcessRunner }, { TauriPromptStore }, { ClaudeCli }, { openUrl }, { invoke }] =
+  const [{ appDataDir, appConfigDir, homeDir }, { openTauriDb }, { readDataDir, moveDataDir }, { ensureCliDir }, { TauriClock }, { TauriProcessRunner }, { TauriPromptStore }, { ClaudeCli }, { openUrl }, { invoke }, { TauriNet }] =
     await Promise.all([
       import('@tauri-apps/api/path'),
       import('@/adapters/tauri/db'),
@@ -26,6 +26,7 @@ export async function bootTauri(): Promise<CoreInit> {
       import('@/adapters/tauri/claudeCli'),
       import('@tauri-apps/plugin-opener'),
       import('@tauri-apps/api/core'),
+      import('@/adapters/tauri/net'),
     ]);
   const [appData, appConfig, home] = await Promise.all([appDataDir(), appConfigDir(), homeDir()]);
   let custom: string | null = null;
@@ -49,7 +50,7 @@ export async function bootTauri(): Promise<CoreInit> {
     : { call: () => Promise.reject(new Error('claude is not available')) };
   const clock = new TauriClock();
   clock.configure({ dayStartHour: settings.dayStartHour, overrideDate: settings.dayOverride });
-  const deps: Deps = { db, llm, clock, prompts: new TauriPromptStore(dataDir) };
+  const deps: Deps = { db, llm, clock, prompts: new TauriPromptStore(dataDir), net: new TauriNet() };
   return {
     deps,
     runner,
@@ -79,7 +80,8 @@ export async function bootPreview(search: string): Promise<CoreInit> {
   const core = await buildPreview(parsePreviewState(search), { early: parsePreviewEarly(search) });
   const settings = await getSettings(core.deps.db);
   core.deps.clock.configure({ dayStartHour: settings.dayStartHour, overrideDate: settings.dayOverride });
-  const deps = { ...core.deps, llm: withFailure(withDelay(core.deps.llm, parsePreviewDelay(search)), parsePreviewFail(search)) };
+  const { previewNet } = await import('@/adapters/preview/previewNet');
+  const deps = { ...core.deps, llm: withFailure(withDelay(core.deps.llm, parsePreviewDelay(search)), parsePreviewFail(search)), net: previewNet };
   return {
     ...core,
     deps,

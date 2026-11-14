@@ -20,9 +20,14 @@ export interface WordFields {
   partOfSpeech: string;
 }
 
+/** '' = not checked yet; 'found' = kaikki has the word; 'none' = kaikki has no entry. */
+export type DictChecked = '' | 'found' | 'none';
+
 export interface Word extends WordFields {
   id: number;
   generation: Generation;
+  /** Russian translations from kaikki.org, in sense order. */
+  dict: { translations: string[]; checked: DictChecked };
 }
 
 export interface WordExercise {

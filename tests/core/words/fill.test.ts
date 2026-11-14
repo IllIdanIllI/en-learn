@@ -15,7 +15,7 @@ const fail: LlmResult<unknown> = { ok: false, code: 'not_signed_in', message: 's
 const fields = (word: string): WordFields => ({
   word, definition: '', translation: '', example: '', synonyms: [], link: '', added: '2026-11-04', transcription: '', partOfSpeech: '',
 });
-const word = (over: Partial<Word>): Word => ({ ...fields('alpha'), id: 1, generation: 'ready', ...over });
+const word = (over: Partial<Word>): Word => ({ ...fields('alpha'), id: 1, generation: 'ready', dict: { translations: [], checked: '' }, ...over });
 
 /** Every requested word gets the same transcription, or the one `transcription` picks. */
 const phon = (transcription: (w: string) => string = () => '/ˈsuːpəsiːd/') => (req: { userPrompt: string }): LlmResult<unknown> => {

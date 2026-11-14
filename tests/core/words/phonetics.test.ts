@@ -4,7 +4,7 @@ import type { Word } from '@/core/words/types';
 
 const word = (over: Partial<Word>): Word => ({
   id: 1, word: 'alpha', definition: '', translation: '', example: '', synonyms: [], link: '', added: '2026-11-04',
-  generation: 'ready', transcription: '', partOfSpeech: '', ...over,
+  generation: 'ready', transcription: '', partOfSpeech: '', dict: { translations: [], checked: '' }, ...over,
 });
 
 describe('wordsMissingPhonetics', () => {

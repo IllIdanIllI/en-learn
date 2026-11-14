@@ -11,9 +11,17 @@ import {
   listWordErrors,
   listWords,
   replaceExercises,
+  setDict,
+  setGeneration,
   updateExercise,
   updateWord,
 } from '@/core/db/repos/words';
+import { generatePhonetics } from '@/core/words/generate';
+import { FixedClock } from '@/adapters/test/fixedClock';
+import { FakeLlm } from '@/adapters/test/fakeLlm';
+import { bundledPrompts } from '@/core/llm/bundledPrompts';
+import type { Deps } from '@/core/ports';
+import type { PhoneticsReply } from '@/core/llm/types';
 import type { WordFields } from '@/core/words/types';
 
 const fields = (word: string, over: Partial<WordFields> = {}): WordFields => ({
@@ -33,7 +41,7 @@ describe('words repo', () => {
   test("insert and list round-trips synonyms and generation 'pending'", async () => {
     const db = await createTestDb();
     const id = await insertWord(db, fields('coherence'), '2026-11-04T09:00:00Z');
-    expect(await listWords(db)).toEqual([{ id, ...fields('coherence'), generation: 'pending' }]);
+    expect(await listWords(db)).toEqual([{ id, ...fields('coherence'), generation: 'pending', dict: { translations: [], checked: '' } }]);
   });
 
   test('duplicate word case-insensitive', async () => {
@@ -182,5 +190,48 @@ describe('words repo: transcription and part of speech', () => {
       "INSERT INTO word (word, definition, translation, example, synonyms, link, added, generation, created_at) VALUES ('old', '', '', '', '[]', '', '2026-11-04', 'ready', 'x')",
     );
     expect(await listWords(db)).toEqual([expect.objectContaining({ word: 'old', transcription: '', partOfSpeech: '' })]);
+  });
+});
+
+describe('words repo: dictionary fields', () => {
+  test('a new word reads an empty dict', async () => {
+    const db = await createTestDb();
+    await insertWord(db, fields('coherence'), '2026-11-04T09:00:00Z');
+    expect((await listWords(db))[0]!.dict).toEqual({ translations: [], checked: '' });
+  });
+
+  test('setDict writes both fields', async () => {
+    const db = await createTestDb();
+    const id = await insertWord(db, fields('assertion'), '2026-11-04T09:00:00Z');
+    await setDict(db, id, ['утверждение'], 'found');
+    expect((await listWords(db))[0]!.dict).toEqual({ translations: ['утверждение'], checked: 'found' });
+  });
+
+  test('updateWord with the same spelling (other case or spacing) keeps dict', async () => {
+    const db = await createTestDb();
+    const id = await insertWord(db, fields('assertion'), '2026-11-04T09:00:00Z');
+    await setDict(db, id, ['утверждение'], 'found');
+    await updateWord(db, id, fields(' Assertion ', { definition: 'changed' }));
+    expect((await listWords(db))[0]).toMatchObject({ definition: 'changed', dict: { translations: ['утверждение'], checked: 'found' } });
+  });
+
+  test('updateWord with a changed spelling resets dict', async () => {
+    const db = await createTestDb();
+    const id = await insertWord(db, fields('assertion'), '2026-11-04T09:00:00Z');
+    await setDict(db, id, ['утверждение'], 'found');
+    await updateWord(db, id, fields('assertions'));
+    expect((await listWords(db))[0]).toMatchObject({ word: 'assertions', dict: { translations: [], checked: '' } });
+  });
+
+  test('generatePhonetics keeps dict when it writes the transcription', async () => {
+    const db = await createTestDb();
+    const id = await insertWord(db, fields('supersede'), '2026-11-04T09:00:00Z');
+    await setGeneration(db, id, 'ready');
+    await setDict(db, id, ['заменять'], 'found');
+    const reply: PhoneticsReply = { words: [{ word: 'supersede', transcription: '/ˌsuːpəˈsiːd/', partOfSpeech: 'verb' }] };
+    const llm = new FakeLlm({ phonetics: [{ ok: true, data: reply, costUsd: 0, durationMs: 1, raw: '{}' }] });
+    const deps: Deps = { db, llm, clock: new FixedClock('2026-11-04'), prompts: { load: async (kind) => bundledPrompts[kind] } };
+    expect(await generatePhonetics(deps, [id])).toEqual({ ok: true, failed: 0 });
+    expect((await listWords(db))[0]).toMatchObject({ transcription: '/ˌsuːpəˈsiːd/', dict: { translations: ['заменять'], checked: 'found' } });
   });
 });

@@ -20,6 +20,7 @@ function word(id: number, added = '2026-10-04', generation: Word['generation'] =
     link: '',
     added,
     generation,
+    dict: { translations: [], checked: '' },
   };
 }
 

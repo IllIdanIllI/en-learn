@@ -38,6 +38,7 @@ function word(id: number, text: string): Word {
     link: '',
     added: '2026-10-04',
     generation: 'ready',
+    dict: { translations: [], checked: '' },
   };
 }
 

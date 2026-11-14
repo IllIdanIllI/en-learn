@@ -18,6 +18,20 @@
       ]
     },
     {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "https://kaikki.org/*"
+        },
+        {
+          "url": "https://huggingface.co/*"
+        },
+        {
+          "url": "https://*.hf.co/*"
+        }
+      ]
+    },
+    {
       "identifier": "shell:allow-spawn",
       "allow": [
         {

@@ -2,6 +2,7 @@ import type { Db } from '@/core/ports';
 import type { ISODate } from '@/core/domain';
 import type {
   CardType,
+  DictChecked,
   Generation,
   ReviewResult,
   Word,
@@ -30,6 +31,8 @@ interface WordRow {
   generation: Generation;
   transcription: string;
   part_of_speech: string;
+  dict_translations: string;
+  dict_checked: DictChecked;
 }
 
 interface ExerciseRow {
@@ -68,6 +71,7 @@ const toWord = (r: WordRow): Word => ({
   generation: r.generation,
   transcription: r.transcription,
   partOfSpeech: r.part_of_speech,
+  dict: { translations: JSON.parse(r.dict_translations) as string[], checked: r.dict_checked },
 });
 
 const toExercise = (r: ExerciseRow): WordExercise => ({
@@ -109,12 +113,20 @@ export async function insertWord(db: Db, f: WordFields, createdAt: string): Prom
   return lastInsertId;
 }
 
+/** Saves the fields. A changed spelling (ignoring case and outer spaces) clears the dictionary check, which was for the old word. */
 export async function updateWord(db: Db, id: number, f: WordFields): Promise<void> {
   await assertUnique(db, f.word, id);
+  const [old] = await db.select<{ word: string }>('SELECT word FROM word WHERE id = ?', [id]);
+  const renamed = old !== undefined && old.word.trim().toLowerCase() !== f.word.trim().toLowerCase();
+  const dictReset = renamed ? ", dict_translations = '[]', dict_checked = ''" : '';
   await db.execute(
-    'UPDATE word SET word = ?, definition = ?, translation = ?, example = ?, synonyms = ?, link = ?, added = ?, transcription = ?, part_of_speech = ? WHERE id = ?',
+    `UPDATE word SET word = ?, definition = ?, translation = ?, example = ?, synonyms = ?, link = ?, added = ?, transcription = ?, part_of_speech = ?${dictReset} WHERE id = ?`,
     [f.word, f.definition, f.translation, f.example, JSON.stringify(f.synonyms), f.link, f.added, f.transcription, f.partOfSpeech, id],
   );
+}
+
+export async function setDict(db: Db, id: number, translations: string[], checked: Exclude<DictChecked, ''>): Promise<void> {
+  await db.execute('UPDATE word SET dict_translations = ?, dict_checked = ? WHERE id = ?', [JSON.stringify(translations), checked, id]);
 }
 
 export async function setGeneration(db: Db, id: number, g: Generation): Promise<void> {
@@ -123,7 +135,7 @@ export async function setGeneration(db: Db, id: number, g: Generation): Promise<
 
 export async function listWords(db: Db): Promise<Word[]> {
   const rows = await db.select<WordRow>(
-    'SELECT id, word, definition, translation, example, synonyms, link, added, generation, transcription, part_of_speech FROM word ORDER BY added, id',
+    'SELECT id, word, definition, translation, example, synonyms, link, added, generation, transcription, part_of_speech, dict_translations, dict_checked FROM word ORDER BY added, id',
   );
   return rows.map(toWord);
 }

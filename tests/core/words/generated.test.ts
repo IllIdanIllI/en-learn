@@ -146,7 +146,7 @@ describe('word_check', () => {
     expect(checkWordCheckReply(ok({ explanation: ' ' }), s, keys)).not.toBeNull();
   });
   test('prompt carries the word, definition, sentence and topic lines', () => {
-    const w: Word = { id: 1, word: 'supersede', definition: 'replace', translation: '', example: '', synonyms: [], transcription: '', partOfSpeech: '', link: '', added: '2026-11-04', generation: 'ready' };
+    const w: Word = { id: 1, word: 'supersede', definition: 'replace', translation: '', example: '', synonyms: [], transcription: '', partOfSpeech: '', link: '', added: '2026-11-04', generation: 'ready', dict: { translations: [], checked: '' } };
     const p = buildWordCheckPrompt(w, 'My sentence.', [{ key: 'articles', title: 'Articles' }]);
     expect(buildWordCheckPrompt({ ...w, definition: '  ' }, 's', [])).toContain('Definition: (missing)');
     expect(p).toContain('supersede');

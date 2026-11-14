@@ -81,6 +81,11 @@ export interface PromptStore {
   load(kind: LlmKind): Promise<{ system: string; schema: object }>;
 }
 
+/** Plain-text HTTP GET. Resolves with any status; rejects only when the request fails. */
+export interface Net {
+  getText(url: string): Promise<{ status: number; text: string }>;
+}
+
 export interface Deps {
   db: Db;
   llm: Llm;
@@ -88,4 +93,6 @@ export interface Deps {
   prompts: PromptStore;
   /** Random source for the words feature; defaults to Math.random. */
   rand?: () => number;
+  /** HTTP GET for the dictionary lookup; absent where the app has no network adapter. */
+  net?: Net;
 }

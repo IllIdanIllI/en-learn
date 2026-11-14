@@ -19,6 +19,8 @@ export interface VoiceEngine {
   prefetch(text: string, variant: SpellingVariant): void;
   /** Stops the sound and the system voice, and ignores a reply still on its way. */
   stop(): void;
+  /** After a failed start, or a failed download, starts the voice again; does nothing while a load runs or when not failed. */
+  retry(): void;
 }
 
 export interface KokoroDeps {
@@ -33,6 +35,8 @@ export interface KokoroDeps {
   unlock?: () => void;
   /** The debug log; it never changes what the engine does. */
   log?: (kind: string, text: string) => void;
+  /** How long the start may take once the files are on disk; the default, 20 s, is what the app uses. */
+  startLimitMs?: number;
 }
 
 interface Clip {
@@ -51,9 +55,11 @@ interface Entry {
 type WorkerOut =
   | { type: 'ready' }
   | { type: 'audio'; id: number; pcm: Float32Array; rate: number }
-  | { type: 'error'; id?: number; message: string };
+  | { type: 'error'; id?: number; message: string }
+  | { type: 'log'; text: string };
 
 const CACHE_LIMIT = 200;
+const START_LIMIT_MS = 20_000;
 
 /** Kokoro voice: the model is loaded on the first press, synthesis runs in `makeWorker()`, and the system voice covers every gap. */
 export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
@@ -62,6 +68,14 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
   let error: string | null = null;
   // Set from the first line of load() until it is ready or has failed: a press during the file checks starts no second load.
   let loading = false;
+  // Set by a failure once the status has reached `loading` in this run: a press does not start Kokoro again, only retry does.
+  let startFailed = false;
+  let reachedLoading = false;
+  // Bumped by each failure, so a load still awaiting its file reads gives up once it has failed.
+  let generation = 0;
+  let startTimer: ReturnType<typeof setTimeout> | null = null;
+  // The text of the last `load …` or `worker …` line of this start, for the time-out reason.
+  let lastStep = '';
   const listeners = new Set<() => void>();
   const notify = () => listeners.forEach((fn) => fn());
   const setStatus = (next: VoiceStatus) => {
@@ -73,6 +87,7 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
 
   // The debug log. A failing log never reaches the caller.
   const log = (text: string) => {
+    if (/^(load|worker) /.test(text)) lastStep = text;
     try {
       deps.log?.('voice', text);
     } catch {
@@ -100,8 +115,16 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
     playing = null;
   }
 
+  function clearStartTimer() {
+    if (startTimer !== null) clearTimeout(startTimer);
+    startTimer = null;
+  }
+
   function fail(cause: Error) {
     logError(cause.message);
+    clearStartTimer();
+    generation += 1;
+    startFailed = reachedLoading;
     worker?.terminate();
     worker = null;
     for (const { key, entry } of waiting.values()) {
@@ -162,7 +185,10 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
 
   function onMessage(w: Worker, data: WorkerOut) {
     if (worker !== w) return;
-    if (data.type === 'ready') {
+    if (data.type === 'log') {
+      log(`worker ${data.text}`);
+    } else if (data.type === 'ready') {
+      clearStartTimer();
       loading = false;
       setStatus('ready');
     } else if (data.type === 'audio') {
@@ -186,9 +212,13 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
 
   async function load() {
     loading = true;
+    startFailed = false;
+    reachedLoading = false;
     fraction = 0;
     error = null;
     lastPercent = 0;
+    lastStep = '';
+    const gen = generation;
     try {
       await ensureVoiceFiles(
         deps.io,
@@ -205,18 +235,35 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
         () => setStatus('downloading'),
       );
       setStatus('loading');
+      reachedLoading = true;
+      startTimer = setTimeout(() => {
+        startTimer = null;
+        fail(new Error(`start timed out after 20 s at: ${lastStep || 'no step logged'}`));
+      }, deps.startLimitMs ?? START_LIMIT_MS);
       const files: Record<string, ArrayBuffer> = {};
-      for (const file of VOICE_FILES) files[file.path] = await deps.io.read(`${deps.dir}/${file.path}`);
+      for (const file of VOICE_FILES) {
+        const started = Date.now();
+        files[file.path] = await deps.io.read(`${deps.dir}/${file.path}`);
+        log(`load read ${file.path} ${files[file.path]!.byteLength}B ${Date.now() - started}ms`);
+      }
+      // The start time-out may have failed this run while the files were read.
+      if (gen !== generation) return;
       const w = deps.makeWorker();
       worker = w;
+      log('load worker created');
       w.onmessage = (e: MessageEvent<WorkerOut>) => onMessage(w, e.data);
-      w.onerror = () => {
+      w.onerror = (e: ErrorEvent) => {
         if (worker !== w) return;
+        log(`worker error ${e.message} ${e.filename}:${e.lineno}`);
         fail(new Error('voice worker crashed'));
       };
+      w.onmessageerror = () => {
+        if (worker === w) log('worker messageerror');
+      };
       w.postMessage({ type: 'init', files }, Object.values(files));
+      log('load init sent');
     } catch (e) {
-      fail(e instanceof Error ? e : new Error(String(e)));
+      if (gen === generation) fail(e instanceof Error ? e : new Error(String(e)));
     }
   }
 
@@ -262,7 +309,7 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       if (status !== 'ready') {
         log(`press "${text}" ${variant} system-not-ready`);
         system.speak(text, variant);
-        if (!loading && (status === 'idle' || status === 'failed')) void load();
+        if (!loading && !startFailed && (status === 'idle' || status === 'failed')) void load();
         return;
       }
       const systemSpeaking = system.speaking();
@@ -295,6 +342,10 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       press = ++seq;
       stopPlayback();
       system.cancel();
+    },
+    retry() {
+      if (status !== 'failed' || loading) return;
+      void load();
     },
   };
 }

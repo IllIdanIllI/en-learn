@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { createKokoroEngine, type VoiceEngine } from '@/ui/voice/engine';
 import { VOICE_FILES } from '@/ui/voice/files';
 import type { VoiceIo } from '@/ui/voice/io';
@@ -11,6 +11,7 @@ class FakeWorker {
   terminated = false;
   onmessage: ((e: { data: unknown }) => void) | null = null;
   onerror: ((e: unknown) => void) | null = null;
+  onmessageerror: ((e: unknown) => void) | null = null;
   postMessage(msg: Msg) {
     this.posted.push(msg);
   }
@@ -225,18 +226,20 @@ describe('KokoroEngine', () => {
     expect(workers).toEqual([]);
   });
 
-  test('an init error means failed, and the next press retries the files', async () => {
+  test('an init error means failed; a press after a start failure does not start again, retry does', async () => {
     const engine = makeEngine();
     engine.speak('lucid', 'en-GB');
     await flush();
     workers[0]!.reply({ type: 'error', message: 'no wasm' });
     expect(engine.status()).toBe('failed');
-    const sizes = sizeCalls;
     engine.speak('lucid', 'en-GB');
     expect(spoken).toHaveLength(2);
     await flush();
+    expect(engine.status()).toBe('failed');
+    expect(workers).toHaveLength(1);
+    engine.retry();
+    await flush();
     expect(engine.status()).toBe('loading');
-    expect(sizeCalls).toBeGreaterThan(sizes);
     expect(workers).toHaveLength(2);
   });
 
@@ -627,5 +630,183 @@ describe('KokoroEngine', () => {
     expect(engine.lastError()).toBe('HTTP 500');
     engine.speak('pivotal', 'en-GB');
     expect(engine.lastError()).toBeNull();
+  });
+});
+
+describe('KokoroEngine start steps and time limit', () => {
+  /** Lets every pending promise run; the fake clock does not move. */
+  async function settle() {
+    for (let i = 0; i < 50; i++) await Promise.resolve();
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test('a start logs each file read, the worker creation and the init, and the worker step lines', async () => {
+    const engine = makeEngine();
+    engine.speak('lucid', 'en-GB');
+    await settle();
+    const texts = logs.map(([, text]) => text);
+    for (const file of VOICE_FILES) {
+      expect(texts.some((t) => t.startsWith(`load read ${file.path} 8B `) && t.endsWith('ms'))).toBe(true);
+    }
+    expect(texts.filter((t) => t.startsWith('load read '))).toHaveLength(VOICE_FILES.length);
+    expect(texts).toContain('load worker created');
+    expect(texts).toContain('load init sent');
+    workers[0]!.reply({ type: 'log', text: 'model loading' });
+    expect(logs.at(-1)).toEqual(['voice', 'worker model loading']);
+  });
+
+  test('a worker error event logs its message, file and line, then fails as a crash', async () => {
+    const engine = makeEngine();
+    engine.speak('lucid', 'en-GB');
+    await settle();
+    workers[0]!.onerror!({ message: 'boom', filename: 'kokoro.worker.js', lineno: 3 });
+    expect(logs).toContainEqual(['voice', 'worker error boom kokoro.worker.js:3']);
+    expect(engine.status()).toBe('failed');
+    expect(engine.lastError()).toBe('voice worker crashed');
+  });
+
+  test('a worker messageerror event is logged', async () => {
+    const engine = makeEngine();
+    engine.speak('lucid', 'en-GB');
+    await settle();
+    workers[0]!.onmessageerror!({});
+    expect(logs.at(-1)).toEqual(['voice', 'worker messageerror']);
+  });
+
+  test('after 19 999 ms in loading the status is still loading; at 20 000 ms it fails at the last step', async () => {
+    const engine = makeEngine();
+    engine.speak('lucid', 'en-GB');
+    await settle();
+    expect(engine.status()).toBe('loading');
+    workers[0]!.reply({ type: 'log', text: 'model loading' });
+    vi.advanceTimersByTime(19_999);
+    expect(engine.status()).toBe('loading');
+    vi.advanceTimersByTime(1);
+    expect(engine.status()).toBe('failed');
+    expect(engine.lastError()).toBe('start timed out after 20 s at: worker model loading');
+    expect(logs).toContainEqual(['voice', 'error start timed out after 20 s at: worker model loading']);
+    expect(logs.at(-1)).toEqual(['voice', 'status failed']);
+    expect(workers[0]!.terminated).toBe(true);
+  });
+
+  test('a late ready from the timed-out worker changes nothing', async () => {
+    const engine = makeEngine();
+    engine.speak('lucid', 'en-GB');
+    await settle();
+    vi.advanceTimersByTime(20_000);
+    workers[0]!.reply({ type: 'ready' });
+    expect(engine.status()).toBe('failed');
+    expect(engine.lastError()).toBe('start timed out after 20 s at: load init sent');
+  });
+
+  test('after a time-out a press speaks with the system voice and starts no worker; retry starts one, and a second retry starts none', async () => {
+    const engine = makeEngine();
+    engine.speak('lucid', 'en-GB');
+    await settle();
+    vi.advanceTimersByTime(20_000);
+    engine.speak('pivotal', 'en-GB');
+    await settle();
+    expect(spoken.at(-1)).toEqual({ text: 'pivotal', variant: 'en-GB' });
+    expect(workers).toHaveLength(1);
+    engine.retry();
+    engine.retry();
+    await settle();
+    expect(workers).toHaveLength(2);
+    expect(engine.status()).toBe('loading');
+    expect(engine.lastError()).toBeNull();
+  });
+
+  test('retry does nothing unless the status is failed', async () => {
+    const engine = makeEngine();
+    engine.speak('lucid', 'en-GB');
+    await settle();
+    engine.retry();
+    await settle();
+    expect(workers).toHaveLength(1);
+    expect(engine.status()).toBe('loading');
+  });
+
+  test('a worker error during the start also blocks presses until retry', async () => {
+    const engine = makeEngine();
+    engine.speak('lucid', 'en-GB');
+    await settle();
+    workers[0]!.onerror!({ message: 'boom', filename: 'kokoro.worker.js', lineno: 3 });
+    engine.speak('pivotal', 'en-GB');
+    await settle();
+    expect(workers).toHaveLength(1);
+    expect(spoken.at(-1)).toEqual({ text: 'pivotal', variant: 'en-GB' });
+    engine.retry();
+    await settle();
+    expect(workers).toHaveLength(2);
+  });
+
+  test('a download does not count toward the start limit', async () => {
+    const model = VOICE_FILES[0]!;
+    const base = completeIo();
+    let written = false;
+    const engine = makeEngine({
+      ...base,
+      size: async (path) => {
+        if (path === `/app/voice/${model.path}.part`) return written ? model.size : null;
+        if (path === `/app/voice/${model.path}`) return null;
+        return base.size(path);
+      },
+      rename: async () => {
+        written = false;
+      },
+      download: async (_url, _dest, onBytes) => {
+        await new Promise((resolve) => setTimeout(resolve, 60_000));
+        written = true;
+        onBytes(model.size);
+      },
+    });
+    engine.speak('lucid', 'en-GB');
+    await settle();
+    expect(engine.status()).toBe('downloading');
+    vi.advanceTimersByTime(60_000);
+    await settle();
+    expect(engine.status()).toBe('loading');
+    vi.advanceTimersByTime(19_999);
+    expect(engine.status()).toBe('loading');
+    vi.advanceTimersByTime(1);
+    expect(engine.status()).toBe('failed');
+    expect(engine.lastError()).toMatch(/^start timed out after 20 s at: /);
+  });
+
+  test('ready in time clears the limit', async () => {
+    const engine = makeEngine();
+    engine.speak('lucid', 'en-GB');
+    await settle();
+    vi.advanceTimersByTime(19_000);
+    workers[0]!.reply({ type: 'ready' });
+    vi.advanceTimersByTime(5_000);
+    expect(engine.status()).toBe('ready');
+    expect(engine.lastError()).toBeNull();
+  });
+
+  test('after a failed download a press starts a new load, as before', async () => {
+    let downloads = 0;
+    const base = completeIo();
+    const engine = makeEngine({
+      ...base,
+      size: async (path) => (path === `/app/voice/${VOICE_FILES[0]!.path}` ? null : base.size(path)),
+      download: async () => {
+        downloads += 1;
+        throw new Error('HTTP 500');
+      },
+    });
+    engine.speak('lucid', 'en-GB');
+    await settle();
+    expect(engine.status()).toBe('failed');
+    engine.speak('lucid', 'en-GB');
+    await settle();
+    expect(downloads).toBe(2);
   });
 });

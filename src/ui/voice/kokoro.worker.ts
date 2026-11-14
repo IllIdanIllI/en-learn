@@ -15,13 +15,26 @@ type In = { type: 'init'; files: Record<string, ArrayBuffer> } | Speak;
 let files: Record<string, ArrayBuffer> = {};
 let tts: KokoroTTS | null = null;
 
+// The start steps for the page's debug log. A failing post never throws.
+function report(text: string) {
+  try {
+    self.postMessage({ type: 'log', text });
+  } catch {
+    // Logging is best effort.
+  }
+}
+
+report('started');
+
 // The model loader fetches from Hugging Face; serve those paths from the bytes the page passed in.
 const realFetch = self.fetch.bind(self);
 self.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
   const match = FILE_URL.exec(url);
   if (match) {
-    const bytes = files[match[1] ?? ''];
+    const path = match[1] ?? '';
+    const bytes = files[path];
+    report(bytes ? `fetch ${path} ${bytes.byteLength}B` : `fetch ${path} 404`);
     return bytes ? new Response(bytes, { status: 200 }) : new Response(null, { status: 404 });
   }
   // Any other origin is refused; only the app's own origin is fetched.
@@ -33,11 +46,15 @@ async function handle(msg: In) {
   try {
     if (msg.type === 'init') {
       files = msg.files;
+      report(`init ${Object.keys(files).length} files`);
       env.useBrowserCache = false;
       env.allowLocalModels = false;
       env.backends.onnx.wasm!.numThreads = 1;
       env.backends.onnx.wasm!.wasmPaths = { wasm: wasmUrl, mjs: mjsUrl };
+      report('model loading');
+      const started = Date.now();
       tts = await KokoroTTS.from_pretrained(MODEL, { dtype: 'q8', device: 'wasm' });
+      report(`model loaded ${Date.now() - started}ms`);
       self.postMessage({ type: 'ready' });
     } else {
       if (!tts) throw new Error('the voice model is not loaded');

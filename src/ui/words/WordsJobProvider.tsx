@@ -50,6 +50,8 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
   const looping = useRef(false);
   const current = useRef<number[]>([]);
   const filling = useRef(false);
+  // The fill in flight: a generation awaits it before each of its calls, so the two never hold the job lock together.
+  const fillPromise = useRef<Promise<void> | null>(null);
   // Words the fill run left without a transcription, or that a failed call could not fill: not tried again in this app run.
   const skip = useRef<Set<number>>(new Set());
   // The name fix runs once per app start; the fill run waits for it so its queue goes first.
@@ -66,6 +68,8 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
         setProgress({ done: 0, total: ids.length });
         let stop = false;
         try {
+          // A fill yields at its next batch boundary, so this waits for one batch at most.
+          if (fillPromise.current) await fillPromise.current;
           const res = await generateWords(depsRef.current, ids, (done, total) => setProgress({ done, total }));
           if (!res.ok) {
             if (res.code === 'busy') {
@@ -121,11 +125,13 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
   const fillLoop = useCallback(async () => {
     try {
       await fixNames();
+      // A generation started meanwhile (for example by the name fix) goes first; its end starts the fill again.
+      if (looping.current) return;
       const plan = planFill(await listWords(depsRef.current.db), skip.current);
       if (plan.phonetics.length === 0) return;
       try {
         setFillError(null);
-        const res = await runFill(depsRef.current, plan, (done, total) => setFill({ done, total }));
+        const res = await runFill(depsRef.current, plan, (done, total) => setFill({ done, total }), () => looping.current);
         for (const id of 'emptied' in res ? res.emptied : []) skip.current.add(id);
         // A busy lock is not an error: the words stay empty and the next visit runs them.
         if (!res.ok && !res.busy) setFillError(res.message);
@@ -143,7 +149,7 @@ export function WordsJobProvider({ children }: { children: ReactNode }) {
     if (filling.current || looping.current) return;
     // Set before the first await, so a second call (StrictMode, a quick revisit) returns at once.
     filling.current = true;
-    void fillLoop();
+    fillPromise.current = fillLoop();
   }, [fillLoop]);
   const retryFill = useCallback(() => {
     setFillError(null);

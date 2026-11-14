@@ -985,6 +985,15 @@ test.describe('a page per word', () => {
   });
 });
 
+/** Opens diligent's word page until its transcription shows; the fill writes it a moment after its progress text goes. */
+async function expectDiligentFilled(page: Page) {
+  await expect(async () => {
+    await page.getByRole('link', { name: 'Слова', exact: true }).click();
+    await row(page, 'diligent').getByRole('link', { name: 'diligent', exact: true }).click();
+    await expect(page.getByLabel('Транскрипция')).toHaveValue('/diligent/', { timeout: 1_000 });
+  }).toPass({ timeout: 20_000 });
+}
+
 test.describe('transcription fill on a Words visit', () => {
   test('the fill shows its progress, then the words have their transcriptions', async ({ page }) => {
     await page.goto('/?state=words-fill&delay=300#/words');
@@ -1002,5 +1011,35 @@ test.describe('transcription fill on a Words visit', () => {
     await expect(page.getByRole('link', { name: /Новые слова/ })).toBeVisible();
     await row(page, 'diligent').getByRole('link', { name: 'diligent', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Создать заново' })).toBeEnabled();
+  });
+
+  test('a word added while the fill runs, and a visit during its generation: both complete, no busy notice', async ({ page }) => {
+    await page.goto('/?state=words-fill&delay=3000#/words');
+    await expect(page.getByText('Добавляю транскрипции: 0 из 3')).toBeVisible();
+    await page.getByRole('button', { name: 'Добавить слово' }).click();
+    await page.getByLabel('Слово', { exact: true }).fill('lucid');
+    await page.getByRole('button', { name: 'Сохранить' }).click();
+    await expect(row(page, 'lucid')).toBeVisible();
+    // A second visit while the generation runs: the fill must not start a second run.
+    await page.evaluate(() => { location.hash = '#/today'; });
+    await page.evaluate(() => { location.hash = '#/words'; });
+    // The Words page is mounted again while the fill still runs.
+    await expect(page.getByText('Добавляю транскрипции: 0 из 3')).toBeVisible();
+    // The generation waits for the fill, so its translation shows only after the fill has ended.
+    await expect(row(page, 'lucid')).toContainText('перевод', { timeout: 20_000 });
+    await expect(row(page, 'lucid')).not.toContainText('Упражнения не созданы');
+    await expect(page.getByText('Сейчас создаётся урок')).toHaveCount(0);
+    await expectDiligentFilled(page);
+  });
+
+  test('two Words visits during one fill run it once: the total stays 3', async ({ page }) => {
+    await page.goto('/?state=words-fill&delay=3000#/words');
+    await expect(page.getByText('Добавляю транскрипции: 0 из 3')).toBeVisible();
+    await page.evaluate(() => { location.hash = '#/today'; });
+    await page.evaluate(() => { location.hash = '#/words'; });
+    await expect(page.getByText('Добавляю транскрипции: 0 из 3')).toBeVisible();
+    await expectDiligentFilled(page);
+    await expect(page.getByText(/из 6/)).toHaveCount(0);
+    await expect(page.getByText('Сейчас создаётся урок')).toHaveCount(0);
   });
 });

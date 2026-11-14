@@ -27,14 +27,21 @@ export function planFill(words: Word[], skip: ReadonlySet<number>, _opts?: FillO
  * Runs the plan one phonetics batch at a time, each under the job lock. `onProgress` gets 0 first, then the count after each
  * batch. A busy lock stops the run before anything is written. `emptied` holds the words of the batches whose call succeeded
  * and that still have no transcription; the words of a failed batch are not in it, so a later run tries them again.
+ * `yieldTo` is asked before each batch; a yes ends the run there as busy, so a generation waits for one batch at most.
  */
-export async function runFill(deps: Deps, plan: FillPlan, onProgress: (done: number, total: number) => void): Promise<FillResult> {
+export async function runFill(
+  deps: Deps,
+  plan: FillPlan,
+  onProgress: (done: number, total: number) => void,
+  yieldTo?: () => boolean,
+): Promise<FillResult> {
   const total = plan.phonetics.length;
   const emptied: number[] = [];
   let message: string | null = null;
   let done = 0;
   onProgress(0, total);
   for (let i = 0; i < total; i += PHONETICS_BATCH) {
+    if (yieldTo?.()) return { ok: false, busy: true };
     const ids = plan.phonetics.slice(i, i + PHONETICS_BATCH);
     const res = await generatePhonetics(deps, ids);
     if (!res.ok && res.code === 'busy') return { ok: false, busy: true };

@@ -93,6 +93,18 @@ describe('runFill', () => {
     expect(res).toEqual({ ok: false, busy: false, message: 'sign in', emptied: ids.slice(0, 20) });
   });
 
+  test('yieldTo is asked before each batch; a yes stops the run there and leaves the rest empty', async () => {
+    const llm = new FakeLlm({ phonetics: [phon(), phon()] });
+    const deps = await setup(llm);
+    const ids = await readyWords(deps, ...Array.from({ length: 25 }, (_, i) => `w${i}`));
+    let asked = 0;
+    const res = await runFill(deps, { phonetics: ids, dict: [] }, () => {}, () => ++asked > 1);
+    expect(res).toEqual({ ok: false, busy: true });
+    expect(llm.calls).toHaveLength(1);
+    const rows = await listWords(deps.db);
+    expect(rows.filter((w) => ids.includes(w.id)).slice(20).every((w) => w.transcription === '')).toBe(true);
+  });
+
   test('a held job lock returns busy and writes nothing', async () => {
     const llm = new FakeLlm({ phonetics: [phon()] });
     const deps = await setup(llm);

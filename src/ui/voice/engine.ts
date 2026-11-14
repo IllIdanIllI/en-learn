@@ -85,6 +85,16 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
     setStatus('failed');
   }
 
+  // The system voice, guarded: it does nothing where the browser cannot speak.
+  const system = {
+    speak: (text: string, variant: SpellingVariant) => {
+      if (deps.system.canSpeak()) deps.system.speak(text, variant);
+    },
+    cancel: () => {
+      if (deps.system.canSpeak()) deps.system.cancel();
+    },
+  };
+
   function onMessage(w: Worker, data: WorkerOut) {
     if (worker !== w) return;
     if (data.type === 'ready') {
@@ -95,6 +105,13 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       waiting.delete(data.id);
       request.entry.clip = { pcm: data.pcm, rate: data.rate };
       request.entry.resolve(request.entry.clip);
+    } else if (data.id !== undefined) {
+      // One sentence failed: only its entry is dropped, so its press falls back to the system voice and the worker stays.
+      const request = waiting.get(data.id);
+      if (!request) return;
+      waiting.delete(data.id);
+      if (cache.get(request.key) === request.entry) cache.delete(request.key);
+      request.entry.reject(new Error(data.message));
     } else {
       fail(new Error(data.message));
     }
@@ -123,7 +140,7 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
   }
 
   /** The clip for this text: from the cache, or posted to the worker. */
-  function request(text: string, variant: SpellingVariant): Entry {
+  function request(text: string, variant: SpellingVariant, prefetch: boolean): Entry {
     const voice = VOICE_BY_VARIANT[variant];
     const key = `${voice}|${text}`;
     const cached = cache.get(key);
@@ -140,7 +157,7 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
     cache.set(key, entry);
     if (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value!);
     waiting.set(id, { key, entry });
-    worker!.postMessage({ type: 'speak', id, text, voice });
+    worker!.postMessage({ type: 'speak', id, text, voice, prefetch });
     return entry;
   }
 
@@ -159,12 +176,12 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       press = token;
       stopPlayback();
       if (status !== 'ready') {
-        deps.system.speak(text, variant);
+        system.speak(text, variant);
         if (status === 'idle' || status === 'failed') void load();
         return;
       }
-      deps.system.cancel();
-      const entry = request(text, variant);
+      system.cancel();
+      const entry = request(text, variant, false);
       if (entry.clip) {
         playing = deps.play(entry.clip.pcm, entry.clip.rate);
         return;
@@ -175,18 +192,18 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
           playing = deps.play(clip.pcm, clip.rate);
         },
         () => {
-          if (press === token) deps.system.speak(text, variant);
+          if (press === token) system.speak(text, variant);
         },
       );
     },
     prefetch(text, variant) {
       if (status !== 'ready') return;
-      request(text, variant);
+      request(text, variant, true);
     },
     stop() {
       press = ++seq;
       stopPlayback();
-      deps.system.cancel();
+      system.cancel();
     },
   };
 }

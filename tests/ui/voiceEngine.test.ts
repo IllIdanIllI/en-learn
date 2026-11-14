@@ -3,7 +3,7 @@ import { createKokoroEngine, type VoiceEngine } from '@/ui/voice/engine';
 import { VOICE_FILES } from '@/ui/voice/files';
 import type { VoiceIo } from '@/ui/voice/io';
 
-type Msg = { type: string; id?: number; text?: string; voice?: string; files?: Record<string, ArrayBuffer> };
+type Msg = { type: string; id?: number; text?: string; voice?: string; prefetch?: boolean; files?: Record<string, ArrayBuffer> };
 
 /** A worker that records what it is sent; the test drives its replies through `reply`. */
 class FakeWorker {
@@ -35,6 +35,7 @@ let plays: { first: number; rate: number }[];
 let stops: number;
 let unlocks: number;
 let sizeCalls: number;
+let canSpeakNow: boolean;
 
 /** Every file is already on disk, so a press goes straight to loading. */
 function completeIo(): VoiceIo {
@@ -60,7 +61,7 @@ function makeEngine(io: VoiceIo = completeIo()): VoiceEngine {
       return w as unknown as Worker;
     },
     system: {
-      canSpeak: () => true,
+      canSpeak: () => canSpeakNow,
       speak: (text, variant) => spoken.push({ text, variant }),
       cancel: () => {
         cancels += 1;
@@ -97,6 +98,7 @@ beforeEach(() => {
   stops = 0;
   unlocks = 0;
   sizeCalls = 0;
+  canSpeakNow = true;
 });
 
 describe('KokoroEngine', () => {
@@ -209,14 +211,52 @@ describe('KokoroEngine', () => {
     expect(workers).toHaveLength(2);
   });
 
-  test('a speak error from the worker is failed and that press keeps the system voice', async () => {
+  test('a speak error from the worker keeps the engine ready, and that press keeps the system voice', async () => {
     const engine = await readyEngine();
     engine.speak('lucid', 'en-US');
     workers[0]!.reply({ type: 'error', id: workers[0]!.request().id, message: 'bad input' });
-    expect(engine.status()).toBe('failed');
+    expect(engine.status()).toBe('ready');
     await flush();
     expect(plays).toEqual([]);
     expect(spoken.at(-1)).toEqual({ text: 'lucid', variant: 'en-US' });
+  });
+
+  test('after a failed sentence the next press posts to the same worker and plays', async () => {
+    const engine = await readyEngine();
+    engine.speak('broken', 'en-US');
+    workers[0]!.reply({ type: 'error', id: workers[0]!.request().id, message: 'bad input' });
+    engine.speak('lucid', 'en-US');
+    expect(workers).toHaveLength(1);
+    expect(workers[0]!.request()).toMatchObject({ text: 'lucid', prefetch: false });
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(3), rate: 24000 });
+    await flush();
+    expect(plays).toEqual([{ first: 3, rate: 24000 }]);
+  });
+
+  test('a failed prefetch is retried by the next press for that text', async () => {
+    const engine = await readyEngine();
+    engine.prefetch('broken', 'en-US');
+    workers[0]!.reply({ type: 'error', id: workers[0]!.request().id, message: 'bad input' });
+    engine.speak('broken', 'en-US');
+    expect(workers[0]!.posted.filter((m) => m.type === 'speak')).toHaveLength(2);
+  });
+
+  test('prefetches are posted with the prefetch flag, presses without it', async () => {
+    const engine = await readyEngine();
+    engine.prefetch('ephemeral', 'en-US');
+    engine.speak('lucid', 'en-US');
+    const [prefetched, pressed] = workers[0]!.posted.filter((m) => m.type === 'speak');
+    expect(prefetched).toMatchObject({ text: 'ephemeral', prefetch: true });
+    expect(pressed).toMatchObject({ text: 'lucid', prefetch: false });
+  });
+
+  test('without system speech, a press does not call the system voice', async () => {
+    canSpeakNow = false;
+    const engine = await readyEngine();
+    engine.speak('lucid', 'en-US');
+    engine.stop();
+    expect(spoken).toEqual([]);
+    expect(cancels).toBe(0);
   });
 
   test('an interrupted download means failed, and the next presses retry until one completes', async () => {

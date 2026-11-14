@@ -3,14 +3,14 @@ import { KokoroTTS } from 'kokoro-js';
 // The JSEP build of onnxruntime-web, the one @huggingface/transformers bundles. Served from the app's own origin.
 import wasmUrl from 'ort-dist/ort-wasm-simd-threaded.jsep.wasm?url';
 import mjsUrl from 'ort-dist/ort-wasm-simd-threaded.jsep.mjs?url';
+import { nextRequest } from './queue';
 
 const MODEL = 'onnx-community/Kokoro-82M-v1.0-ONNX';
 // Any revision: the files come from the app's own copy, which is pinned in files.ts.
 const FILE_URL = /^https:\/\/huggingface\.co\/onnx-community\/Kokoro-82M-v1\.0-ONNX\/resolve\/[^/]+\/(.+)$/;
 
-type In =
-  | { type: 'init'; files: Record<string, ArrayBuffer> }
-  | { type: 'speak'; id: number; text: string; voice: 'af_heart' | 'bf_emma' };
+type Speak = { type: 'speak'; id: number; text: string; voice: 'af_heart' | 'bf_emma'; prefetch: boolean };
+type In = { type: 'init'; files: Record<string, ArrayBuffer> } | Speak;
 
 let files: Record<string, ArrayBuffer> = {};
 let tts: KokoroTTS | null = null;
@@ -24,7 +24,8 @@ self.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const bytes = files[match[1] ?? ''];
     return bytes ? new Response(bytes, { status: 200 }) : new Response(null, { status: 404 });
   }
-  if (url.startsWith('https://')) return new Response(null, { status: 404 });
+  // Any other origin is refused; only the app's own origin is fetched.
+  if (new URL(url, self.location.href).origin !== self.location.origin) return new Response(null, { status: 404 });
   return realFetch(input, init);
 };
 
@@ -49,8 +50,30 @@ async function handle(msg: In) {
   }
 }
 
-// One request at a time: a speak waits for the init, and syntheses do not overlap.
-let queue: Promise<void> = Promise.resolve();
+// One synthesis at a time: a speak waits for the init, and a press runs before the queued prefetches.
+let initing: Promise<void> = Promise.resolve();
+const pending: Speak[] = [];
+let running = false;
+
+async function pump() {
+  if (running) return;
+  running = true;
+  try {
+    await initing;
+    for (let i = nextRequest(pending); i !== -1; i = nextRequest(pending)) {
+      const [msg] = pending.splice(i, 1);
+      await handle(msg!);
+    }
+  } finally {
+    running = false;
+  }
+}
+
 self.addEventListener('message', (e: MessageEvent<In>) => {
-  queue = queue.then(() => handle(e.data));
+  if (e.data.type === 'init') {
+    initing = handle(e.data);
+    return;
+  }
+  pending.push(e.data);
+  void pump();
 });

@@ -216,3 +216,18 @@ X. **Kokoro voice.**
    - Action 5: open the Web Inspector console during Actions 1 and 2.
    - Expected: no Content Security Policy errors. The `.mjs` engine file loads (JavaScript MIME type).
    - If the download fails: record the console error. Check that the Hugging Face redirect host (`*.hf.co`) is allowed by the HTTP scope.
+
+## Debug tools: round 7 (2026-11-14)
+
+Y. **Debug tools (round 7).**
+   1. Action: `cd src-tauri && cargo check`.
+      Expected: it builds with the `devtools` feature.
+   2. Action: right-click in the app and choose "Inspect Element".
+      Expected: the Web Inspector opens, and its Console shows no Content Security Policy errors.
+   3. Action: Settings, Debug log: press Copy, Show, Clear.
+      Expected: Copy shows "Скопировано"; Show lists the log with `--- this run ---`; Clear makes the count `Записей: 0`.
+   4. Action: on Today, press Cmd+Shift+L.
+      Expected: the toast "Журнал скопирован" appears.
+   5. Action: quit and start the app again, then Settings, Debug log, Show.
+      Expected: the log starts with `--- previous run ---`.
+   If it fails: record the notice text, the Console error and the Settings screenshot.

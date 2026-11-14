@@ -14,6 +14,7 @@ import { FieldError } from '@/ui/components/FieldError';
 import { Segmented } from '@/ui/components/Segmented';
 import { useCore } from '@/ui/app/CoreProvider';
 import { Notice } from '@/ui/today/chips';
+import { DebugLogSection } from '@/ui/debug/DebugLogSection';
 
 const MODELS = ['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-opus-5-5'];
 const EFFORTS: Effort[] = ['low', 'medium', 'high'];
@@ -271,6 +272,7 @@ export function Settings() {
           {t(lang, 'page.setup')}
         </Link>
       </p>
+      <DebugLogSection />
     </>
   );
 }

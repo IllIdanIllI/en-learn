@@ -228,3 +228,14 @@ test('pointer cursor: the speaker while the voice downloads', async ({ page }) =
   expect(await page.getByRole('button', { name: 'Произнести' }).first().evaluate((el) => getComputedStyle(el).cursor)).toBe('pointer');
   expect(await wrongCursors(page)).toEqual([]);
 });
+
+test('pointer cursor: the debug log buttons with the text area open', async ({ page }) => {
+  await page.goto('/?state=words#/settings');
+  await page.getByRole('button', { name: 'Показать журнал', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Журнал отладки' })).toBeVisible();
+  const cursor = (name: string) => page.getByRole('button', { name, exact: true }).evaluate((el) => getComputedStyle(el).cursor);
+  expect(await cursor('Скопировать журнал')).toBe('pointer');
+  expect(await cursor('Скрыть журнал')).toBe('pointer');
+  expect(await cursor('Очистить')).toBe('pointer');
+  expect(await wrongCursors(page)).toEqual([]);
+});

@@ -4,13 +4,17 @@ import { Toaster } from '@/ui/components/ui/sonner';
 import { TooltipProvider } from '@/ui/components/ui/tooltip';
 import { VoiceProvider } from '@/ui/voice/VoiceProvider';
 import { logDebug } from '@/ui/debug/debugLog';
+import { useCopyLogShortcut } from '@/ui/debug/useCopyLogShortcut';
 import { ErrorBoundary } from './ErrorBoundary';
+import { useCore } from './CoreProvider';
 import { Sidebar } from './Sidebar';
 
 /** Without `claude` only Today changes (it shows the prerequisites notice); every other page stays usable. */
 export function AppShell() {
   const { pathname } = useLocation();
+  const { lang } = useCore();
   useEffect(() => logDebug('route', pathname), [pathname]);
+  useCopyLogShortcut(lang);
   return (
     <VoiceProvider>
       <TooltipProvider>

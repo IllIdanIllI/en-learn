@@ -5,6 +5,7 @@ import { checkPrerequisites } from '@/core/prereq';
 import type { Deps, Llm } from '@/core/ports';
 import type { CoreInit } from './CoreProvider';
 import { canSpeak, cancelSpeech, speak } from '@/ui/words/speech';
+import { logDebug } from '@/ui/debug/debugLog';
 
 declare global {
   interface Window {
@@ -15,6 +16,14 @@ declare global {
 
 /** Real app: Tauri adapters, SQLite file, the installed `claude` CLI. */
 export async function bootTauri(): Promise<CoreInit> {
+  let version = 'unknown';
+  try {
+    const { getVersion } = await import('@tauri-apps/api/app');
+    version = await getVersion();
+  } catch {
+    // The version is only for the debug log; boot goes on without it.
+  }
+  logDebug('run', `tauri ${version} ${navigator.userAgent}`);
   const [{ appDataDir, appConfigDir, homeDir }, { openTauriDb }, { readDataDir, moveDataDir }, { ensureCliDir }, { TauriClock }, { TauriProcessRunner }, { TauriPromptStore }, { ClaudeCli }, { openUrl }, { invoke }, { TauriNet }] =
     await Promise.all([
       import('@tauri-apps/api/path'),
@@ -87,6 +96,7 @@ export async function bootTauri(): Promise<CoreInit> {
 
 /** Browser preview: sql.js, canned LLM, fixed clock; `?state=` picks the fixture. */
 export async function bootPreview(search: string): Promise<CoreInit> {
+  logDebug('run', `preview ${navigator.userAgent}`);
   const { buildPreview, parsePreviewState, parsePreviewDelay, parsePreviewEarly, parsePreviewFail, withDelay, withFailure } = await import('@/adapters/preview/fixtures');
   const { MINI_PROGRAMME, MINI_RULES } = await import('@/adapters/preview/miniSeed');
   const core = await buildPreview(parsePreviewState(search), { early: parsePreviewEarly(search) });

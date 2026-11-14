@@ -5,8 +5,12 @@ import './styles/globals.css';
 import { boot } from './app/boot';
 import { CoreProvider } from './app/CoreProvider';
 import { AppRoutes } from './app/routes';
+import { installDebugCapture } from './debug/capture';
+import { debugLog, logDebug } from './debug/debugLog';
 
 const root = createRoot(document.getElementById('root')!);
+
+installDebugCapture(window, logDebug, () => debugLog.flush());
 
 boot().then(
   (init) =>

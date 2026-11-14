@@ -1,13 +1,16 @@
+import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Toaster } from '@/ui/components/ui/sonner';
 import { TooltipProvider } from '@/ui/components/ui/tooltip';
 import { VoiceProvider } from '@/ui/voice/VoiceProvider';
+import { logDebug } from '@/ui/debug/debugLog';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Sidebar } from './Sidebar';
 
 /** Without `claude` only Today changes (it shows the prerequisites notice); every other page stays usable. */
 export function AppShell() {
   const { pathname } = useLocation();
+  useEffect(() => logDebug('route', pathname), [pathname]);
   return (
     <VoiceProvider>
       <TooltipProvider>

@@ -55,7 +55,7 @@ The learner relies on the word card: it must show the transcription, sound natur
 
 ## R9. Builder decisions (from the spec review)
 - **Order of work**: R1, R5, R6, R7, R3, R2. R2 carries the platform risk and may slip without blocking the rest.
-- **Network goes through Rust**: one Tauri command family in `src-tauri` (using `reqwest`, added as a direct dependency). Requests are made one at a time, with a generic User-Agent `en-learn`, and only to allowlisted hosts. The web view never fetches external hosts, so the CSP `connect-src` stays as is.
+- **Network goes through Rust** (changed at planning: the official `tauri-plugin-http` does the requests on the Rust side with a host scope and a streamed body, instead of a custom `reqwest` command family; CSP `connect-src` gains only `'self'`, needed for the voice engine's own files): one Tauri command family in `src-tauri` (using `reqwest`, added as a direct dependency). Requests are made one at a time, with a generic User-Agent `en-learn`, and only to allowlisted hosts. The web view never fetches external hosts, so the CSP `connect-src` stays as is.
   - `fetch_text(url)`: host allowlist `kaikki.org`.
   - `download_file(url, dest, expected_size)`: host allowlist `huggingface.co` (redirects followed). It streams to `<dest>.part`, emits progress events, checks the final size, then renames. Any failure deletes the `.part`.
   - In TS this is a `Net` port in `deps` (Tauri adapter, preview stub, test fake).

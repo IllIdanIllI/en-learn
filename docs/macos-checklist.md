@@ -186,3 +186,33 @@ U. **Speaker buttons on the word card.**
    - Action 2: press a speaker while another is speaking.
    - Expected: the first speech stops and the new text is spoken.
    - If it is silent: note the macOS version and the voices installed; the macOS `say` command is the fallback to consider.
+
+## Words: round 6 (2026-11-14)
+
+V. **Build with the HTTP plugin.**
+   - Action: `cd src-tauri && cargo check`, then `yarn tauri dev`.
+   - Expected: it builds. `tauri-plugin-http` 2.9.0 is in Cargo.lock, matching `@tauri-apps/plugin-http` 2.9.0, and the Tauri CLI reports no version mismatch.
+   - If it fails: record the compiler output.
+
+W. **Transcriptions and dictionary fill.**
+   - Action 1: open Words with the existing vocabulary.
+   - Expected: "Добавляю транскрипции: X из Y" counts up and then disappears. Word cards show `/IPA/ · part of speech`.
+   - Action 2: while it runs, add a word.
+   - Expected: no "lesson is being built" notice; the new word is generated after the current batch.
+   - Action 3: open "assertion" (or any word whose translation is narrow).
+   - Expected: "Словарь: утверждение" and the warning "Перевода нет в словаре, проверьте"; the Wiktionary link opens in the browser.
+   - Action 4: turn Wi-Fi off and revisit Words.
+   - Expected: after at most 3 failed lookups the notice "Не удалось добавить транскрипции: …" with Повторить. The app stays usable.
+   - If it fails: record the notice text and the `llm_call` rows of kind `phonetics`.
+
+X. **Kokoro voice.**
+   - Action 1: on a word card, press the speaker for the first time.
+   - Expected: the system voice says the word at once. The speaker shows "Загрузка голоса: N%" while about 92 MB downloads into `~/Library/Application Support/<app>/voice/`. Later presses use Kokoro.
+   - Action 2: measure the time from a press to sound for a word and for the example (go/no-go: a word under about 2 s once ready).
+   - Action 3: quit, turn Wi-Fi off, start the app, press a speaker.
+   - Expected: Kokoro plays offline (the files are not downloaded again).
+   - Action 4: listen to `bf_emma` (British) and `af_heart` (American, Settings → spelling).
+   - Expected: both sound natural. Note any word they mispronounce.
+   - Action 5: open the Web Inspector console during Actions 1 and 2.
+   - Expected: no Content Security Policy errors. The `.mjs` engine file loads (JavaScript MIME type).
+   - If the download fails: record the console error. Check that the Hugging Face redirect host (`*.hf.co`) is allowed by the HTTP scope.

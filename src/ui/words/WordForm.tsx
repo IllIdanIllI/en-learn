@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Check } from 'lucide-react';
 import { t } from '@/core/i18n';
-import { DuplicateWord, insertWord, updateWord } from '@/core/db/repos/words';
+import { DuplicateWord, insertWord, listWords, updateWord } from '@/core/db/repos/words';
+import { keepUntouchedBlanks, type FillField } from '@/core/words/keepBlanks';
 import { cleanWordName } from '@/core/words/name';
 import { isHttpsLink } from '@/core/words/link';
 import type { Word, WordFields } from '@/core/words/types';
@@ -33,6 +34,12 @@ export function WordForm({ word, onSaved, onCancel }: { word?: Word; onSaved: ()
   const [duplicate, setDuplicate] = useState(false);
   const [saving, setSaving] = useState(false);
   const { saved, markSaved, clear } = useSavedFlag();
+  // The fill fields the learner typed in; an untouched blank one keeps the stored value on save.
+  const touched = useRef<Set<FillField>>(new Set());
+  const touching = (key: FillField, set: (v: string) => void) => (v: string) => {
+    touched.current.add(key);
+    set(v);
+  };
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +61,8 @@ export function WordForm({ word, onSaved, onCancel }: { word?: Word; onSaved: ()
     setDuplicate(false);
     try {
       if (word) {
-        await updateWord(deps.db, word.id, fields);
+        const stored = (await listWords(deps.db)).find((w) => w.id === word.id);
+        await updateWord(deps.db, word.id, stored === undefined ? fields : keepUntouchedBlanks(fields, stored, touched.current));
         markSaved();
       } else {
         const id = await insertWord(deps.db, fields, deps.clock.now());
@@ -115,8 +123,8 @@ export function WordForm({ word, onSaved, onCancel }: { word?: Word; onSaved: ()
         {duplicate && <p role="alert" className="mt-1 text-sm text-destructive">{t(lang, 'words.duplicate')}</p>}
       </div>
       {field('translation', t(lang, 'words.field.translation'), translation, setTranslation)}
-      {field('transcription', t(lang, 'words.field.transcription'), transcription, setTranscription)}
-      {field('partOfSpeech', t(lang, 'words.field.partOfSpeech'), partOfSpeech, setPartOfSpeech)}
+      {field('transcription', t(lang, 'words.field.transcription'), transcription, touching('transcription', setTranscription))}
+      {field('partOfSpeech', t(lang, 'words.field.partOfSpeech'), partOfSpeech, touching('partOfSpeech', setPartOfSpeech))}
       {field('definition', t(lang, 'words.field.definition'), definition, setDefinition, { area: true })}
       {field('example', t(lang, 'words.field.example'), example, setExample, { area: true })}
       {field('synonyms', t(lang, 'words.field.synonyms'), synonyms, setSynonyms)}

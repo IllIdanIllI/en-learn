@@ -20,6 +20,8 @@ function statusText(lang: 'ru' | 'en', voice: VoiceEngine): string {
     case 'ready':
       return t(lang, 'settings.voice.ready');
     case 'failed':
+      // After Retry, before the new load reports a step, the failure is cleared: the voice is starting, not failed.
+      if (voice.lastError() === null) return t(lang, 'settings.voice.loading');
       return t(lang, 'settings.voice.failed', { reason: voice.lastError() ?? '' });
   }
 }
@@ -50,7 +52,7 @@ export function VoiceStatusRow() {
   return (
     <div className="space-y-2">
       {voice && <p className="pt-1.5">{statusText(lang, voice)}</p>}
-      {voice?.status() === 'failed' && (
+      {voice?.status() === 'failed' && voice.lastError() !== null && (
         <Button variant="secondary" onClick={() => voice.retry()}>
           {t(lang, 'settings.voice.retry')}
         </Button>

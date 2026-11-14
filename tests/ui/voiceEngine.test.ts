@@ -349,6 +349,17 @@ describe('KokoroEngine', () => {
     expect(logs).toContainEqual(['voice', 'press "pivotal" en-GB system-not-ready']);
   });
 
+  test('a press after a start failure logs system-start-failed, not system-not-ready', async () => {
+    const engine = makeEngine();
+    engine.speak('lucid', 'en-GB');
+    await flush();
+    workers[0]!.onerror!({ message: 'boom', filename: 'kokoro.worker.js', lineno: 3 });
+    expect(engine.status()).toBe('failed');
+    engine.speak('pivotal', 'en-GB');
+    expect(logs).toContainEqual(['voice', 'press "pivotal" en-GB system-start-failed']);
+    expect(logs).not.toContainEqual(['voice', 'press "pivotal" en-GB system-not-ready']);
+  });
+
   test('a ready press logs kokoro-wait, then the clip start with a 20-character outline', async () => {
     const engine = await readyEngine();
     engine.speak('pivotal', 'en-GB');
@@ -745,6 +756,51 @@ describe('KokoroEngine start steps and time limit', () => {
     engine.retry();
     await settle();
     expect(workers).toHaveLength(2);
+  });
+
+  test('a file read still pending at the time-out creates no worker when it resolves', async () => {
+    let release!: (buf: ArrayBuffer) => void;
+    const base = completeIo();
+    const engine = makeEngine({
+      ...base,
+      read: () => new Promise<ArrayBuffer>((resolve) => (release = resolve)),
+    });
+    engine.speak('lucid', 'en-GB');
+    await settle();
+    expect(engine.status()).toBe('loading');
+    vi.advanceTimersByTime(20_000);
+    expect(engine.status()).toBe('failed');
+    release(new ArrayBuffer(8));
+    await settle();
+    expect(workers).toHaveLength(0);
+    expect(engine.status()).toBe('failed');
+  });
+
+  test('retry while the read of the timed-out start is still pending leaves exactly one worker', async () => {
+    let release!: (buf: ArrayBuffer) => void;
+    let held = false;
+    const base = completeIo();
+    const engine = makeEngine({
+      ...base,
+      read: (path) => {
+        if (held) return base.read(path);
+        held = true;
+        return new Promise<ArrayBuffer>((resolve) => (release = resolve));
+      },
+    });
+    engine.speak('lucid', 'en-GB');
+    await settle();
+    vi.advanceTimersByTime(20_000);
+    expect(engine.status()).toBe('failed');
+    engine.retry();
+    await settle();
+    expect(workers).toHaveLength(1);
+    release(new ArrayBuffer(8));
+    await settle();
+    expect(workers).toHaveLength(1);
+    expect(engine.status()).toBe('loading');
+    workers[0]!.reply({ type: 'ready' });
+    expect(engine.status()).toBe('ready');
   });
 
   test('a download does not count toward the start limit', async () => {

@@ -307,7 +307,7 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       const hadClip = clipPlaying !== null;
       stopPlayback();
       if (status !== 'ready') {
-        log(`press "${text}" ${variant} system-not-ready`);
+        log(`press "${text}" ${variant} ${startFailed ? 'system-start-failed' : 'system-not-ready'}`);
         system.speak(text, variant);
         if (!loading && !startFailed && (status === 'idle' || status === 'failed')) void load();
         return;

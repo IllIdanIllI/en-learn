@@ -1043,3 +1043,50 @@ test.describe('transcription fill on a Words visit', () => {
     await expect(page.getByText('Сейчас создаётся урок')).toHaveCount(0);
   });
 });
+
+test.describe('search shortcut and saved confirmation', () => {
+  test('the search field has a search icon inside its wrapper', async ({ page }) => {
+    await page.goto('/?state=words#/words');
+    const icon = page.locator('#words-search').locator('xpath=..').locator('svg');
+    await expect(icon).toHaveCount(1);
+    await expect(icon).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  for (const key of ['Meta+f', 'Control+f']) {
+    test(`${key} focuses the search field and selects its text`, async ({ page }) => {
+      await page.goto('/?state=words#/words');
+      const search = page.locator('#words-search');
+      await search.fill('устой');
+      await page.locator('h1').click();
+      await page.keyboard.press(key);
+      await expect(search).toBeFocused();
+      const selection = await search.evaluate((el: HTMLInputElement) => ({ start: el.selectionStart, end: el.selectionEnd, length: el.value.length }));
+      expect(selection).toEqual({ start: 0, end: 5, length: 5 });
+    });
+  }
+
+  test('saving a word shows Saved until a field changes', async ({ page }) => {
+    await page.goto('/?state=words#/words');
+    await row(page, 'resilient').getByRole('link', { name: 'resilient', exact: true }).click();
+    const saved = page.getByRole('status').filter({ hasText: 'Сохранено' });
+    await expect(saved).toHaveCount(0);
+    await page.getByLabel('Перевод', { exact: true }).fill('стойкий');
+    await page.locator('form').getByRole('button', { name: 'Сохранить' }).click();
+    await expect(saved).toBeVisible();
+    await page.getByLabel('Перевод', { exact: true }).fill('стойкий!');
+    await expect(saved).toHaveCount(0);
+  });
+
+  test('saving an exercise shows Saved in its own row, and typing hides it', async ({ page }) => {
+    await page.goto('/?state=words#/words');
+    await row(page, 'resilient').getByRole('link', { name: 'resilient', exact: true }).click();
+    const exercise = page.locator('li').filter({ hasText: 'Допустимые ответы' }).first();
+    const saved = exercise.getByRole('status');
+    await expect(saved).toHaveCount(0);
+    await exercise.getByLabel('Текст', { exact: true }).fill('Edited prompt');
+    await exercise.getByRole('button', { name: 'Сохранить' }).click();
+    await expect(saved).toHaveText('Сохранено');
+    await exercise.getByLabel('Текст', { exact: true }).fill('Edited again');
+    await expect(saved).toHaveCount(0);
+  });
+});

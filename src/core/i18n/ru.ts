@@ -450,6 +450,7 @@ export const ru: Record<keyof typeof en, string> = {
   'words.cancel': 'Отмена',
   'words.duplicate': 'Такое слово уже есть',
   'words.saveError': 'Не удалось сохранить: {message}',
+  'words.saved': 'Сохранено',
   'words.import.label': 'Вставьте карточки из Obsidian',
   'words.import.preview': 'Найдено {n} · {k} уже есть · {m} проблем',
   'words.import.problem': 'карточка {n}: нет Word',

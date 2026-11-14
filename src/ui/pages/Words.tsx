@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Search } from 'lucide-react';
 import { t } from '@/core/i18n';
 import { extraNewFor } from '@/core/words/queue';
 import { getSettings } from '@/core/db/repos/settings';
@@ -39,6 +40,7 @@ export function Words() {
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const loaded = useLoaded(async () => {
     const { wordsExtraNew } = await getSettings(deps.db);
     return { views: await loadWordViews(deps.db), overview: await wordsOverview(deps.db, today, extraNewFor(wordsExtraNew, today)) };
@@ -54,6 +56,18 @@ export function Words() {
       [v.word.word, v.word.translation, v.word.definition].some((s) => s.toLowerCase().includes(needle)),
   );
   const togglePanel = (p: Exclude<Panel, null>) => setPanel((cur) => (cur === p ? null : p));
+  // Cmd+F (Ctrl+F) searches the list instead of the browser's find, unless a dialog is open.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'f' || document.querySelector('[role=dialog]')) return;
+      e.preventDefault();
+      const input = searchRef.current;
+      input?.focus();
+      input?.setSelectionRange(0, input.value.length);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
     <>
@@ -121,14 +135,18 @@ export function Words() {
         <Button variant="secondary" aria-expanded={panel === 'import'} onClick={() => togglePanel('import')}>{t(lang, 'words.import')}</Button>
         <div className="w-64">
           <label htmlFor="words-search" className="label text-muted-foreground">{t(lang, 'words.search')}</label>
-          <FieldInput
-            id="words-search"
-            type="search"
-            className="mt-1"
-            placeholder={t(lang, 'words.search.placeholder')}
-            value={search}
-            onChange={(e) => setParams(e.target.value === '' ? {} : { q: e.target.value }, { replace: true })}
-          />
+          <div className="relative mt-1">
+            <Search aria-hidden className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+            <FieldInput
+              id="words-search"
+              ref={searchRef}
+              type="search"
+              className="pl-8"
+              placeholder={t(lang, 'words.search.placeholder')}
+              value={search}
+              onChange={(e) => setParams(e.target.value === '' ? {} : { q: e.target.value }, { replace: true })}
+            />
+          </div>
         </div>
       </div>
       {panel === 'add' && (

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Check } from 'lucide-react';
 import { t } from '@/core/i18n';
 import { DuplicateWord, insertWord, updateWord } from '@/core/db/repos/words';
 import { cleanWordName } from '@/core/words/name';
@@ -10,6 +11,7 @@ import { ExternalLink } from '@/ui/components/ExternalLink';
 import { FieldInput } from '@/ui/components/ui/field-input';
 import { Textarea } from '@/ui/components/ui/textarea';
 import { Notice } from '@/ui/today/chips';
+import { useSavedFlag } from './useSavedFlag';
 import { useWordsJob } from './WordsJobProvider';
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -30,6 +32,7 @@ export function WordForm({ word, onSaved, onCancel }: { word?: Word; onSaved: ()
   const [error, setError] = useState<string | null>(null);
   const [duplicate, setDuplicate] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { saved, markSaved, clear } = useSavedFlag();
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,6 +55,7 @@ export function WordForm({ word, onSaved, onCancel }: { word?: Word; onSaved: ()
     try {
       if (word) {
         await updateWord(deps.db, word.id, fields);
+        markSaved();
       } else {
         const id = await insertWord(deps.db, fields, deps.clock.now());
         job.run([id]);
@@ -89,13 +93,13 @@ export function WordForm({ word, onSaved, onCancel }: { word?: Word; onSaved: ()
         )}
       </div>
       {extra?.area ? (
-        <Textarea id={`${id}-${key}`} className="mt-1 min-h-0 resize-y [font-family:inherit]! text-sm!" rows={3} value={value} onChange={(e) => set(e.target.value)} />
+        <Textarea id={`${id}-${key}`} className="mt-1 min-h-0 resize-y [font-family:inherit]! text-sm!" rows={3} value={value} onChange={(e) => { set(e.target.value); clear(); }} />
       ) : (
         <FieldInput
           id={`${id}-${key}`}
           className="mt-1"
           value={value}
-          onChange={(e) => set(e.target.value)}
+          onChange={(e) => { set(e.target.value); clear(); }}
           type={extra?.type}
           required={extra?.required}
           aria-invalid={extra?.invalid || undefined}
@@ -122,6 +126,12 @@ export function WordForm({ word, onSaved, onCancel }: { word?: Word; onSaved: ()
       <div className="flex gap-2 sm:col-span-2">
         <Button type="submit" disabled={cleanWordName(text) === '' || saving}>{t(lang, 'words.save')}</Button>
         {onCancel && <Button type="button" variant="ghost" onClick={onCancel}>{t(lang, 'words.cancel')}</Button>}
+        {saved && (
+          <span role="status" className="inline-flex items-center gap-1 text-sm text-success">
+            <Check aria-hidden className="size-4" />
+            {t(lang, 'words.saved')}
+          </span>
+        )}
       </div>
     </form>
   );

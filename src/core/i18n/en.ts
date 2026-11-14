@@ -448,6 +448,7 @@ export const en = {
   'words.cancel': 'Cancel',
   'words.duplicate': 'This word already exists',
   'words.saveError': 'Could not save: {message}',
+  'words.saved': 'Saved',
   'words.import.label': 'Paste cards from Obsidian',
   'words.import.preview': 'Found {n} · {k} already exist · {m} problems',
   'words.import.problem': 'card {n}: no Word',

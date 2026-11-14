@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Check } from 'lucide-react';
 import { t } from '@/core/i18n';
 import { deleteWord, updateExercise } from '@/core/db/repos/words';
 import type { WordView } from '@/core/words/practice';
@@ -9,6 +10,7 @@ import { Button, buttonVariants } from '@/ui/components/ui/button';
 import { Textarea } from '@/ui/components/ui/textarea';
 import { Notice } from '@/ui/today/chips';
 import { WordForm } from './WordForm';
+import { useSavedFlag } from './useSavedFlag';
 import { useWordsJob } from './WordsJobProvider';
 
 function ExerciseEditor({ exercise, onSaved }: { exercise: WordExercise; onSaved: () => void }) {
@@ -16,6 +18,7 @@ function ExerciseEditor({ exercise, onSaved }: { exercise: WordExercise; onSaved
   const [prompt, setPrompt] = useState(exercise.prompt);
   const [answers, setAnswers] = useState(exercise.answers.join('\n'));
   const [error, setError] = useState<string | null>(null);
+  const { saved, markSaved, clear } = useSavedFlag();
   const list = answers.split('\n').map((a) => a.trim()).filter((a) => a !== '');
   const changed = prompt !== exercise.prompt || list.join('\n') !== exercise.answers.join('\n');
 
@@ -23,6 +26,7 @@ function ExerciseEditor({ exercise, onSaved }: { exercise: WordExercise; onSaved
     setError(null);
     try {
       await updateExercise(deps.db, { ...exercise, prompt: prompt.trim(), answers: list });
+      markSaved();
       onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -34,17 +38,23 @@ function ExerciseEditor({ exercise, onSaved }: { exercise: WordExercise; onSaved
       <span className="label text-muted-foreground">{t(lang, `words.ex.${exercise.type}`)}</span>
       <div>
         <label htmlFor={`ex-${exercise.id}-prompt`} className="label text-muted-foreground">{t(lang, 'words.ex.prompt')}</label>
-        <Textarea id={`ex-${exercise.id}-prompt`} className="mt-1 min-h-0" rows={2} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+        <Textarea id={`ex-${exercise.id}-prompt`} className="mt-1 min-h-0" rows={2} value={prompt} onChange={(e) => { setPrompt(e.target.value); clear(); }} />
       </div>
       <div>
         <label htmlFor={`ex-${exercise.id}-answers`} className="label text-muted-foreground">{t(lang, 'words.ex.answers')}</label>
-        <Textarea id={`ex-${exercise.id}-answers`} className="mt-1 min-h-0" rows={Math.max(1, list.length)} value={answers} onChange={(e) => setAnswers(e.target.value)} />
+        <Textarea id={`ex-${exercise.id}-answers`} className="mt-1 min-h-0" rows={Math.max(1, list.length)} value={answers} onChange={(e) => { setAnswers(e.target.value); clear(); }} />
       </div>
       {error !== null && <Notice>{t(lang, 'words.saveError', { message: error })}</Notice>}
-      <div>
+      <div className="flex items-center gap-2">
         <Button size="sm" variant="secondary" disabled={!changed || prompt.trim() === '' || list.length === 0} onClick={() => void save()}>
           {t(lang, 'words.save')}
         </Button>
+        {saved && (
+          <span role="status" className="inline-flex items-center gap-1 text-sm text-success">
+            <Check aria-hidden className="size-4" />
+            {t(lang, 'words.saved')}
+          </span>
+        )}
       </div>
     </li>
   );

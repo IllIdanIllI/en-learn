@@ -1,5 +1,6 @@
 import { fetch } from '@tauri-apps/plugin-http';
-import { exists, mkdir, open, readFile, remove, rename, stat } from '@tauri-apps/plugin-fs';
+import { exists, mkdir, open, readDir, readFile, remove, rename, stat } from '@tauri-apps/plugin-fs';
+import type { ClipIo } from './clipStore';
 
 /** A download that gets no chunk for this long is stalled: it rejects, and the `.part` cleanup takes over. */
 const STALL_MS = 30_000;
@@ -65,5 +66,39 @@ export class TauriVoiceIo implements VoiceIo {
   async read(path: string): Promise<ArrayBuffer> {
     const bytes = await readFile(path);
     return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  }
+}
+
+/** The Tauri implementation of the clip folder access (plugin-fs, scope `$APPDATA/voice/**`). */
+export class TauriClipIo implements ClipIo {
+  async read(path: string): Promise<ArrayBuffer | null> {
+    if (!(await exists(path))) return null;
+    const bytes = await readFile(path);
+    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  }
+
+  async write(path: string, bytes: ArrayBuffer): Promise<void> {
+    await mkdir(path.slice(0, path.lastIndexOf('/')), { recursive: true });
+    const file = await open(path, { write: true, create: true, truncate: true });
+    try {
+      await file.write(new Uint8Array(bytes));
+    } finally {
+      await file.close();
+    }
+  }
+
+  remove(path: string): Promise<void> {
+    return remove(path);
+  }
+
+  async list(dir: string): Promise<{ name: string; size: number; modified: number }[]> {
+    if (!(await exists(dir))) return [];
+    const out: { name: string; size: number; modified: number }[] = [];
+    for (const entry of await readDir(dir)) {
+      if (!entry.isFile) continue;
+      const info = await stat(`${dir}/${entry.name}`);
+      out.push({ name: entry.name, size: info.size, modified: info.mtime?.getTime() ?? 0 });
+    }
+    return out;
   }
 }

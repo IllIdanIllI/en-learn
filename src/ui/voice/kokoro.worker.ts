@@ -1,3 +1,4 @@
+import './streamIteration';
 import { env } from '@huggingface/transformers';
 import { KokoroTTS } from 'kokoro-js';
 // The plain wasm build of onnxruntime-web, served from the app's own origin. Not the JSEP build (the WebGPU one that
@@ -28,6 +29,8 @@ function report(text: string) {
 }
 
 report('started');
+// A promise nobody awaits can fail silently inside the libraries; the debug log shows it.
+self.addEventListener('unhandledrejection', (e) => report(`unhandled ${String(e.reason)}`));
 
 // The model loader fetches from Hugging Face; serve those paths from the bytes the page passed in.
 const realFetch = self.fetch.bind(self);

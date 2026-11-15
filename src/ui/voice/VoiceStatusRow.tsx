@@ -26,7 +26,7 @@ function statusText(lang: 'ru' | 'en', voice: VoiceEngine): string {
   }
 }
 
-/** The voice status (live), Retry after a failure, and the system voice of the spelling variant. */
+/** The voice status (live) and Retry after a failure; without the Kokoro engine, the system voice of the spelling variant. */
 export function VoiceStatusRow() {
   const { lang, settings } = useCore();
   const voice = useVoice();
@@ -38,13 +38,13 @@ export function VoiceStatusRow() {
   // Browsers may fill the voice list only after the first call, so the choice is read again on `voiceschanged`.
   const [, setVoicesVersion] = useState(0);
   useEffect(() => {
-    if (!canSpeak()) return;
+    if (voice !== null || !canSpeak()) return;
     const synth = window.speechSynthesis;
     const onChange = () => setVoicesVersion((n) => n + 1);
     synth.addEventListener('voiceschanged', onChange);
     return () => synth.removeEventListener('voiceschanged', onChange);
-  }, []);
-  const systemVoice = canSpeak() ? chooseSystemVoice(window.speechSynthesis.getVoices(), variant) : null;
+  }, [voice]);
+  const systemVoice = voice === null && canSpeak() ? chooseSystemVoice(window.speechSynthesis.getVoices(), variant) : null;
   const systemLine = systemVoice
     ? t(lang, 'settings.voice.system', { name: `${systemVoice.name} (${systemVoice.lang})` })
     : t(lang, 'settings.voice.systemDefault');
@@ -57,7 +57,7 @@ export function VoiceStatusRow() {
           {t(lang, 'settings.voice.retry')}
         </Button>
       )}
-      {canSpeak() && <p className="label text-muted-foreground">{systemLine}</p>}
+      {voice === null && canSpeak() && <p className="label text-muted-foreground">{systemLine}</p>}
     </div>
   );
 }

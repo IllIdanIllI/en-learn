@@ -10,7 +10,8 @@ declare global {
 /**
  * Browser preview voice, provided only when the URL has `?voice=`: `downloading` holds the download at 40%,
  * `downloaded` starts at 100% and is ready 300 ms after the first subscribe, `failed` has failed to start with the
- * time-out reason and `retry()` makes it ready, and any other value is a ready voice
+ * time-out reason (`retry()` goes to loading, then ready 300 ms later, and a press while failed notifies the
+ * subscribers), `starting` is loading and never ready, and any other value is a ready voice
  * that records each spoken text in `window.__spoken`. A subscriber is notified once when it subscribes.
  */
 export function previewVoice(search: string): VoiceEngine | null {
@@ -19,7 +20,8 @@ export function previewVoice(search: string): VoiceEngine | null {
   const downloading = mode === 'downloading';
   const downloaded = mode === 'downloaded';
   const failed = mode === 'failed';
-  let status: VoiceStatus = downloading || downloaded ? 'downloading' : failed ? 'failed' : 'ready';
+  const starting = mode === 'starting';
+  let status: VoiceStatus = downloading || downloaded ? 'downloading' : failed ? 'failed' : starting ? 'loading' : 'ready';
   let error: string | null = failed ? 'start timed out after 20 s at: worker model loading' : null;
   let timerStarted = false;
   const listeners = new Set<() => void>();
@@ -29,10 +31,15 @@ export function previewVoice(search: string): VoiceEngine | null {
     lastError: () => error,
     retry() {
       if (status !== 'failed') return;
-      status = 'ready';
+      status = 'loading';
       error = null;
       listeners.forEach((listener) => listener());
+      setTimeout(() => {
+        status = 'ready';
+        listeners.forEach((listener) => listener());
+      }, 300);
     },
+    sentenceError: () => null,
     subscribe(fn) {
       listeners.add(fn);
       fn();
@@ -48,6 +55,7 @@ export function previewVoice(search: string): VoiceEngine | null {
       };
     },
     speak: (text) => {
+      if (status === 'failed') listeners.forEach((listener) => listener());
       if (status === 'ready') (window.__spoken ??= []).push(text);
     },
     prefetch: () => {},

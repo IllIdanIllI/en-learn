@@ -66,9 +66,18 @@ test('pointer cursor: Retry of a failed transcription fill', async ({ page }) =>
 
 test('pointer cursor: Retry of a failed voice start in Settings', async ({ page }) => {
   await page.goto('/?voice=failed#/settings');
-  const retry = page.getByRole('button', { name: 'Повторить', exact: true });
+  const retry = page.locator('main').getByRole('button', { name: 'Повторить', exact: true });
   await retry.waitFor();
   expect(await retry.evaluate((el) => getComputedStyle(el).cursor)).toBe('pointer');
+});
+
+test('pointer cursor: Retry in the failed voice notification', async ({ page }) => {
+  await page.goto('/?state=words&voice=failed#/words/practice?mode=new');
+  await page.locator('[data-card-type]').waitFor();
+  const retry = page.locator('[data-sonner-toast]').getByRole('button', { name: 'Повторить', exact: true });
+  await retry.waitFor();
+  expect(await retry.evaluate((el) => getComputedStyle(el).cursor)).toBe('pointer');
+  expect(await wrongCursors(page)).toEqual([]);
 });
 
 test('pointer cursor: anagram tiles, a placed letter and Skip', async ({ page }) => {

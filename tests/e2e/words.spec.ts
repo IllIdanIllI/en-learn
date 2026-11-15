@@ -938,10 +938,24 @@ test.describe('two trainings, the word card and its buttons', () => {
     await expect(card(page).getByRole('button', { name: 'Произнести' }).first()).toBeEnabled();
   });
 
-  test('when the voice has downloaded, a notification says so', async ({ page }) => {
+  test('when the voice has downloaded, a notification says it is ready', async ({ page }) => {
     await page.goto('/?state=words&voice=downloaded#/words/practice?mode=new');
     await card(page).waitFor();
-    await expect(page.getByText('Голос загружен')).toBeVisible();
+    await expect(page.getByText('Голос готов')).toBeVisible();
+  });
+
+  test('while the voice starts, one notification says so', async ({ page }) => {
+    await page.goto('/?state=words&voice=starting#/words/practice?mode=new');
+    await card(page).waitFor();
+    await expect(page.getByText('Голос запускается…')).toBeVisible();
+  });
+
+  test('a failed voice shows a notification with Retry, and Retry ends in a ready voice', async ({ page }) => {
+    await page.goto('/?state=words&voice=failed#/words/practice?mode=new');
+    await card(page).waitFor();
+    await expect(page.getByText('Голос не работает: start timed out after 20 s at: worker model loading')).toBeVisible();
+    await page.getByRole('button', { name: 'Повторить', exact: true }).click();
+    await expect(page.getByText('Голос готов')).toBeVisible();
   });
 });
 

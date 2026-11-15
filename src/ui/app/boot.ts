@@ -4,7 +4,6 @@ import { loadSeed } from '@/core/programme/setup';
 import { checkPrerequisites } from '@/core/prereq';
 import type { Deps, Llm } from '@/core/ports';
 import type { CoreInit } from './CoreProvider';
-import { canSpeak, cancelSpeech, speak } from '@/ui/words/speech';
 import { logDebug } from '@/ui/debug/debugLog';
 
 declare global {
@@ -67,7 +66,6 @@ export async function bootTauri(): Promise<CoreInit> {
     io: new TauriVoiceIo(),
     dir: `${appData}/voice`,
     makeWorker: () => new Worker(new URL('../voice/kokoro.worker.ts', import.meta.url), { type: 'module' }),
-    system: { canSpeak, speak, cancel: cancelSpeech, speaking: () => window.speechSynthesis.speaking },
     play: playPcm,
     unlock: unlockAudio,
     log: logDebug,

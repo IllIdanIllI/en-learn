@@ -13,11 +13,13 @@ export interface VoiceEngine {
   /** The message of the last failure; null after a new load starts. */
   lastError(): string | null;
   subscribe(fn: () => void): () => void;
-  /** Plays the text with Kokoro once it is ready; until then, and on failure, with the system voice. Never throws. */
+  /** Plays the text with Kokoro; a press before the voice is ready is held and played once it is. Never throws. */
   speak(text: string, variant: SpellingVariant): void;
+  /** The message of the latest press whose synthesis failed; null again at the next press. */
+  sentenceError(): string | null;
   /** Synthesises the text into the cache in the background; does nothing before the model is ready. */
   prefetch(text: string, variant: SpellingVariant): void;
-  /** Stops the sound and the system voice, and ignores a reply still on its way. */
+  /** Stops the sound, drops a held press, and ignores a reply still on its way. */
   stop(): void;
   /** After a failed start, or a failed download, starts the voice again; does nothing while a load runs or when not failed. */
   retry(): void;
@@ -28,7 +30,6 @@ export interface KokoroDeps {
   /** The folder holding the voice files (`<appData>/voice`). */
   dir: string;
   makeWorker: () => Worker;
-  system: { canSpeak(): boolean; speak(text: string, variant: SpellingVariant): void; cancel(): void; speaking(): boolean };
   /** Plays the clip; `onEnd` runs when it ends, stopped or not. */
   play: (pcm: Float32Array, rate: number, onEnd: () => void) => { stop(): void };
   /** Called synchronously on every press, so WebKit lets the later playback start. */
@@ -61,16 +62,17 @@ type WorkerOut =
 const CACHE_LIMIT = 200;
 const START_LIMIT_MS = 20_000;
 
-/** Kokoro voice: the model is loaded on the first press, synthesis runs in `makeWorker()`, and the system voice covers every gap. */
+/** Kokoro voice: the model is loaded on the first press, synthesis runs in `makeWorker()`, and a press before it is ready is held. */
 export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
   let status: VoiceStatus = 'idle';
   let fraction = 0;
   let error: string | null = null;
   // Set from the first line of load() until it is ready or has failed: a press during the file checks starts no second load.
   let loading = false;
-  // Set by a failure once the status has reached `loading` in this run: a press does not start Kokoro again, only retry does.
-  let startFailed = false;
-  let reachedLoading = false;
+  // The latest press made before the voice was ready; it plays at `ready` and is dropped by stop() and by a failure.
+  let held: { text: string; variant: SpellingVariant; token: number; hadClip: boolean } | null = null;
+  // The message of the latest press whose synthesis failed.
+  let sentence: string | null = null;
   // Bumped by each failure, so a load still awaiting its file reads gives up once it has failed.
   let generation = 0;
   let startTimer: ReturnType<typeof setTimeout> | null = null;
@@ -124,7 +126,7 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
     logError(cause.message);
     clearStartTimer();
     generation += 1;
-    startFailed = reachedLoading;
+    held = null;
     worker?.terminate();
     worker = null;
     for (const { key, entry } of waiting.values()) {
@@ -137,25 +139,8 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
     setStatus('failed');
   }
 
-  // The system voice, guarded: it does nothing where the browser cannot speak.
-  const system = {
-    speak: (text: string, variant: SpellingVariant) => {
-      if (deps.system.canSpeak()) deps.system.speak(text, variant);
-    },
-    cancel: () => {
-      if (deps.system.canSpeak()) deps.system.cancel();
-    },
-    speaking: () => {
-      try {
-        return deps.system.canSpeak() && deps.system.speaking() === true;
-      } catch {
-        return false;
-      }
-    },
-  };
-
-  /** Starts a clip and logs it; `system` and `clip` say what was playing when the press came. */
-  function playClip(text: string, clip: Clip, systemSpeaking: boolean, hadClip: boolean): { stop(): void } {
+  /** Starts a clip and logs it; `clip` says whether a clip was playing when the press came. */
+  function playClip(text: string, clip: Clip, hadClip: boolean): { stop(): void } {
     const id = ++clipSeq;
     let shape: string;
     try {
@@ -164,7 +149,7 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       shape = '?';
     }
     log(
-      `play "${text}" ${clip.pcm.length} samples ${clip.rate}Hz ${(clip.pcm.length / clip.rate).toFixed(2)}s ${shape} system=${systemSpeaking ? 'yes' : 'no'} clip=${hadClip ? 'yes' : 'no'}`,
+      `play "${text}" ${clip.pcm.length} samples ${clip.rate}Hz ${(clip.pcm.length / clip.rate).toFixed(2)}s ${shape} clip=${hadClip ? 'yes' : 'no'}`,
     );
     let ended = false;
     let handle: { stop(): void };
@@ -191,6 +176,15 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       clearStartTimer();
       loading = false;
       setStatus('ready');
+      const pending = held;
+      held = null;
+      if (pending) {
+        try {
+          playPress(pending.text, pending.variant, pending.token, pending.hadClip);
+        } catch (e) {
+          logError(e instanceof Error ? e.message : String(e));
+        }
+      }
     } else if (data.type === 'audio') {
       const request = waiting.get(data.id);
       if (!request) return;
@@ -199,7 +193,7 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       request.entry.resolve(request.entry.clip);
     } else if (data.id !== undefined) {
       logError(data.message);
-      // One sentence failed: only its entry is dropped, so its press falls back to the system voice and the worker stays.
+      // One sentence failed: only its entry is dropped, so its press is silent and the worker stays.
       const request = waiting.get(data.id);
       if (!request) return;
       waiting.delete(data.id);
@@ -212,8 +206,6 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
 
   async function load() {
     loading = true;
-    startFailed = false;
-    reachedLoading = false;
     fraction = 0;
     error = null;
     lastPercent = 0;
@@ -235,7 +227,6 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
         () => setStatus('downloading'),
       );
       setStatus('loading');
-      reachedLoading = true;
       startTimer = setTimeout(() => {
         startTimer = null;
         fail(new Error(`start timed out after 20 s at: ${lastStep || 'no step logged'}`));
@@ -289,10 +280,36 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
     return entry;
   }
 
+  /** Plays the text on a ready voice: from the cache, or after the worker's reply, if no later press or stop() came. */
+  function playPress(text: string, variant: SpellingVariant, token: number, hadClip: boolean) {
+    const entry = request(text, variant, false);
+    if (entry.clip) {
+      log(`press "${text}" ${variant} kokoro-cached`);
+      playing = playClip(text, entry.clip, hadClip);
+      return;
+    }
+    log(`press "${text}" ${variant} kokoro-wait`);
+    entry.promise.then(
+      (clip) => {
+        if (press !== token) return;
+        playing = playClip(text, clip, hadClip);
+      },
+      (e: Error) => {
+        if (press !== token) return;
+        log(`press "${text}" ${variant} failed`);
+        // A worker failure rejects its waiting presses too; the failure toast covers that, not the text one.
+        if (status !== 'ready') return;
+        sentence = e.message;
+        notify();
+      },
+    );
+  }
+
   return {
     status: () => status,
     progress: () => fraction,
     lastError: () => error,
+    sentenceError: () => sentence,
     subscribe(fn) {
       listeners.add(fn);
       return () => {
@@ -306,32 +323,23 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       // Whether a previous clip was still playing at this press.
       const hadClip = clipPlaying !== null;
       stopPlayback();
+      held = null;
+      if (sentence !== null) {
+        sentence = null;
+        notify();
+      }
       if (status !== 'ready') {
-        log(`press "${text}" ${variant} ${startFailed ? 'system-start-failed' : 'system-not-ready'}`);
-        system.speak(text, variant);
-        if (!loading && !startFailed && (status === 'idle' || status === 'failed')) void load();
+        if (status === 'failed' && !loading) {
+          log(`press "${text}" ${variant} silent-failed`);
+          notify();
+          return;
+        }
+        log(`press "${text}" ${variant} held`);
+        held = { text, variant, token, hadClip };
+        if (status === 'idle' && !loading) void load();
         return;
       }
-      const systemSpeaking = system.speaking();
-      system.cancel();
-      const entry = request(text, variant, false);
-      if (entry.clip) {
-        log(`press "${text}" ${variant} kokoro-cached`);
-        playing = playClip(text, entry.clip, systemSpeaking, hadClip);
-        return;
-      }
-      log(`press "${text}" ${variant} kokoro-wait`);
-      entry.promise.then(
-        (clip) => {
-          if (press !== token) return;
-          playing = playClip(text, clip, systemSpeaking, hadClip);
-        },
-        () => {
-          if (press !== token) return;
-          log(`press "${text}" ${variant} system-fallback`);
-          system.speak(text, variant);
-        },
-      );
+      playPress(text, variant, token, hadClip);
     },
     prefetch(text, variant) {
       if (status !== 'ready') return;
@@ -341,7 +349,7 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       log('stop');
       press = ++seq;
       stopPlayback();
-      system.cancel();
+      held = null;
     },
     retry() {
       if (status !== 'failed' || loading) return;

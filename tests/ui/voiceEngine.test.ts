@@ -30,16 +30,12 @@ const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 const pcm = (n: number) => Float32Array.of(n);
 
 let workers: FakeWorker[];
-let spoken: { text: string; variant: string }[];
-let cancels: number;
 let plays: { first: number; rate: number }[];
 let ends: (() => void)[];
 let logs: [string, string][];
-let speakingNow: boolean;
 let stops: number;
 let unlocks: number;
 let sizeCalls: number;
-let canSpeakNow: boolean;
 
 /** Every file is already on disk, so a press goes straight to loading. */
 function completeIo(): VoiceIo {
@@ -63,14 +59,6 @@ function makeEngine(io: VoiceIo = completeIo()): VoiceEngine {
       const w = new FakeWorker();
       workers.push(w);
       return w as unknown as Worker;
-    },
-    system: {
-      canSpeak: () => canSpeakNow,
-      speak: (text, variant) => spoken.push({ text, variant }),
-      cancel: () => {
-        cancels += 1;
-      },
-      speaking: () => speakingNow,
     },
     play: (samples, rate, onEnd) => {
       plays.push({ first: samples[0]!, rate });
@@ -109,10 +97,11 @@ function downloadingIo(fractions: number[]): VoiceIo {
   };
 }
 
-/** An engine whose model is loaded: the first press fell back to the system voice and the init reply came. */
+/** An engine whose model is loaded: a press started the load, `stop()` dropped that press, and the init reply came. */
 async function readyEngine(): Promise<VoiceEngine> {
   const engine = makeEngine();
   engine.speak('warm up', 'en-GB');
+  engine.stop();
   await flush();
   workers[0]!.reply({ type: 'ready' });
   return engine;
@@ -120,32 +109,100 @@ async function readyEngine(): Promise<VoiceEngine> {
 
 beforeEach(() => {
   workers = [];
-  spoken = [];
-  cancels = 0;
   plays = [];
   ends = [];
   logs = [];
-  speakingNow = false;
   stops = 0;
   unlocks = 0;
   sizeCalls = 0;
-  canSpeakNow = true;
 });
 
 describe('KokoroEngine', () => {
-  test('the first press falls back to the system voice and the engine is ready after the init reply', async () => {
+  test('the first press is held, starts the load, and plays with Kokoro once the init reply comes', async () => {
     const engine = makeEngine();
     expect(engine.status()).toBe('idle');
     engine.speak('lucid', 'en-GB');
-    expect(spoken).toEqual([{ text: 'lucid', variant: 'en-GB' }]);
+    expect(plays).toEqual([]);
     await flush();
     expect(engine.status()).toBe('loading');
     const init = workers[0]!.posted[0]!;
     expect(init.type).toBe('init');
     expect(Object.keys(init.files!).sort()).toEqual(VOICE_FILES.map((f) => f.path).sort());
+    expect(workers[0]!.request()).toBeUndefined();
     workers[0]!.reply({ type: 'ready' });
     expect(engine.status()).toBe('ready');
+    expect(workers[0]!.request()).toMatchObject({ type: 'speak', text: 'lucid', voice: 'bf_emma', prefetch: false });
     expect(plays).toEqual([]);
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(1), rate: 24000 });
+    await flush();
+    expect(plays).toEqual([{ first: 1, rate: 24000 }]);
+  });
+
+  test('two presses before ready: only the second is held and played', async () => {
+    const engine = makeEngine();
+    engine.speak('first', 'en-US');
+    engine.speak('second', 'en-GB');
+    await flush();
+    workers[0]!.reply({ type: 'ready' });
+    const requests = workers[0]!.posted.filter((m) => m.type === 'speak');
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ text: 'second', voice: 'bf_emma' });
+    workers[0]!.reply({ type: 'audio', id: requests[0]!.id, pcm: pcm(2), rate: 24000 });
+    await flush();
+    expect(plays).toEqual([{ first: 2, rate: 24000 }]);
+  });
+
+  test('stop before ready drops the held press: nothing is posted or played at ready', async () => {
+    const engine = makeEngine();
+    engine.speak('lucid', 'en-US');
+    engine.stop();
+    await flush();
+    workers[0]!.reply({ type: 'ready' });
+    expect(workers[0]!.posted.filter((m) => m.type === 'speak')).toEqual([]);
+    expect(plays).toEqual([]);
+  });
+
+  test('a failure drops the held press: nothing is posted or played after a retry becomes ready', async () => {
+    const engine = makeEngine();
+    engine.speak('lucid', 'en-US');
+    await flush();
+    workers[0]!.reply({ type: 'error', message: 'no wasm' });
+    engine.retry();
+    await flush();
+    workers[1]!.reply({ type: 'ready' });
+    expect(workers[1]!.posted.filter((m) => m.type === 'speak')).toEqual([]);
+    expect(plays).toEqual([]);
+  });
+
+  test('a press while a retry is running is held and plays at ready', async () => {
+    const engine = makeEngine();
+    engine.speak('lucid', 'en-US');
+    await flush();
+    workers[0]!.reply({ type: 'error', message: 'no wasm' });
+    engine.retry();
+    expect(engine.status()).toBe('failed');
+    engine.speak('pivotal', 'en-GB');
+    expect(logs).toContainEqual(['voice', 'press "pivotal" en-GB held']);
+    expect(logs).not.toContainEqual(['voice', 'press "pivotal" en-GB silent-failed']);
+    await flush();
+    expect(workers).toHaveLength(2);
+    workers[1]!.reply({ type: 'ready' });
+    expect(workers[1]!.request()).toMatchObject({ text: 'pivotal', voice: 'bf_emma' });
+    workers[1]!.reply({ type: 'audio', id: workers[1]!.request().id, pcm: pcm(4), rate: 24000 });
+    await flush();
+    expect(plays).toEqual([{ first: 4, rate: 24000 }]);
+  });
+
+  test('a held press whose synthesis fails after ready is silent and sets sentenceError', async () => {
+    const engine = makeEngine();
+    engine.speak('lucid', 'en-US');
+    await flush();
+    workers[0]!.reply({ type: 'ready' });
+    workers[0]!.reply({ type: 'error', id: workers[0]!.request().id, message: 'bad input' });
+    await flush();
+    expect(engine.status()).toBe('ready');
+    expect(plays).toEqual([]);
+    expect(engine.sentenceError()).toBe('bad input');
   });
 
   test('a second press posts the text and plays the reply', async () => {
@@ -177,15 +234,13 @@ describe('KokoroEngine', () => {
     expect(plays).toEqual([{ first: 2, rate: 24000 }]);
   });
 
-  test('a press stops the audio still playing and cancels system speech', async () => {
+  test('a press stops the audio still playing', async () => {
     const engine = await readyEngine();
     engine.speak('one', 'en-US');
     workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(1), rate: 24000 });
     await flush();
-    const before = cancels;
     engine.speak('two', 'en-US');
     expect(stops).toBe(1);
-    expect(cancels).toBe(before + 1);
   });
 
   test('stop before the reply: nothing plays', async () => {
@@ -226,14 +281,14 @@ describe('KokoroEngine', () => {
     expect(workers).toEqual([]);
   });
 
-  test('an init error means failed; a press after a start failure does not start again, retry does', async () => {
+  test('an init error means failed; a press after it is silent and starts nothing, retry does', async () => {
     const engine = makeEngine();
     engine.speak('lucid', 'en-GB');
     await flush();
     workers[0]!.reply({ type: 'error', message: 'no wasm' });
     expect(engine.status()).toBe('failed');
     engine.speak('lucid', 'en-GB');
-    expect(spoken).toHaveLength(2);
+    expect(plays).toEqual([]);
     await flush();
     expect(engine.status()).toBe('failed');
     expect(workers).toHaveLength(1);
@@ -243,14 +298,28 @@ describe('KokoroEngine', () => {
     expect(workers).toHaveLength(2);
   });
 
-  test('a speak error from the worker keeps the engine ready, and that press keeps the system voice', async () => {
+  test('a speak error from the worker keeps the engine ready, and that press is silent', async () => {
     const engine = await readyEngine();
     engine.speak('lucid', 'en-US');
     workers[0]!.reply({ type: 'error', id: workers[0]!.request().id, message: 'bad input' });
     expect(engine.status()).toBe('ready');
     await flush();
     expect(plays).toEqual([]);
-    expect(spoken.at(-1)).toEqual({ text: 'lucid', variant: 'en-US' });
+  });
+
+  test('a failed sentence sets sentenceError and notifies; the next press clears it and notifies', async () => {
+    const engine = await readyEngine();
+    expect(engine.sentenceError()).toBeNull();
+    const seen: (string | null)[] = [];
+    engine.subscribe(() => seen.push(engine.sentenceError()));
+    engine.speak('lucid', 'en-US');
+    workers[0]!.reply({ type: 'error', id: workers[0]!.request().id, message: 'bad input' });
+    await flush();
+    expect(engine.sentenceError()).toBe('bad input');
+    expect(seen).toEqual(['bad input']);
+    engine.speak('pivotal', 'en-US');
+    expect(engine.sentenceError()).toBeNull();
+    expect(seen).toEqual(['bad input', null]);
   });
 
   test('after a failed sentence the next press posts to the same worker and plays', async () => {
@@ -282,16 +351,7 @@ describe('KokoroEngine', () => {
     expect(pressed).toMatchObject({ text: 'lucid', prefetch: false });
   });
 
-  test('without system speech, a press does not call the system voice', async () => {
-    canSpeakNow = false;
-    const engine = await readyEngine();
-    engine.speak('lucid', 'en-US');
-    engine.stop();
-    expect(spoken).toEqual([]);
-    expect(cancels).toBe(0);
-  });
-
-  test('an interrupted download means failed, and the next presses retry until one completes', async () => {
+  test('an interrupted download means failed; a press starts no load, only retry does, until one completes', async () => {
     let downloadCalls = 0;
     const onDisk = new Map<string, number>();
     const io: VoiceIo = {
@@ -319,19 +379,22 @@ describe('KokoroEngine', () => {
     await flush();
     expect(engine.status()).toBe('failed');
     expect(workers).toHaveLength(0);
-    expect(spoken).toEqual([{ text: 'first', variant: 'en-GB' }]);
+    expect(downloadCalls).toBe(1);
 
     engine.speak('second', 'en-GB');
+    await flush();
+    expect(downloadCalls).toBe(1);
+    expect(engine.status()).toBe('failed');
+
+    engine.retry();
     await flush();
     expect(downloadCalls).toBe(2);
     expect(engine.status()).toBe('failed');
     expect(workers).toHaveLength(0);
-    expect(spoken.at(-1)).toEqual({ text: 'second', variant: 'en-GB' });
 
-    engine.speak('third', 'en-GB');
+    engine.retry();
     await flush();
     expect(engine.status()).toBe('loading');
-    expect(spoken.at(-1)).toEqual({ text: 'third', variant: 'en-GB' });
     workers[0]!.reply({ type: 'ready' });
     expect(engine.status()).toBe('ready');
     expect(plays).toEqual([]);
@@ -343,21 +406,28 @@ describe('KokoroEngine', () => {
     expect(unlocks).toBe(1);
   });
 
-  test('a press before ready logs system-not-ready', () => {
+  test('a press before ready logs held', () => {
     const engine = makeEngine();
     engine.speak('pivotal', 'en-GB');
-    expect(logs).toContainEqual(['voice', 'press "pivotal" en-GB system-not-ready']);
+    expect(logs).toContainEqual(['voice', 'press "pivotal" en-GB held']);
   });
 
-  test('a press after a start failure logs system-start-failed, not system-not-ready', async () => {
+  test('a press after a start failure logs silent-failed, not held, and notifies the subscribers', async () => {
     const engine = makeEngine();
     engine.speak('lucid', 'en-GB');
     await flush();
     workers[0]!.onerror!({ message: 'boom', filename: 'kokoro.worker.js', lineno: 3 });
     expect(engine.status()).toBe('failed');
+    let notified = 0;
+    engine.subscribe(() => {
+      notified += 1;
+    });
     engine.speak('pivotal', 'en-GB');
-    expect(logs).toContainEqual(['voice', 'press "pivotal" en-GB system-start-failed']);
-    expect(logs).not.toContainEqual(['voice', 'press "pivotal" en-GB system-not-ready']);
+    expect(logs).toContainEqual(['voice', 'press "pivotal" en-GB silent-failed']);
+    expect(logs).not.toContainEqual(['voice', 'press "pivotal" en-GB held']);
+    expect(notified).toBe(1);
+    await flush();
+    expect(workers).toHaveLength(1);
   });
 
   test('a ready press logs kokoro-wait, then the clip start with a 20-character outline', async () => {
@@ -368,16 +438,7 @@ describe('KokoroEngine', () => {
     clip[0] = 0.5;
     workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: clip, rate: 24000 });
     await flush();
-    expect(logs.at(-1)).toEqual(['voice', `play "pivotal" 24000 samples 24000Hz 1.00s #${'.'.repeat(19)} system=no clip=no`]);
-  });
-
-  test('the clip start line says system=yes when the system voice was speaking at the press', async () => {
-    const engine = await readyEngine();
-    speakingNow = true;
-    engine.speak('pivotal', 'en-GB');
-    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(1), rate: 24000 });
-    await flush();
-    expect(logs.at(-1)![1]).toMatch(/ system=yes clip=no$/);
+    expect(logs.at(-1)).toEqual(['voice', `play "pivotal" 24000 samples 24000Hz 1.00s #${'.'.repeat(19)} clip=no`]);
   });
 
   test('a second press of the same text logs kokoro-cached', async () => {
@@ -398,7 +459,7 @@ describe('KokoroEngine', () => {
     workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(2), rate: 24000 });
     await flush();
     expect(stops).toBe(1);
-    expect(logs.at(-1)![1]).toMatch(/ system=no clip=yes$/);
+    expect(logs.at(-1)![1]).toMatch(/ clip=yes$/);
   });
 
   test('the end callback logs end, and a press after it says clip=no', async () => {
@@ -435,9 +496,9 @@ describe('KokoroEngine', () => {
     await flush();
     ends[0]!();
     engine.speak('pivotal', 'en-GB');
-    expect(logs.at(-1)![1]).toMatch(/ system=no clip=no$/);
+    expect(logs.at(-1)![1]).toMatch(/ clip=no$/);
     engine.speak('pivotal', 'en-GB');
-    expect(logs.at(-1)![1]).toMatch(/ system=no clip=yes$/);
+    expect(logs.at(-1)![1]).toMatch(/ clip=yes$/);
   });
 
   test('clip=yes is read at the press, not when a late reply starts the clip', async () => {
@@ -462,7 +523,6 @@ describe('KokoroEngine', () => {
         workers.push(w);
         return w as unknown as Worker;
       },
-      system: { canSpeak: () => true, speak: () => {}, cancel: () => {}, speaking: () => false },
       play: (_s, _r, onEnd) => {
         if (boom) throw new Error('no audio');
         ends.push(onEnd);
@@ -471,6 +531,7 @@ describe('KokoroEngine', () => {
       log: (kind, text) => logs.push([kind, text]),
     });
     engine.speak('warm up', 'en-GB');
+    engine.stop();
     await flush();
     workers[0]!.reply({ type: 'ready' });
     engine.speak('a', 'en-US');
@@ -483,53 +544,18 @@ describe('KokoroEngine', () => {
     expect(logs.at(-1)![1]).toMatch(/ clip=no$/);
   });
 
-  test('a speaking() that throws still plays the clip and logs system=no', async () => {
-    const throwing = createKokoroEngine({
-      io: completeIo(),
-      dir: '/app/voice',
-      makeWorker: () => {
-        const w = new FakeWorker();
-        workers.push(w);
-        return w as unknown as Worker;
-      },
-      system: {
-        canSpeak: () => true,
-        speak: () => {},
-        cancel: () => {},
-        speaking: () => {
-          throw new Error('no speechSynthesis');
-        },
-      },
-      play: (samples, rate, onEnd) => {
-        plays.push({ first: samples[0]!, rate });
-        ends.push(onEnd);
-        return { stop: () => {} };
-      },
-      log: (kind, text) => logs.push([kind, text]),
-    });
-    throwing.speak('warm up', 'en-GB');
-    await flush();
-    const w = workers.at(-1)!;
-    w.reply({ type: 'ready' });
-    throwing.speak('pivotal', 'en-GB');
-    w.reply({ type: 'audio', id: w.request().id, pcm: pcm(1), rate: 24000 });
-    await flush();
-    expect(plays).toHaveLength(1);
-    expect(logs.at(-1)![1]).toMatch(/ system=no clip=no$/);
-  });
-
   test('stop logs stop', async () => {
     const engine = await readyEngine();
     engine.stop();
     expect(logs.at(-1)).toEqual(['voice', 'stop']);
   });
 
-  test('a rejected request logs system-fallback', async () => {
+  test('a rejected request logs failed', async () => {
     const engine = await readyEngine();
     engine.speak('lucid', 'en-US');
     workers[0]!.reply({ type: 'error', id: workers[0]!.request().id, message: 'bad input' });
     await flush();
-    expect(logs).toContainEqual(['voice', 'press "lucid" en-US system-fallback']);
+    expect(logs).toContainEqual(['voice', 'press "lucid" en-US failed']);
   });
 
   test('a worker error logs its first 200 characters', async () => {
@@ -625,7 +651,7 @@ describe('KokoroEngine', () => {
     expect(workers).toHaveLength(1);
   });
 
-  test('a failed download sets lastError to its message, and the next load clears it', async () => {
+  test('a failed download sets lastError to its message, and the next load (retry) clears it', async () => {
     const base = completeIo();
     const engine = makeEngine({
       ...base,
@@ -640,6 +666,8 @@ describe('KokoroEngine', () => {
     expect(engine.status()).toBe('failed');
     expect(engine.lastError()).toBe('HTTP 500');
     engine.speak('pivotal', 'en-GB');
+    expect(engine.lastError()).toBe('HTTP 500');
+    engine.retry();
     expect(engine.lastError()).toBeNull();
   });
 });
@@ -717,14 +745,14 @@ describe('KokoroEngine start steps and time limit', () => {
     expect(engine.lastError()).toBe('start timed out after 20 s at: load init sent');
   });
 
-  test('after a time-out a press speaks with the system voice and starts no worker; retry starts one, and a second retry starts none', async () => {
+  test('after a time-out a press is silent and starts no worker; retry starts one, and a second retry starts none', async () => {
     const engine = makeEngine();
     engine.speak('lucid', 'en-GB');
     await settle();
     vi.advanceTimersByTime(20_000);
     engine.speak('pivotal', 'en-GB');
     await settle();
-    expect(spoken.at(-1)).toEqual({ text: 'pivotal', variant: 'en-GB' });
+    expect(plays).toEqual([]);
     expect(workers).toHaveLength(1);
     engine.retry();
     engine.retry();
@@ -752,7 +780,7 @@ describe('KokoroEngine start steps and time limit', () => {
     engine.speak('pivotal', 'en-GB');
     await settle();
     expect(workers).toHaveLength(1);
-    expect(spoken.at(-1)).toEqual({ text: 'pivotal', variant: 'en-GB' });
+    expect(plays).toEqual([]);
     engine.retry();
     await settle();
     expect(workers).toHaveLength(2);
@@ -847,7 +875,7 @@ describe('KokoroEngine start steps and time limit', () => {
     expect(engine.lastError()).toBeNull();
   });
 
-  test('after a failed download a press starts a new load, as before', async () => {
+  test('after a failed download a press starts no new load, retry does', async () => {
     let downloads = 0;
     const base = completeIo();
     const engine = makeEngine({
@@ -862,6 +890,9 @@ describe('KokoroEngine start steps and time limit', () => {
     await settle();
     expect(engine.status()).toBe('failed');
     engine.speak('lucid', 'en-GB');
+    await settle();
+    expect(downloads).toBe(1);
+    engine.retry();
     await settle();
     expect(downloads).toBe(2);
   });

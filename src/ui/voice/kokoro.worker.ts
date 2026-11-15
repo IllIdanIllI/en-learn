@@ -1,8 +1,10 @@
 import { env } from '@huggingface/transformers';
 import { KokoroTTS } from 'kokoro-js';
 // The JSEP build of onnxruntime-web, the one @huggingface/transformers bundles. Served from the app's own origin.
-import wasmUrl from 'ort-dist/ort-wasm-simd-threaded.jsep.wasm?url';
-import mjsUrl from 'ort-dist/ort-wasm-simd-threaded.jsep.mjs?url';
+// Relative paths, not a package name: the package exports block these files, and the dev server would pre-bundle
+// a bare `.mjs?url` import into a module (a function instead of a URL, and the voice fails to start).
+import wasmUrl from '../../../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm?url';
+import mjsUrl from '../../../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs?url';
 import { nextRequest } from './queue';
 
 const MODEL = 'onnx-community/Kokoro-82M-v1.0-ONNX';
@@ -62,7 +64,8 @@ async function handle(msg: In) {
       self.postMessage({ type: 'audio', id: msg.id, pcm: audio.audio, rate: audio.sampling_rate });
     }
   } catch (e) {
-    const message = e instanceof Error ? (e.stack ?? e.message) : String(e);
+    // WebKit's `stack` leaves out the message, so both are sent.
+    const message = e instanceof Error ? `${e.name}: ${e.message}${e.stack ? `\n${e.stack}` : ''}` : String(e);
     self.postMessage({ type: 'error', id: msg.type === 'speak' ? msg.id : undefined, message });
   }
 }

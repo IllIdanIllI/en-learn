@@ -49,6 +49,8 @@ describe('loadWritingTexts', () => {
         errors: 2,
         rate: 3.3,
         sourceBlockId: null,
+        assessment: null,
+        strengths: [],
       },
       {
         blockId: 2,
@@ -61,7 +63,18 @@ describe('loadWritingTexts', () => {
         errors: 0,
         rate: 0,
         sourceBlockId: 1,
+        assessment: null,
+        strengths: [],
       },
     ]);
+  });
+
+  test('returns the stored assessment and strengths of a checked text', async () => {
+    const db = await seed();
+    const assessment = { taskResponse: { band: 6, note: 'a' }, coherence: { band: 6.5, note: 'b' }, vocabulary: { band: 5.5, note: 'c' }, grammar: { band: 6, note: 'd' } };
+    const strengths = [{ fragment: 'my weekend', note: 'Ясно.' }];
+    await db.execute('UPDATE writing_text SET assessment = ?, strengths = ? WHERE block_id = 1', [JSON.stringify(assessment), JSON.stringify(strengths)]);
+    const rows = await loadWritingTexts(db);
+    expect(rows.map((r) => [r.blockId, r.assessment, r.strengths])).toEqual([[1, assessment, strengths], [2, null, []]]);
   });
 });

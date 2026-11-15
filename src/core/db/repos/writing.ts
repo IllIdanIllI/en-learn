@@ -1,5 +1,6 @@
 import type { Db } from '@/core/ports';
 import type { ISODate } from '@/core/domain';
+import type { TextAssessment, TextStrength } from '@/core/llm/types';
 import { MIN_WORDS } from '@/core/writing/text';
 
 /** The newest writing text of a graded session dated before `before` (on or before it with `inclusive`) that has at least MIN_WORDS words. */
@@ -44,11 +45,20 @@ export async function listOpenWritingBlocks(db: Db, sessionId: number): Promise<
 
 export async function insertWritingText(
   db: Db,
-  w: { blockId: number; text: string; words: number; sourceBlockId: number | null; createdAt: string },
+  w: {
+    blockId: number; text: string; words: number; sourceBlockId: number | null; createdAt: string;
+    /** Null for a rewrite, a text too short to check and old texts. */
+    assessment?: TextAssessment | null;
+    /** Null for a text too short to check and old texts. */
+    strengths?: TextStrength[] | null;
+  },
 ): Promise<void> {
   await db.execute(
-    'INSERT INTO writing_text (block_id, text, words, source_block_id, created_at) VALUES (?, ?, ?, ?, ?)',
-    [w.blockId, w.text, w.words, w.sourceBlockId, w.createdAt],
+    'INSERT INTO writing_text (block_id, text, words, source_block_id, created_at, assessment, strengths) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [
+      w.blockId, w.text, w.words, w.sourceBlockId, w.createdAt,
+      w.assessment ? JSON.stringify(w.assessment) : null, w.strengths ? JSON.stringify(w.strengths) : null,
+    ],
   );
 }
 

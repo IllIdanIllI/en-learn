@@ -210,7 +210,9 @@
         "additionalProperties": false,
         "required": [
           "blockRef",
-          "errors"
+          "errors",
+          "strengths",
+          "assessment"
         ],
         "properties": {
           "blockRef": {
@@ -228,7 +230,8 @@
                 "topicKey",
                 "suggestedTopic",
                 "ruleSection",
-                "explanation"
+                "explanation",
+                "kind"
               ],
               "properties": {
                 "fragment": {
@@ -254,6 +257,121 @@
                 "explanation": {
                   "type": "string",
                   "description": "Short neutral explanation in the learner native language"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "spelling",
+                    "grammar",
+                    "vocabulary",
+                    "punctuation"
+                  ]
+                }
+              }
+            }
+          },
+          "strengths": {
+            "type": "array",
+            "description": "0 to 5 strong parts of the text; empty if nothing is notable",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "fragment",
+                "note"
+              ],
+              "properties": {
+                "fragment": {
+                  "type": "string",
+                  "description": "The exact strong text as written in the learner text, 2 to 15 words, overlapping no error fragment"
+                },
+                "note": {
+                  "type": "string",
+                  "description": "One short factual sentence in the learner native language: why it is good"
+                }
+              }
+            }
+          },
+          "assessment": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "taskResponse",
+              "coherence",
+              "vocabulary",
+              "grammar"
+            ],
+            "properties": {
+              "taskResponse": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "band",
+                  "note"
+                ],
+                "properties": {
+                  "band": {
+                    "type": "number",
+                    "description": "IELTS Writing Task 2 band, 1 to 9 in steps of 0.5; 0 for a rewrite"
+                  },
+                  "note": {
+                    "type": "string",
+                    "description": "One short factual sentence in the learner native language naming what decides the band; empty for a rewrite"
+                  }
+                }
+              },
+              "coherence": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "band",
+                  "note"
+                ],
+                "properties": {
+                  "band": {
+                    "type": "number",
+                    "description": "IELTS Writing Task 2 band, 1 to 9 in steps of 0.5; 0 for a rewrite"
+                  },
+                  "note": {
+                    "type": "string",
+                    "description": "One short factual sentence in the learner native language naming what decides the band; empty for a rewrite"
+                  }
+                }
+              },
+              "vocabulary": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "band",
+                  "note"
+                ],
+                "properties": {
+                  "band": {
+                    "type": "number",
+                    "description": "IELTS Writing Task 2 band, 1 to 9 in steps of 0.5; 0 for a rewrite"
+                  },
+                  "note": {
+                    "type": "string",
+                    "description": "One short factual sentence in the learner native language naming what decides the band; empty for a rewrite"
+                  }
+                }
+              },
+              "grammar": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "band",
+                  "note"
+                ],
+                "properties": {
+                  "band": {
+                    "type": "number",
+                    "description": "IELTS Writing Task 2 band, 1 to 9 in steps of 0.5; 0 for a rewrite"
+                  },
+                  "note": {
+                    "type": "string",
+                    "description": "One short factual sentence in the learner native language naming what decides the band; empty for a rewrite"
+                  }
                 }
               }
             }

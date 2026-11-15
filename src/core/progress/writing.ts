@@ -1,5 +1,7 @@
 import type { ISODate } from '@/core/domain';
 import type { Db } from '@/core/ports';
+import type { TextAssessment, TextStrength } from '@/core/llm/types';
+import { parseAssessment, parseStrengths } from '@/core/session/view';
 import { MIN_WORDS, errorRate } from '@/core/writing/text';
 import { loadGradedFacts } from './history';
 
@@ -14,6 +16,10 @@ export type WritingTextRow = {
   errors: number;
   rate: number | null;
   sourceBlockId: number | null;
+  /** Null for a rewrite, a text too short to check and old texts. */
+  assessment: TextAssessment | null;
+  /** Empty when the text has none or was checked before strong parts existed. */
+  strengths: TextStrength[];
 };
 
 /** Checked writing texts of graded sessions, newest first. Errors are the block's items whose effective verdict is wrong. */
@@ -28,9 +34,11 @@ export async function loadWritingTexts(db: Db): Promise<WritingTextRow[]> {
       text: string;
       words: number;
       source_block_id: number | null;
+      assessment: string | null;
+      strengths: string | null;
     }>(
       `SELECT b.id AS block_id, s.id AS session_id, s.date AS date, b.format AS format, b.instruction AS prompt,
-              wt.text AS text, wt.words AS words, wt.source_block_id AS source_block_id
+              wt.text AS text, wt.words AS words, wt.source_block_id AS source_block_id, wt.assessment AS assessment, wt.strengths AS strengths
        FROM writing_text wt
        JOIN block b ON b.id = wt.block_id
        JOIN session s ON s.id = b.session_id
@@ -57,6 +65,8 @@ export async function loadWritingTexts(db: Db): Promise<WritingTextRow[]> {
       errors,
       rate: errorRate(errors, t.words),
       sourceBlockId: t.source_block_id,
+      assessment: parseAssessment(t.assessment),
+      strengths: parseStrengths(t.strengths),
     };
   });
 }

@@ -1,4 +1,5 @@
 import type { Db } from '@/core/ports';
+import type { ErrorKind } from '@/core/llm/types';
 import type {
   BlockFormat,
   BlockKind,
@@ -202,17 +203,19 @@ export interface AnswerWrite {
   vocabularyNote: string | null;
   /** Writing errors without a programme topic: the grader's name for the area. */
   suggestedTopic?: string | null;
+  /** Writing errors: the grader's error type. */
+  errorKind?: ErrorKind | null;
 }
 
 /** Idempotent per item; dispute and inattention columns are left alone. */
 export async function upsertAnswer(db: Db, a: AnswerWrite): Promise<void> {
   await db.execute(
-    `INSERT INTO answer (item_id, text, verdict, fix, rule_section, explanation, vocabulary_note, suggested_topic)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO answer (item_id, text, verdict, fix, rule_section, explanation, vocabulary_note, suggested_topic, error_kind)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(item_id) DO UPDATE SET text = excluded.text, verdict = excluded.verdict, fix = excluded.fix,
        rule_section = excluded.rule_section, explanation = excluded.explanation, vocabulary_note = excluded.vocabulary_note,
-       suggested_topic = excluded.suggested_topic`,
-    [a.itemId, a.text, a.verdict, a.fix, a.ruleSection, a.explanation, a.vocabularyNote, a.suggestedTopic ?? null],
+       suggested_topic = excluded.suggested_topic, error_kind = excluded.error_kind`,
+    [a.itemId, a.text, a.verdict, a.fix, a.ruleSection, a.explanation, a.vocabularyNote, a.suggestedTopic ?? null, a.errorKind ?? null],
   );
 }
 

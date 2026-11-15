@@ -33,6 +33,15 @@ export interface ValidationResult { items: { ref: string; ok: boolean; reason: s
 
 export type Verdict = 'correct' | 'wrong' | 'rule_gap' | 'defect' | 'needs_clarification';
 
+export type ErrorKind = 'spelling' | 'grammar' | 'vocabulary' | 'punctuation';
+
+export interface TextStrength { fragment: string; note: string }
+
+export interface CriterionBand { band: number; note: string }
+
+/** Approximate IELTS Writing Task 2 bands; for a rewrite every band is 0 and every note ''. */
+export interface TextAssessment { taskResponse: CriterionBand; coherence: CriterionBand; vocabulary: CriterionBand; grammar: CriterionBand }
+
 export interface GradeResult {
   items: {
     ref: string;
@@ -50,7 +59,9 @@ export interface GradeResult {
   ruleGaps: { ref: string; ruleTopicKey: string; proposal: string; explanation: string; sources: Source[] }[];
   texts: {
     blockRef: string;
-    errors: { fragment: string; fix: string; topicKey: string; suggestedTopic: string; ruleSection: string; explanation: string }[];
+    errors: { fragment: string; fix: string; topicKey: string; suggestedTopic: string; ruleSection: string; explanation: string; kind: ErrorKind }[];
+    strengths: TextStrength[];
+    assessment: TextAssessment;
   }[];
 }
 

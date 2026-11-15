@@ -197,7 +197,8 @@ describe('loadSessionView writing blocks', () => {
     await setSessionStatus(db, sid, 'graded');
     const block = (await loadSessionView(db, sid)).blocks[0]!;
     expect(block.graded).toBe(true);
-    expect(block.writing).toEqual({ text: 'He goes home.', words: 3, source: null });
+    expect(block.writing).toEqual({ text: 'He goes home.', words: 3, assessment: null, strengths: [], source: null });
+    expect(block.items.map((x) => x.errorKind)).toEqual([null]);
     expect(block.items.map((x) => [x.prompt, x.answer?.text, x.effective])).toEqual([['He goes home.', 'goes', 'wrong']]);
     expect(block.score).toBeUndefined();
   });
@@ -207,7 +208,7 @@ describe('loadSessionView writing blocks', () => {
     const sid = await insertDraftSession(db, { date: '2026-10-24', title: 'Sat', isLight: false, createdAt: 'x' });
     await insertBlock(db, sid, 0, { kind: 'writing', format: 'essay', title: 'Essay', instruction: 'Discuss.', formatExample: null, passage: null, minutes: 40 });
     await setSessionStatus(db, sid, 'generated');
-    expect((await loadSessionView(db, sid)).blocks[0]).toMatchObject({ graded: false, items: [], writing: { text: null, words: null, source: null } });
+    expect((await loadSessionView(db, sid)).blocks[0]).toMatchObject({ graded: false, items: [], writing: { text: null, words: null, assessment: null, strengths: [], source: null } });
     await setSessionStatus(db, sid, 'graded');
     const view = await loadSessionView(db, sid);
     expect(view.blocks[0]!.graded).toBe(false);
@@ -233,8 +234,35 @@ describe('loadSessionView writing blocks', () => {
     const block = (await loadSessionView(db, s2)).blocks[0]!;
     expect(block.paragraphs).toEqual([]);
     expect(block.writing).toEqual({
-      text: null, words: null,
-      source: { text: 'He goes home. They are here.', errors: [{ was: 'goes', fix: 'go' }, { was: 'are', fix: 'is' }], rate: 3.3 },
+      text: null, words: null, assessment: null, strengths: [],
+      source: { text: 'He goes home. They are here.', errors: [{ was: 'goes', fix: 'go' }, { was: 'are', fix: 'is' }], rate: 3.3, strengths: [] },
     });
+  });
+
+  test('a checked essay carries its assessment, strengths and error kinds; a rewrite carries the source strengths', async () => {
+    const db = await createTestDb();
+    const s1 = await insertDraftSession(db, { date: '2026-10-24', title: 'Sat', isLight: false, createdAt: 'x' });
+    const essay = await insertBlock(db, s1, 0, { kind: 'writing', format: 'essay', title: 'Essay', instruction: 'Discuss.', formatExample: null, passage: null, minutes: 40 });
+    await insertItem(db, essay, 0, { ...base, prompt: 'He goes home.', expected: 'go' });
+    await answer(db, essay, 0, 'goes', 'go');
+    await db.execute("UPDATE answer SET error_kind = 'grammar'");
+    const assessment = { taskResponse: { band: 6, note: 'a' }, coherence: { band: 6.5, note: 'b' }, vocabulary: { band: 5.5, note: 'c' }, grammar: { band: 6, note: 'd' } };
+    const strengths = [{ fragment: 'They stay', note: 'Ясно.' }];
+    await db.execute(
+      "INSERT INTO writing_text (block_id, text, words, source_block_id, created_at, assessment, strengths) VALUES (?, 'He goes home. They stay.', 60, NULL, 'x', ?, ?)",
+      [essay, JSON.stringify(assessment), JSON.stringify(strengths)],
+    );
+    await setSessionStatus(db, s1, 'graded');
+    const block = (await loadSessionView(db, s1)).blocks[0]!;
+    expect(block.writing).toMatchObject({ assessment, strengths });
+    expect(block.items.map((x) => x.errorKind)).toEqual(['grammar']);
+
+    const s2 = await insertDraftSession(db, { date: '2026-10-25', title: 'Sun', isLight: false, createdAt: 'x' });
+    await insertBlock(db, s2, 0, {
+      kind: 'writing', format: 'rewrite', title: 'Rewrite', instruction: 'Rewrite.', formatExample: null,
+      passage: JSON.stringify({ sourceBlockId: essay, text: 'He goes home. They stay.' }), minutes: 20,
+    });
+    await setSessionStatus(db, s2, 'generated');
+    expect((await loadSessionView(db, s2)).blocks[0]!.writing!.source).toMatchObject({ strengths });
   });
 });

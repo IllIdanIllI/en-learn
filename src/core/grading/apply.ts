@@ -95,7 +95,8 @@ export async function applyGraded(db: Db, clock: Clock, items: GradingItem[], g:
   // Writing: the errors of a block are rewritten whole, and the text goes last, so a crash in between is repaired by grading again.
   for (const w of g.writing) {
     await db.execute('DELETE FROM item WHERE block_id = ?', [w.blockId]);
-    const errors = g.result.texts.find((t) => t.blockRef === `b${w.blockOrd}`)?.errors ?? [];
+    const entry = g.result.texts.find((t) => t.blockRef === `b${w.blockOrd}`);
+    const errors = entry?.errors ?? [];
     for (const [ord, e] of errors.entries()) {
       const rule = e.topicKey === '' ? null : await findTopicRule(db, e.topicKey);
       await insertItem(db, w.blockId, ord, {
@@ -106,10 +107,13 @@ export async function applyGraded(db: Db, clock: Clock, items: GradingItem[], g:
       const [item] = await db.select<{ id: number }>('SELECT id FROM item WHERE block_id = ? AND ord = ?', [w.blockId, ord]);
       await upsertAnswer(db, {
         itemId: item!.id, text: e.fragment, verdict: 'wrong', fix: e.fix, ruleSection: e.ruleSection || null,
-        explanation: e.explanation, vocabularyNote: null, suggestedTopic: rule ? null : e.suggestedTopic || null,
+        explanation: e.explanation, vocabularyNote: null, suggestedTopic: rule ? null : e.suggestedTopic || null, errorKind: e.kind,
       });
     }
-    await insertWritingText(db, { blockId: w.blockId, text: w.text, words: w.words, sourceBlockId: w.sourceBlockId, createdAt: clock.now() });
+    await insertWritingText(db, {
+      blockId: w.blockId, text: w.text, words: w.words, sourceBlockId: w.sourceBlockId, createdAt: clock.now(),
+      assessment: w.format === 'essay' ? entry?.assessment : null, strengths: entry?.strengths,
+    });
   }
 
   for (const [key, text] of g.spot) {

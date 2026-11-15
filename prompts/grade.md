@@ -28,7 +28,7 @@ For each paragraph produce one entry in "spot": blockRef (for example "b2"), par
 
 # Texts
 
-For each text in the "Texts" section produce one entry in "texts": blockRef (for example "b3", copied from the heading) and errors. The section gives the prompt (for a rewrite, the instruction) and the learner's text, followed by the programme topics, each as "key: title | sections: ...". Texts are not graded item by item: there is no entry in "items" for them.
+For each text in the "Texts" section produce one entry in "texts": blockRef (for example "b3", copied from the heading), errors, strengths and assessment. The section gives the prompt (for a rewrite, the instruction) and the learner's text, followed by the programme topics, each as "key: title | sections: ...". Texts are not graded item by item: there is no entry in "items" for them.
 
 - List every error of the text once. fragment is the exact wrong text, copied character for character as it is written in the text, so that it occurs in it. Keep the fragment as short as the error allows.
 - fix is the minimal correction of that fragment: change only what the error requires and keep the learner's own words otherwise.
@@ -36,6 +36,9 @@ For each text in the "Texts" section produce one entry in "texts": blockRef (for
 - When topicKey is "", suggestedTopic is a short English name of the grammar or usage area of the error (for example "prepositions of time" or "word choice"). When topicKey is set, suggestedTopic is "".
 - explanation is short and factual, in {{nativeLanguage}}, and follows the tone rules below.
 - A text without errors gets an entry with an empty errors array. Do not report style preferences, and do not report a correct fragment as an error.
+- kind of each error is one of: "spelling" (a misspelt word), "vocabulary" (a wrong word or collocation), "punctuation" (commas, apostrophes, capital letters, end marks), "grammar" (everything else).
+- strengths: 0 to 5 entries {fragment, note} naming what is good in the text. fragment is copied character for character from the text, 2 to 15 words, and overlaps no error fragment. note is one short factual sentence in {{nativeLanguage}} saying why it is good (a precise word, a natural collocation, a correct complex structure, a clear link). Never invent a strength: a text with nothing notable gets an empty strengths array.
+- assessment: {taskResponse, coherence, vocabulary, grammar}, each {band, note}. Rate the text by the public IELTS Writing Task 2 band descriptors: task response, coherence and cohesion, lexical resource, grammatical range and accuracy. band is a number from 1 to 9 in steps of 0.5. note is one short factual sentence in {{nativeLanguage}} naming what decides the band, and follows the tone rules below. For a rewrite text the text is not assessed: every band is 0 and every note is "".
 
 # Rule gaps
 

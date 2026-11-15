@@ -8,5 +8,5 @@
   "tomorrow": ["if + настоящее время в условных предложениях"],
   "spellingErrors": [ { "word": "necessary", "hint": "one collar, two sleeves" } ],
   "ruleGaps": [ { "ref": "b0.i1", "ruleTopicKey": "conditionals", "proposal": "## Формула\n...", "explanation": "Ответ естественный, но правило его не описывает.", "sources": [ { "title": "British Council", "url": "https://learnenglish.britishcouncil.org/grammar" } ] } ],
-  "texts": [ { "blockRef": "b3", "errors": [ { "fragment": "goes", "fix": "went", "topicKey": "", "suggestedTopic": "past simple", "ruleSection": "", "explanation": "Для прошедшего времени нужна форма went." } ] } ]
+  "texts": [ { "blockRef": "b3", "errors": [ { "fragment": "goes", "fix": "went", "topicKey": "", "suggestedTopic": "past simple", "ruleSection": "", "explanation": "Для прошедшего времени нужна форма went.", "kind": "grammar" } ], "strengths": [ { "fragment": "on the other hand", "note": "Связка ясно вводит другую точку зрения." } ], "assessment": { "taskResponse": { "band": 6, "note": "Позиция названа, примеры общие." }, "coherence": { "band": 6.5, "note": "Абзацы связаны, связки разнообразны." }, "vocabulary": { "band": 5.5, "note": "Есть неточный выбор слов." }, "grammar": { "band": 6, "note": "Простые структуры верны, сложные дают ошибки." } } } ]
 }

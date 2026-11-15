@@ -1,6 +1,7 @@
 import type { GradingItem } from '@/core/db/repos/sessions';
 import type { Settings } from '@/core/db/repos/settings';
 import type { GradeResult } from '@/core/llm/types';
+import { placeFragments } from '@/core/writing/text';
 import { BUILTIN_SHORTHANDS, parseSpotLines } from './precheck';
 
 export interface SpotParagraph {
@@ -140,7 +141,11 @@ export function proseOf(r: GradeResult): string[] {
     ...r.items.flatMap((i) => [i.explanation, i.vocabularyNote]),
     ...r.tomorrow,
     ...r.spot.flatMap((s) => s.extra.map((e) => e.explanation)),
-    ...r.texts.flatMap((t) => t.errors.map((e) => e.explanation)),
+    ...r.texts.flatMap((t) => [
+      ...t.errors.map((e) => e.explanation),
+      ...t.strengths.map((x) => x.note),
+      t.assessment.taskResponse.note, t.assessment.coherence.note, t.assessment.vocabulary.note, t.assessment.grammar.note,
+    ]),
   ].filter((t) => t !== '');
 }
 
@@ -155,14 +160,42 @@ export function missingRefs(batch: GradeBatch, refs: Refs, r: GradeResult): stri
   return out;
 }
 
-/** What is wrong with the errors listed for the texts: a fragment that is not in the text, no explanation, or a topic key outside the programme topics. */
+export const MAX_STRENGTHS = 5;
+
+const isBand = (b: number) => Number.isFinite(b) && b >= 1 && b <= 9 && Number.isInteger(b * 2);
+
+/**
+ * What is wrong with what the grader returned for the texts: an error fragment that is not in the text, no explanation, a topic key outside the programme topics;
+ * a strength that is empty, not in the text, without a note, overlapping an error (same occurrence search as the marking) or more than five of them;
+ * an essay band outside 1 to 9 in halves or a criterion without a note, a rewrite band other than 0.
+ */
 export function textProblems(batch: GradeBatch, r: GradeResult): string | null {
   const keys = new Set(batch.topics.map((t) => t.key));
   for (const t of batch.texts) {
-    for (const e of r.texts.find((x) => x.blockRef === `b${t.blockOrd}`)?.errors ?? []) {
-      if (e.fragment === '' || !t.text.includes(e.fragment)) return `text b${t.blockOrd}: fragment "${e.fragment}" is not in the text`;
-      if (e.explanation.trim() === '') return `text b${t.blockOrd}: error "${e.fragment}" has no explanation`;
-      if (e.topicKey !== '' && !keys.has(e.topicKey)) return `text b${t.blockOrd}: topicKey "${e.topicKey}" is not a programme topic`;
+    const entry = r.texts.find((x) => x.blockRef === `b${t.blockOrd}`);
+    const at = `text b${t.blockOrd}`;
+    for (const e of entry?.errors ?? []) {
+      if (e.fragment === '' || !t.text.includes(e.fragment)) return `${at}: fragment "${e.fragment}" is not in the text`;
+      if (e.explanation.trim() === '') return `${at}: error "${e.fragment}" has no explanation`;
+      if (e.topicKey !== '' && !keys.has(e.topicKey)) return `${at}: topicKey "${e.topicKey}" is not a programme topic`;
+    }
+    if (!entry) continue;
+    const strengths = entry.strengths;
+    if (strengths.length > MAX_STRENGTHS) return `${at}: ${strengths.length} strengths, at most ${MAX_STRENGTHS}`;
+    for (const x of strengths) {
+      if (x.fragment === '' || !t.text.includes(x.fragment)) return `${at}: strength "${x.fragment}" is not in the text`;
+      if (x.note.trim() === '') return `${at}: strength "${x.fragment}" has no note`;
+    }
+    const placed = new Set(placeFragments(t.text, entry.errors.map((e) => e.fragment), strengths.map((x) => x.fragment)).filter((p) => p.strength).map((p) => p.idx));
+    const overlapping = strengths.findIndex((_, k) => !placed.has(k));
+    if (overlapping >= 0) return `${at}: strength "${strengths[overlapping]!.fragment}" overlaps an error fragment`;
+    for (const [name, c] of Object.entries(entry.assessment)) {
+      if (t.format === 'rewrite') {
+        if (c.band !== 0) return `${at}: a rewrite is not assessed, ${name} band must be 0`;
+      } else {
+        if (!isBand(c.band)) return `${at}: ${name} band ${c.band} is not one of 1, 1.5, ... 9`;
+        if (c.note.trim() === '') return `${at}: ${name} has no note`;
+      }
     }
   }
   return null;

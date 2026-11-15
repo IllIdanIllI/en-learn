@@ -1,4 +1,4 @@
-import type { Source } from '@/core/llm/types';
+import type { ErrorKind, Source, TextAssessment, TextStrength } from '@/core/llm/types';
 import type {
   BlockFormat, BlockKind, DisputeDecision, EffectiveVerdict, GapStatus, ISODate, ItemStatus, SessionStatus, Verdict,
 } from '@/core/domain';
@@ -31,6 +31,8 @@ export interface ViewItem {
   ruleId: number | null;
   ruleSection: string | null;
   status: ItemStatus;
+  /** Writing errors of a checked text: the grader's error type; null otherwise and for old texts. */
+  errorKind: ErrorKind | null;
   /** Graded blocks only: the answer key and everything derived from the answer. */
   expected?: string;
   note?: string | null;
@@ -76,9 +78,18 @@ export interface ViewBlock {
   writing?: {
     text: string | null;
     words: number | null;
-    source: { text: string; errors: { was: string; fix: string }[]; rate: number | null } | null;
+    /** The approximate IELTS bands and the strong parts of the text; null and [] for a rewrite, a text too short to check and old texts. */
+    assessment: TextAssessment | null;
+    strengths: TextStrength[];
+    source: { text: string; errors: { was: string; fix: string }[]; rate: number | null; strengths: TextStrength[] } | null;
   };
 }
+
+/** The stored JSON of a text's assessment; null when the column is null (rewrite, too short, old text). */
+export const parseAssessment = (json: string | null): TextAssessment | null => (json === null ? null : (JSON.parse(json) as TextAssessment));
+
+/** The stored JSON of a text's strong parts; [] when the column is null. */
+export const parseStrengths = (json: string | null): TextStrength[] => (json === null ? [] : (JSON.parse(json) as TextStrength[]));
 
 export interface SessionView {
   id: number;
@@ -100,7 +111,7 @@ interface ItemRow {
   topic_id: number | null; rule_id: number | null; rule_section: string | null; status: ItemStatus; note: string | null;
   a_text: string | null; a_verdict: Verdict | null; a_fix: string | null; a_rule_section: string | null;
   a_explanation: string | null; a_vocabulary_note: string | null; a_is_inattention: number | null;
-  a_dispute_text: string | null; a_dispute_reply: string | null; a_dispute_decision: DisputeDecision | null;
+  a_dispute_text: string | null; a_dispute_reply: string | null; a_dispute_decision: DisputeDecision | null; a_error_kind: ErrorKind | null;
   has_answer: number | null; spelling_word_id: number | null; mnemonic: string | null; gap_id: number | null; gap_status: GapStatus | null; gap_proposal: string | null; gap_sources: string | null;
 }
 
@@ -126,7 +137,7 @@ export async function loadSessionView(db: Db, sessionId: number): Promise<Sessio
             i.topic_id AS topic_id, i.rule_id AS rule_id, i.rule_section AS rule_section, i.status AS status, i.note AS note,
             a.text AS a_text, a.verdict AS a_verdict, a.fix AS a_fix, a.rule_section AS a_rule_section,
             a.explanation AS a_explanation, a.vocabulary_note AS a_vocabulary_note, a.is_inattention AS a_is_inattention,
-            a.dispute_text AS a_dispute_text, a.dispute_reply AS a_dispute_reply, a.dispute_decision AS a_dispute_decision,
+            a.dispute_text AS a_dispute_text, a.dispute_reply AS a_dispute_reply, a.dispute_decision AS a_dispute_decision, a.error_kind AS a_error_kind,
             a.item_id AS has_answer, i.spelling_word_id AS spelling_word_id, w.mnemonic AS mnemonic, g.id AS gap_id, g.status AS gap_status, g.proposal AS gap_proposal, g.sources AS gap_sources
      FROM item i JOIN block b ON b.id = i.block_id
      LEFT JOIN answer a ON a.item_id = i.id LEFT JOIN rule_gap g ON g.item_id = i.id
@@ -156,17 +167,18 @@ export async function loadSessionView(db: Db, sessionId: number): Promise<Sessio
     feedback = { patterns: fb[0] ? (JSON.parse(fb[0].patterns) as string[]) : [], tomorrow: fb[0] ? (JSON.parse(fb[0].tomorrow) as string[]) : [] };
   }
 
-  const writingTexts = new Map<number, { text: string; words: number }>();
-  for (const r of await db.select<{ block_id: number; text: string; words: number }>(
-    'SELECT wt.block_id AS block_id, wt.text AS text, wt.words AS words FROM writing_text wt JOIN block b ON b.id = wt.block_id WHERE b.session_id = ?',
+  const writingTexts = new Map<number, { text: string; words: number; assessment: TextAssessment | null; strengths: TextStrength[] }>();
+  for (const r of await db.select<{ block_id: number; text: string; words: number; assessment: string | null; strengths: string | null }>(
+    `SELECT wt.block_id AS block_id, wt.text AS text, wt.words AS words, wt.assessment AS assessment, wt.strengths AS strengths
+     FROM writing_text wt JOIN block b ON b.id = wt.block_id WHERE b.session_id = ?`,
     [sessionId],
-  )) writingTexts.set(r.block_id, { text: r.text, words: r.words });
+  )) writingTexts.set(r.block_id, { text: r.text, words: r.words, assessment: parseAssessment(r.assessment), strengths: parseStrengths(r.strengths) });
 
   // The checked text a rewrite block starts from: its words and the errors that still count after disputes.
   const sourceIds = blockRows.flatMap((b) => (b.format === 'rewrite' && b.passage !== null ? [(JSON.parse(b.passage) as { sourceBlockId: number }).sourceBlockId] : []));
-  const sources = new Map<number, { text: string; errors: { was: string; fix: string }[]; rate: number | null }>();
+  const sources = new Map<number, { text: string; errors: { was: string; fix: string }[]; rate: number | null; strengths: TextStrength[] }>();
   for (const id of sourceIds) {
-    const [src] = await db.select<{ text: string; words: number }>('SELECT text, words FROM writing_text WHERE block_id = ?', [id]);
+    const [src] = await db.select<{ text: string; words: number; strengths: string | null }>('SELECT text, words, strengths FROM writing_text WHERE block_id = ?', [id]);
     if (!src) continue;
     const rows = await db.select<{ status: ItemStatus; text: string | null; fix: string | null; verdict: Verdict; dispute_decision: DisputeDecision | null; gap_status: GapStatus | null }>(
       `SELECT i.status AS status, a.text AS text, a.fix AS fix, a.verdict AS verdict, a.dispute_decision AS dispute_decision, g.status AS gap_status
@@ -176,12 +188,12 @@ export async function loadSessionView(db: Db, sessionId: number): Promise<Sessio
     const errors = rows
       .filter((r) => effectiveVerdict({ itemStatus: r.status, verdict: r.verdict, disputeDecision: r.dispute_decision, gapStatus: r.gap_status }) === 'wrong')
       .map((r) => ({ was: r.text ?? '', fix: r.fix ?? '' }));
-    sources.set(id, { text: src.text, errors, rate: errorRate(errors.length, src.words) });
+    sources.set(id, { text: src.text, errors, rate: errorRate(errors.length, src.words), strengths: parseStrengths(src.strengths) });
   }
 
   const toItem = (r: ItemRow, number: number, format: BlockFormat, blockGraded: boolean): ViewItem => {
     const item: ViewItem = {
-      id: r.id, ord: r.ord, number, prompt: r.prompt, format, topicId: r.topic_id, ruleId: r.rule_id, ruleSection: r.rule_section, status: r.status,
+      id: r.id, ord: r.ord, number, prompt: r.prompt, format, topicId: r.topic_id, ruleId: r.rule_id, ruleSection: r.rule_section, status: r.status, errorKind: null,
     };
     if (!blockGraded) return item;
     const answer: ViewAnswer | null = r.has_answer === null ? null : {
@@ -191,6 +203,7 @@ export async function loadSessionView(db: Db, sessionId: number): Promise<Sessio
     };
     return {
       ...item,
+      errorKind: r.a_error_kind,
       expected: r.expected,
       note: r.note,
       answer,
@@ -223,6 +236,7 @@ export async function loadSessionView(db: Db, sessionId: number): Promise<Sessio
       ...(isWriting ? {
         writing: {
           text: written?.text ?? null, words: written?.words ?? null,
+          assessment: written?.assessment ?? null, strengths: written?.strengths ?? [],
           source: b.format === 'rewrite' && b.passage !== null ? (sources.get((JSON.parse(b.passage) as { sourceBlockId: number }).sourceBlockId) ?? null) : null,
         },
       } : {}),

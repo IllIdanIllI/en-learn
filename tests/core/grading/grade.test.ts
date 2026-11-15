@@ -582,11 +582,14 @@ describe('gradeSession: writing texts', () => {
   const shortText = `${FIRST}. ${'plain words '.repeat(10).trim()}.`;
   type TextEntry = GradeResult['texts'][number];
   const err = (o: Partial<TextEntry['errors'][number]>): TextEntry['errors'][number] => ({
-    fragment: 'goes', fix: 'went', topicKey: '', suggestedTopic: '', ruleSection: '', explanation: 'Past simple.', ...o,
+    fragment: 'goes', fix: 'went', topicKey: '', suggestedTopic: '', ruleSection: '', explanation: 'Past simple.', kind: 'grammar', ...o,
   });
-  const twoErrors = (): TextEntry => ({
-    blockRef: 'b3',
-    errors: [err({ topicKey: 'articles', ruleSection: 'Basics', suggestedTopic: 'past simple' }), err({ fragment: 'buy', fix: 'bought', suggestedTopic: 'word choice' })],
+  const band = (b: number, note = 'Note.') => ({ band: b, note });
+  const assessed = (): TextEntry['assessment'] => ({ taskResponse: band(6), coherence: band(6.5), vocabulary: band(5.5), grammar: band(6) });
+  const notAssessed = (): TextEntry['assessment'] => ({ taskResponse: band(0, ''), coherence: band(0, ''), vocabulary: band(0, ''), grammar: band(0, '') });
+  const entryOf = (o: Partial<TextEntry> = {}): TextEntry => ({ blockRef: 'b3', errors: [], strengths: [], assessment: assessed(), ...o });
+  const twoErrors = (): TextEntry => entryOf({
+    errors: [err({ topicKey: 'articles', ruleSection: 'Basics', suggestedTopic: 'past simple' }), err({ fragment: 'buy', fix: 'bought', suggestedTopic: 'word choice', kind: 'vocabulary' })],
   });
 
   async function withBlock(script: LlmResult<unknown>[], format: 'essay' | 'rewrite' = 'essay') {
@@ -597,7 +600,7 @@ describe('gradeSession: writing texts', () => {
     });
     return { ...t, blockId };
   }
-  const textRows = (db: Db) => rows<{ block_id: number; text: string; words: number; source_block_id: number | null }>(db, 'SELECT * FROM writing_text');
+  const textRows = (db: Db) => rows<{ block_id: number; text: string; words: number; source_block_id: number | null; assessment: string | null; strengths: string | null }>(db, 'SELECT * FROM writing_text');
 
   test('the grade input has a Texts section and the programme topics with their rule sections', async () => {
     const t = await withBlock([ok(fullResult({ texts: [twoErrors()] }))]);
@@ -624,11 +627,36 @@ describe('gradeSession: writing texts', () => {
       ['goes', 'wrong', 'went', 'Basics', null],
       ['buy', 'wrong', 'bought', null, 'word choice'],
     ]);
-    expect(await textRows(t.db)).toEqual([{ block_id: t.blockId, text: longText, words: 60, source_block_id: null, created_at: expect.any(String) }]);
+    expect(await textRows(t.db)).toEqual([{
+      block_id: t.blockId, text: longText, words: 60, source_block_id: null, created_at: expect.any(String),
+      assessment: JSON.stringify(assessed()), strengths: '[]',
+    }]);
+  });
+
+  test('error kinds, strengths and the assessment are stored; an essay prompt asks for them', async () => {
+    const strengths = [{ fragment: 'plain words plain words', note: 'Ровный ритм.' }];
+    const t = await withBlock([ok(fullResult({ texts: [{ ...twoErrors(), strengths }] }))]);
+    await gradeSession(t.deps, t.sid, { ...subm(), texts: { [t.blockId]: longText } }, []);
+    expect((await rows<{ error_kind: string | null }>(
+      t.db, 'SELECT a.error_kind AS error_kind FROM answer a JOIN item i ON i.id = a.item_id WHERE i.block_id = ? ORDER BY i.ord', [t.blockId],
+    )).map((a) => a.error_kind)).toEqual(['grammar', 'vocabulary']);
+    const [row] = await textRows(t.db);
+    expect(JSON.parse(row!.assessment as string)).toEqual(assessed());
+    expect(JSON.parse(row!.strengths as string)).toEqual(strengths);
+  });
+
+  test('a rewrite stores no assessment but keeps its strengths; a short text stores neither', async () => {
+    const strengths = [{ fragment: 'plain words plain words', note: 'Ровный ритм.' }];
+    const t = await withBlock([ok(fullResult({ texts: [entryOf({ assessment: notAssessed(), strengths })] }))], 'rewrite');
+    await gradeSession(t.deps, t.sid, { ...subm(), texts: { [t.blockId]: longText } }, []);
+    expect(await textRows(t.db)).toEqual([expect.objectContaining({ assessment: null, strengths: JSON.stringify(strengths) })]);
+    const s = await withBlock([ok(fullResult())]);
+    await gradeSession(s.deps, s.sid, { ...subm(), texts: { [s.blockId]: shortText } }, []);
+    expect(await textRows(s.db)).toEqual([expect.objectContaining({ assessment: null, strengths: null })]);
   });
 
   test('a rewrite keeps its source block id', async () => {
-    const t = await withBlock([ok(fullResult({ texts: [{ blockRef: 'b3', errors: [] }] }))], 'rewrite');
+    const t = await withBlock([ok(fullResult({ texts: [entryOf({ assessment: notAssessed() })] }))], 'rewrite');
     await gradeSession(t.deps, t.sid, { ...subm(), texts: { [t.blockId]: longText } }, []);
     expect(userPrompt(t.llm)).toContain('### b3 (rewrite)\nPrompt: Some people think X. Discuss.');
     expect((await textRows(t.db))[0]!.source_block_id).toBe(1);
@@ -662,17 +690,28 @@ describe('gradeSession: writing texts', () => {
     const t = await withBlock([ok(fullResult())]);
     const outcome = await gradeSession(t.deps, t.sid, { ...subm(), texts: { [t.blockId]: '  ' } }, [], { finish: true });
     expect(outcome).toEqual({ kind: 'graded' });
-    expect(await textRows(t.db)).toEqual([{ block_id: t.blockId, text: '', words: 0, source_block_id: null, created_at: expect.any(String) }]);
+    expect(await textRows(t.db)).toEqual([{
+      block_id: t.blockId, text: '', words: 0, source_block_id: null, created_at: expect.any(String), assessment: null, strengths: null,
+    }]);
     expect(userPrompt(t.llm)).not.toContain('## Texts');
     expect(await rows(t.db, 'SELECT id FROM item WHERE block_id = ?', [t.blockId])).toEqual([]);
     expect(await hasOpenItems(t.db, t.sid)).toBe(false);
   });
 
   test.each([
-    ['a fragment is not in the text', result({ texts: [{ blockRef: 'b3', errors: [err({ fragment: 'not here' })] }] }), 'text b3: fragment "not here" is not in the text'],
-    ['a topicKey is not a programme topic', result({ texts: [{ blockRef: 'b3', errors: [err({ topicKey: 'nope' })] }] }), 'nope'],
-    ['an error has no explanation', result({ texts: [{ blockRef: 'b3', errors: [err({ explanation: '  ' })] }] }), 'text b3: error "goes" has no explanation'],
+    ['a fragment is not in the text', result({ texts: [entryOf({ errors: [err({ fragment: 'not here' })] })] }), 'text b3: fragment "not here" is not in the text'],
+    ['a topicKey is not a programme topic', result({ texts: [entryOf({ errors: [err({ topicKey: 'nope' })] })] }), 'nope'],
+    ['an error has no explanation', result({ texts: [entryOf({ errors: [err({ explanation: '  ' })] })] }), 'text b3: error "goes" has no explanation'],
     ['a sent text has no entry', result({ texts: [] }), 'b3'],
+    ['a strength fragment is empty', result({ texts: [entryOf({ strengths: [{ fragment: '', note: 'N.' }] })] }), 'strength "" is not in the text'],
+    ['a strength fragment is not in the text', result({ texts: [entryOf({ strengths: [{ fragment: 'not here', note: 'N.' }] })] }), 'strength "not here" is not in the text'],
+    ['a strength has no note', result({ texts: [entryOf({ strengths: [{ fragment: 'plain words', note: ' ' }] })] }), 'strength "plain words" has no note'],
+    ['a strength overlaps an error', result({ texts: [entryOf({ errors: [err({})], strengths: [{ fragment: 'he goes to', note: 'N.' }] })] }), 'strength "he goes to" overlaps an error fragment'],
+    ['there are six strengths', result({ texts: [entryOf({ strengths: Array.from({ length: 6 }, () => ({ fragment: 'plain words', note: 'N.' })) })] }), '6 strengths, at most 5'],
+    ['an essay band is not a half step', result({ texts: [entryOf({ assessment: { ...assessed(), grammar: band(6.2) } })] }), 'grammar band 6.2'],
+    ['an essay band is above 9', result({ texts: [entryOf({ assessment: { ...assessed(), coherence: band(9.5) } })] }), 'coherence band 9.5'],
+    ['an essay band is 0', result({ texts: [entryOf({ assessment: { ...assessed(), vocabulary: band(0) } })] }), 'vocabulary band 0'],
+    ['an essay criterion has no note', result({ texts: [entryOf({ assessment: { ...assessed(), taskResponse: band(6, ' ') } })] }), 'taskResponse has no note'],
   ])('the check retries when %s', async (_name, bad, message) => {
     const withRest = (r: GradeResult) => ({ ...fullResult(), texts: r.texts });
     const t = await withBlock([ok(withRest(bad)), ok(withRest(result({ texts: [twoErrors()] })))]);
@@ -681,6 +720,23 @@ describe('gradeSession: writing texts', () => {
     const failed = await rows<{ error: string }>(t.db, 'SELECT error FROM llm_call WHERE ok = 0');
     expect(failed).toHaveLength(1);
     expect(failed[0]!.error).toContain(message);
+  });
+
+  test('the check retries when a rewrite has a band other than 0', async () => {
+    const t = await withBlock([ok(fullResult({ texts: [entryOf()] })), ok(fullResult({ texts: [entryOf({ assessment: notAssessed() })] }))], 'rewrite');
+    expect(await gradeSession(t.deps, t.sid, { ...subm(), texts: { [t.blockId]: longText } }, [])).toEqual({ kind: 'graded' });
+    expect(t.llm.calls).toHaveLength(2);
+    expect((await rows<{ error: string }>(t.db, 'SELECT error FROM llm_call WHERE ok = 0'))[0]!.error).toContain('a rewrite is not assessed');
+  });
+
+  test.each([
+    ['a strength note', entryOf({ strengths: [{ fragment: 'plain words', note: 'Снова точное слово.' }] })],
+    ['an assessment note', entryOf({ assessment: { ...assessed(), coherence: band(6, 'Связки снова разнообразны.') } })],
+  ])('the tone check covers %s', async (_name, bad) => {
+    const t = await withBlock([ok(fullResult({ texts: [bad] })), ok(fullResult({ texts: [twoErrors()] }))]);
+    expect(await gradeSession(t.deps, t.sid, { ...subm(), texts: { [t.blockId]: longText } }, [])).toEqual({ kind: 'graded' });
+    expect(t.llm.calls).toHaveLength(2);
+    expect(await rows(t.db, 'SELECT error FROM llm_call WHERE ok = 0')).toHaveLength(1);
   });
 
   test('grading again after a failed apply does not duplicate the errors', async () => {

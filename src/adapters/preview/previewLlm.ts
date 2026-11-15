@@ -1,7 +1,7 @@
 import type { Llm, LlmRequest, LlmResult } from '@/core/ports';
 import { MINI_RULES } from './miniSeed';
 import type {
-  DisputeBatchReply, ExplainReply, GeneratedBlock, GeneratedItem, GeneratedParagraph, GeneratedSession, GradeResult, PhoneticsReply, RuleChatReply, RuleDraft, ValidationResult, WordCheckReply, WordsReply,
+  DisputeBatchReply, ExplainReply, GeneratedBlock, GeneratedItem, GeneratedParagraph, GeneratedSession, GradeResult, PhoneticsReply, RuleChatReply, RuleDraft, TextAssessment, ValidationResult, WordCheckReply, WordsReply,
 } from '@/core/llm/types';
 
 /** Canned, valid model outputs for preview mode. They are derived from the request text so they pass the code checks. */
@@ -259,19 +259,30 @@ function gradeTexts(prompt: string): GradeResult['texts'] {
     const text = block.split('\nText:\n')[1] ?? '';
     if (!blockRef) return [];
     const errors: GradeResult['texts'][number]['errors'] = [];
+    const essay = /^b\d+ \(essay\)/.test(block);
     if (first && text.includes('goes')) {
       errors.push({
         fragment: 'goes', fix: 'go', topicKey: first[1] as string, suggestedTopic: '', ruleSection: first[2] ?? '',
-        explanation: feedbackFor(first[1] as string).explanation,
+        explanation: feedbackFor(first[1] as string).explanation, kind: 'grammar',
       });
     }
     if (text.includes('are')) {
       errors.push({
         fragment: 'are', fix: 'is', topicKey: '', suggestedTopic: 'subject-verb agreement', ruleSection: '',
-        explanation: 'Глагол согласуется с подлежащим в числе.',
+        explanation: 'Глагол согласуется с подлежащим в числе.', kind: 'grammar',
       });
     }
-    return [{ blockRef, errors }];
+    const strengths: GradeResult['texts'][number]['strengths'] = [];
+    if (text.includes('the vast majority')) strengths.push({ fragment: 'the vast majority', note: 'Точное устойчивое сочетание.' });
+    if (text.includes('On the other hand')) strengths.push({ fragment: 'On the other hand', note: 'Связка ясно вводит другую точку зрения.' });
+    const band = (value: number, note: string) => ({ band: essay ? value : 0, note: essay ? note : '' });
+    const assessment: TextAssessment = {
+      taskResponse: band(6, 'Позиция названа, аргументы раскрыты не полностью.'),
+      coherence: band(6, 'Абзацы выстроены логично, связки повторяются.'),
+      vocabulary: band(5.5, 'Лексика достаточна, есть неточный выбор слов.'),
+      grammar: band(5.5, 'Простые структуры верны, в сложных есть ошибки.'),
+    };
+    return [{ blockRef, errors, strengths, assessment }];
   });
 }
 

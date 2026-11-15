@@ -4,7 +4,7 @@ import { answerSegments, scoreSegments } from '../../src/ui/grove/segments';
 import { stalkMeter } from '../../src/ui/grove/sprites';
 
 const item = (id: number, effective?: ViewItem['effective']): ViewItem => ({
-  id, ord: id, number: id, prompt: '', format: 'gap', topicId: null, ruleId: null, ruleSection: null, status: 'active',
+  id, ord: id, number: id, prompt: '', format: 'gap', topicId: null, ruleId: null, ruleSection: null, status: 'active', errorKind: null,
   ...(effective === undefined ? {} : { effective }),
 });
 const block = (id: number, over: Partial<ViewBlock>): ViewBlock => ({

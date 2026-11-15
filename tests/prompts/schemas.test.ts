@@ -69,3 +69,14 @@ test('learner-facing prompts use the native language placeholder', () => {
     expect(bundledPrompts[kind].system).toContain('{{nativeLanguage}}');
   }
 });
+
+test('the grade schema and prompt carry the writing evaluation fields', () => {
+  type Node = { required: string[]; properties: Record<string, Node & { enum?: string[]; items?: Node }> };
+  const texts = ((bundledPrompts.grade.schema as Node).properties.texts as unknown as { items: Node }).items;
+  expect(texts.required).toEqual(expect.arrayContaining(['errors', 'strengths', 'assessment']));
+  expect(texts.properties.errors!.items!.required).toContain('kind');
+  expect(texts.properties.errors!.items!.properties.kind!.enum).toEqual(['spelling', 'grammar', 'vocabulary', 'punctuation']);
+  expect(texts.properties.strengths!.items!.required).toEqual(['fragment', 'note']);
+  expect(texts.properties.assessment!.required).toEqual(['taskResponse', 'coherence', 'vocabulary', 'grammar']);
+  for (const word of ['kind', 'strengths', 'assessment', 'IELTS Writing Task 2']) expect(bundledPrompts.grade.system).toContain(word);
+});

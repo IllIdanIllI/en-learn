@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Dialog } from 'radix-ui';
 import { LoaderCircle, RefreshCw } from 'lucide-react';
 import { t, type Lang } from '@/core/i18n';
@@ -12,9 +12,10 @@ import { Notice } from './chips';
 /**
  * "Новая тема" under the prompt of an open essay. With text in the editor a dialog asks first; Keep or Clear
  * start the request, and `onChanged(clear)` runs when the new prompt is saved, so the page reloads the block.
+ * `disabled` is set while the session's answers are being checked.
  */
-export function NewTopicButton({ deps, blockId, hasText, lang, onChanged }: {
-  deps: Deps; blockId: number; hasText: boolean; lang: Lang; onChanged: (clear: boolean) => void;
+export function NewTopicButton({ deps, blockId, hasText, lang, disabled, onChanged }: {
+  deps: Deps; blockId: number; hasText: boolean; lang: Lang; disabled: boolean; onChanged: (clear: boolean) => void;
 }) {
   const { running } = useGeneration();
   const [busy, setBusy] = useState(false);
@@ -23,9 +24,18 @@ export function NewTopicButton({ deps, blockId, hasText, lang, onChanged }: {
   // Set at once on a press, so a second click before the state renders sends no request.
   const pressed = useRef(false);
   const button = useRef<HTMLButtonElement>(null);
+  // The button is disabled during a request, which drops the focus: it goes back to the button when the request ends.
+  const returnFocus = useRef(false);
+  useEffect(() => {
+    if (busy) returnFocus.current = true;
+    else if (returnFocus.current) {
+      returnFocus.current = false;
+      button.current?.focus();
+    }
+  }, [busy]);
 
   const start = async (clear: boolean) => {
-    if (pressed.current || running) return;
+    if (pressed.current || running || disabled) return;
     pressed.current = true;
     setBusy(true);
     setError(null);
@@ -55,7 +65,7 @@ export function NewTopicButton({ deps, blockId, hasText, lang, onChanged }: {
 
   return (
     <div className="mt-3">
-      <Button ref={button} variant="ghost" size="sm" disabled={busy || running} onClick={press}>
+      <Button ref={button} variant="ghost" size="sm" disabled={busy || running || disabled} onClick={press}>
         {busy ? <LoaderCircle className="animate-spin motion-reduce:animate-none" aria-hidden /> : <RefreshCw aria-hidden />}
         {t(lang, busy ? 'writing.newTopic.busy' : 'writing.newTopic')}
       </Button>
@@ -72,8 +82,8 @@ export function NewTopicButton({ deps, blockId, hasText, lang, onChanged }: {
             <Dialog.Title className="title">{t(lang, 'writing.newTopic.confirm')}</Dialog.Title>
             <div className="flex flex-wrap justify-end gap-2">
               <Button variant="ghost" onClick={() => setConfirming(false)}>{t(lang, 'writing.newTopic.cancel')}</Button>
-              <Button variant="outline" onClick={() => { setConfirming(false); void start(false); }}>{t(lang, 'writing.newTopic.keep')}</Button>
-              <Button onClick={() => { setConfirming(false); void start(true); }}>{t(lang, 'writing.newTopic.clear')}</Button>
+              <Button variant="outline" disabled={running || disabled} onClick={() => { setConfirming(false); void start(false); }}>{t(lang, 'writing.newTopic.keep')}</Button>
+              <Button disabled={running || disabled} onClick={() => { setConfirming(false); void start(true); }}>{t(lang, 'writing.newTopic.clear')}</Button>
             </div>
           </Dialog.Content>
         </Dialog.Portal>

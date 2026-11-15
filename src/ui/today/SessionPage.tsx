@@ -311,6 +311,7 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
             blockId={block.id}
             hasText={(texts[block.id] ?? '').trim() !== ''}
             lang={lang}
+            disabled={busy}
             onChanged={(clear) => {
               // A cleared text empties its draft too; the saved draft is written with it.
               if (clear) {

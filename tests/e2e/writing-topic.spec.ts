@@ -3,6 +3,8 @@ import { expect, test, type Page } from '@playwright/test';
 const OLD = 'Some people think that working from home is better than working in an office.';
 /** The canned reply of the preview essay_prompt call. */
 const NEW = 'Some people think that cities should ban cars from their centres. To what extent do you agree or disagree?';
+/** Over the 50-word minimum of a check. */
+const LONG = 'Working from home gives people more freedom because nobody wastes time on a long commute every morning. Workers can spend that time with their families, sleeping longer, or exercising before the day starts. Companies also save money on office space, and cities benefit from less traffic and lower pollution. Of course, some people miss the social contact of a shared office, so a balance of home and office days often works best for everyone involved.';
 const TEXT = 'Working from home gives people more freedom because nobody wastes time on a long commute every morning.';
 
 const topicButton = (page: Page) => page.getByRole('button', { name: 'Новая тема', exact: true });
@@ -13,6 +15,12 @@ const notice = (page: Page) => page.getByRole('alert').filter({ hasText: 'Не �
 async function leaveAndReturn(page: Page) {
   await page.getByRole('navigation').getByRole('link', { name: 'Настройки' }).click();
   await page.getByRole('navigation').getByRole('link', { name: 'Сегодня' }).click();
+}
+/** Answers every empty task field, so a check goes on to the essay (unanswered items would ask to skip first). */
+async function answerTasks(page: Page) {
+  for (const field of await page.getByRole('main').getByRole('textbox').all()) {
+    if ((await field.inputValue()) === '') await field.fill('x');
+  }
 }
 /** The debug log is kept in localStorage; a "new topic ok" entry is one prompt change. */
 const topicLog = (page: Page) => page.evaluate(() => localStorage.getItem('en-learn.debugLog') ?? '');
@@ -66,6 +74,7 @@ test.describe('new topic button on an open essay', () => {
     await topicButton(page).click();
     await page.getByRole('button', { name: 'Оставить текст', exact: true }).click();
     await expect(page.getByText(NEW)).toBeVisible();
+    await expect(topicButton(page)).toBeFocused();
     await expect(editor(page)).toHaveValue(TEXT);
     await leaveAndReturn(page);
     await expect(editor(page)).toHaveValue(TEXT);
@@ -79,6 +88,7 @@ test.describe('new topic button on an open essay', () => {
     await topicButton(page).click();
     await page.getByRole('button', { name: 'Очистить текст', exact: true }).click();
     await expect(page.getByText(NEW)).toBeVisible();
+    await expect(topicButton(page)).toBeFocused();
     await expect(editor(page)).toHaveValue('');
     await leaveAndReturn(page);
     await expect(editor(page)).toHaveValue('');
@@ -94,8 +104,30 @@ test.describe('new topic button on an open essay', () => {
     await expect(page.getByText(OLD)).toBeVisible();
     await expect(editor(page)).toHaveValue(TEXT);
     await expect(topicButton(page)).toBeEnabled();
+    await expect(topicButton(page)).toBeFocused();
+    await expect.poll(() => topicLog(page)).toContain('new topic error');
     await leaveAndReturn(page);
     await expect(editor(page)).toHaveValue(TEXT);
+  });
+
+  test('Keep with a slow request: focus returns to the button once the request ends', async ({ page }) => {
+    await page.goto('/?state=writing&delay=1500#/today');
+    await editor(page).fill(TEXT);
+    await topicButton(page).click();
+    await page.getByRole('button', { name: 'Оставить текст', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Подбираю тему', exact: true })).toBeDisabled();
+    await expect(page.getByText(NEW)).toBeVisible({ timeout: 30_000 });
+    await expect(topicButton(page)).toBeFocused();
+  });
+
+  test('is disabled while the essay is being checked', async ({ page }) => {
+    await page.goto('/?state=writing&delay=1500#/today');
+    await editor(page).fill(LONG);
+    await answerTasks(page);
+    await page.getByRole('button', { name: 'Проверить ответы', exact: true }).click();
+    await expect(topicButton(page)).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Остановить проверку' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Остановить проверку' })).toHaveCount(0, { timeout: 30_000 });
   });
 
   test('a double click sends one request: the button shows the busy label and is disabled at once', async ({ page }) => {

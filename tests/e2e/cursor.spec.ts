@@ -248,6 +248,20 @@ test('pointer cursor: the debug log buttons with the text area open', async ({ p
   expect(await wrongCursors(page)).toEqual([]);
 });
 
+test('pointer cursor: new topic button disabled while the essay is checked', async ({ page }) => {
+  await page.goto('/?state=writing&delay=1500#/today');
+  await page.getByRole('textbox', { name: 'Ваш текст' }).fill('Working from home gives people more freedom because nobody wastes time on a long commute every morning. Workers can spend that time with their families, sleeping longer, or exercising before the day starts. Companies also save money on office space, and cities benefit from less traffic and lower pollution. Of course, some people miss the social contact of a shared office, so a balance of home and office days often works best for everyone involved.');
+  // Every empty task field is answered first, so the check goes on to the essay (unanswered items ask to skip).
+  for (const field of await page.getByRole('main').getByRole('textbox').all()) {
+    if ((await field.inputValue()) === '') await field.fill('x');
+  }
+  await page.getByRole('button', { name: 'Проверить ответы', exact: true }).click();
+  const topic = page.getByRole('button', { name: 'Новая тема', exact: true });
+  await expect(topic).toBeDisabled();
+  expect(await topic.evaluate((el) => getComputedStyle(el).cursor)).toBe('not-allowed');
+  expect(await wrongCursors(page)).toEqual([]);
+});
+
 test('pointer cursor: new topic button and its dialog', async ({ page }) => {
   await page.goto('/?state=writing#/today');
   await page.getByRole('textbox', { name: 'Ваш текст' }).fill('Working from home gives people more freedom.');

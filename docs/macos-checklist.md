@@ -264,3 +264,17 @@ AA. **First press, no system voice.**
    5. Action: press a speaker whose sound does not start at once (the first press, or a new card right after it opens).
       Expected: the pressed speaker shows a spinning loader until the sound starts; the other speaker keeps its icon.
    If it fails: record the notification text and the debug log tail.
+
+## Words: voice prepared ahead (round 10)
+
+AB. **Words play at once.**
+   1. Action: open a training (New words or Review) and wait without pressing.
+      Expected: the notification "Голос запускается…" appears by itself, then "Голос готов".
+   2. Action: wait about 10 seconds on the first card, then press the word's speaker on this card and on the next few cards.
+      Expected: each word plays at once, with no loader.
+   3. Action: quit the app, start it, open the same training and press a word's speaker as soon as "Голос готов" shows.
+      Expected: the word plays at once; the debug log has a `disk "<word>"` line for it.
+   4. Action: look into the app data folder, `voice/clips`.
+      Expected: `.s16` files appear as clips are made.
+   If it fails: record the debug log tail (the `press`, `disk` and `play` lines with their times).
+

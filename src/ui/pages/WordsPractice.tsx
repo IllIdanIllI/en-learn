@@ -16,6 +16,8 @@ import { Notice } from '@/ui/today/chips';
 import { CardView } from '@/ui/words/CardView';
 import { PracticeEnd } from '@/ui/words/PracticeEnd';
 import { WordEditPanel } from '@/ui/words/WordEditPanel';
+import { useVoice } from '@/ui/voice/VoiceProvider';
+import { planTexts } from '@/ui/voice/planTexts';
 import type { SpellingVariant } from '@/ui/words/speech';
 
 type Ended = { correct: number; total: number; up: { word: string; stage: Stage }[]; down: { word: string; stage: Stage }[]; more: number; canAddNew: boolean };
@@ -27,6 +29,7 @@ const MORE_AT_ONCE = 10;
 
 function Practice({ mode, onContinue, onAddNew }: { mode: PracticeMode; onContinue: () => void; onAddNew: () => void }) {
   const { deps, lang } = useCore();
+  const voice = useVoice();
   const [cards, setCards] = useState<PracticeCard[] | null>(null);
   const [index, setIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +65,19 @@ function Practice({ mode, onContinue, onAddNew }: { mode: PracticeMode; onContin
     })().catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The voice starts when the training opens, so the first press does not pay for the start.
+  useEffect(() => {
+    voice?.warm();
+  }, [voice]);
+
+  // The engine prepares the words of this and the later cards first, then their examples; the plan follows the card and the list.
+  useEffect(() => {
+    if (voice && cards) voice.plan(planTexts(cards, index), spelling);
+  }, [voice, cards, index, spelling]);
+
+  // Leaving the training empties the plan.
+  useEffect(() => () => voice?.plan([], spelling), [voice, spelling]);
 
   const finish = async () => {
     try {

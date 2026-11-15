@@ -1,4 +1,5 @@
 import type { SpellingVariant } from '@/ui/words/speech';
+import type { ClipStore } from './clipStore';
 import { ensureVoiceFiles } from './download';
 import { VOICE_BY_VARIANT, VOICE_FILES } from './files';
 import type { VoiceIo } from './io';
@@ -19,8 +20,10 @@ export interface VoiceEngine {
   sentenceError(): string | null;
   /** The text of the latest press that has not started to sound yet (the voice starts or the clip is made); else null. */
   waiting(): string | null;
-  /** Synthesises the text into the cache in the background; does nothing before the model is ready. */
-  prefetch(text: string, variant: SpellingVariant): void;
+  /** Starts the voice when it is idle, without a press; does nothing otherwise. */
+  warm(): void;
+  /** The texts to prepare in the background, most wanted first; replaces the earlier plan. One is made at a time. */
+  plan(texts: string[], variant: SpellingVariant): void;
   /** Stops the sound, drops a held press, and ignores a reply still on its way. */
   stop(): void;
   /** After a failed start, or a failed download, starts the voice again; does nothing while a load runs or when not failed. */
@@ -40,11 +43,20 @@ export interface KokoroDeps {
   log?: (kind: string, text: string) => void;
   /** How long the start may take once the files are on disk; the default, 20 s, is what the app uses. */
   startLimitMs?: number;
+  /** Clips kept on disk, read before the worker is asked and saved after it answers; `key` names a clip's file. Without it nothing is read or saved. */
+  clips?: { store: ClipStore; key: (voice: string, text: string) => Promise<string> };
 }
 
 interface Clip {
   pcm: Float32Array;
   rate: number;
+}
+
+/** A request waiting for its clip (from the disk or the worker); `put` saves the worker's clip. */
+interface Waiting {
+  key: string;
+  entry: Entry;
+  put?: (clip: Clip) => void;
 }
 
 /** One synthesis. `clip` is set as soon as it arrives, so a cached clip plays without waiting. */
@@ -114,8 +126,14 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
 
   let worker: Worker | null = null;
   // Requests sent to the worker and not answered yet, by request id.
-  const waiting = new Map<number, { key: string; entry: Entry }>();
+  const waiting = new Map<number, Waiting>();
   const cache = new Map<string, Entry>();
+  // The plan: texts to make in the background, and the one background request in flight (a press is never counted here).
+  let planned: string[] = [];
+  let plannedVariant: SpellingVariant = 'en-GB';
+  let background: Entry | null = null;
+  // Planned texts whose clip failed in this plan, so the pump does not loop on a bad text.
+  let failedPlanned = new Set<string>();
   // Ids for requests and presses. Only the latest press may play its reply.
   let seq = 0;
   let press = 0;
@@ -195,11 +213,13 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
           logError(e instanceof Error ? e.message : String(e));
         }
       }
+      pump();
     } else if (data.type === 'audio') {
       const request = waiting.get(data.id);
       if (!request) return;
       waiting.delete(data.id);
       request.entry.clip = { pcm: data.pcm, rate: data.rate };
+      request.put?.(request.entry.clip);
       request.entry.resolve(request.entry.clip);
     } else if (data.id !== undefined) {
       logError(data.message);
@@ -268,7 +288,7 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
     }
   }
 
-  /** The clip for this text: from the cache, or posted to the worker. */
+  /** The clip for this text: from the cache, the disk, or posted to the worker. */
   function request(text: string, variant: SpellingVariant, prefetch: boolean): Entry {
     const voice = VOICE_BY_VARIANT[variant];
     const key = `${voice}|${text}`;
@@ -283,11 +303,64 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
     });
     promise.catch(() => undefined); // a failed prefetch is not an unhandled rejection
     const entry: Entry = { promise, resolve, reject };
+    const record: Waiting = { key, entry };
     cache.set(key, entry);
     if (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value!);
-    waiting.set(id, { key, entry });
-    worker!.postMessage({ type: 'speak', id, text, voice, prefetch });
+    waiting.set(id, record);
+    const clips = deps.clips;
+    if (!clips) {
+      worker!.postMessage({ type: 'speak', id, text, voice, prefetch });
+      return entry;
+    }
+    void (async () => {
+      let diskKey: string | null = null;
+      let hit: Clip | null = null;
+      try {
+        diskKey = await clips.key(voice, text);
+        hit = await clips.store.get(diskKey);
+      } catch {
+        // An unreadable store counts as a miss; the clip is made as if there were none.
+      }
+      // The voice failed while the disk was read: fail() already rejected this entry and dropped it.
+      if (waiting.get(id) !== record) return;
+      if (hit) {
+        waiting.delete(id);
+        log(`disk "${text}"`);
+        entry.clip = hit;
+        resolve(hit);
+        return;
+      }
+      if (diskKey !== null) {
+        const stored = diskKey;
+        record.put = (clip) => void clips.store.put(stored, clip);
+      }
+      worker!.postMessage({ type: 'speak', id, text, voice, prefetch });
+    })();
     return entry;
+  }
+
+  /** Makes the next planned text in the background, when the voice is ready and no earlier planned clip is still being made. */
+  function pump() {
+    if (status !== 'ready' || background !== null) return;
+    const voice = VOICE_BY_VARIANT[plannedVariant];
+    const text = planned.find((t) => !cache.has(`${voice}|${t}`) && !failedPlanned.has(t));
+    if (text === undefined) return;
+    const plan = failedPlanned;
+    let entry: Entry;
+    try {
+      entry = request(text, plannedVariant, true);
+    } catch (e) {
+      logError(e instanceof Error ? e.message : String(e));
+      return;
+    }
+    background = entry;
+    const settled = (failed: boolean) => {
+      if (background === entry) background = null;
+      // A failure of the whole voice is not the text's fault; a retry may make it.
+      if (failed && status === 'ready' && plan === failedPlanned) failedPlanned.add(text);
+      pump();
+    };
+    entry.promise.then(() => settled(false), () => settled(true));
   }
 
   /** Plays the text on a ready voice: from the cache, or after the worker's reply, if no later press or stop() came. */
@@ -358,9 +431,14 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       }
       playPress(text, variant, token, hadClip);
     },
-    prefetch(text, variant) {
-      if (status !== 'ready') return;
-      request(text, variant, true);
+    warm() {
+      if (status === 'idle' && !loading) void load();
+    },
+    plan(texts, variant) {
+      planned = texts;
+      plannedVariant = variant;
+      failedPlanned = new Set();
+      pump();
     },
     stop() {
       log('stop');

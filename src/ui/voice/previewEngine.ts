@@ -65,7 +65,8 @@ export function previewVoice(search: string): VoiceEngine | null {
       }
       if (status === 'ready') (window.__spoken ??= []).push(text);
     },
-    prefetch: () => {},
+    warm: () => {},
+    plan: () => {},
     stop: () => {},
   };
 }

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { createKokoroEngine, type VoiceEngine } from '@/ui/voice/engine';
 import { VOICE_FILES } from '@/ui/voice/files';
 import type { VoiceIo } from '@/ui/voice/io';
+import type { ClipStore, StoredClip } from '@/ui/voice/clipStore';
 
 type Msg = { type: string; id?: number; text?: string; voice?: string; prefetch?: boolean; files?: Record<string, ArrayBuffer> };
 
@@ -51,9 +52,31 @@ function completeIo(): VoiceIo {
   };
 }
 
-function makeEngine(io: VoiceIo = completeIo()): VoiceEngine {
+/** A clip store in memory; `gate` holds every `get` until it is released. */
+function fakeClips(stored: Record<string, StoredClip> = {}, gate: Promise<void> = Promise.resolve()) {
+  const gets: string[] = [];
+  const puts: [string, StoredClip][] = [];
+  const store: ClipStore = {
+    get: async (key) => {
+      gets.push(key);
+      await gate;
+      return stored[key] ?? null;
+    },
+    put: async (key, clip) => {
+      puts.push([key, clip]);
+    },
+  };
+  return { gets, puts, deps: { store, key: async (voice: string, text: string) => `${voice}:${text}` } };
+}
+
+type Clips = ReturnType<typeof fakeClips>['deps'];
+
+const speaks = (w: FakeWorker) => w.posted.filter((m) => m.type === 'speak');
+
+function makeEngine(io: VoiceIo = completeIo(), clips?: Clips): VoiceEngine {
   return createKokoroEngine({
     io,
+    ...(clips ? { clips } : {}),
     dir: '/app/voice',
     makeWorker: () => {
       const w = new FakeWorker();
@@ -98,8 +121,8 @@ function downloadingIo(fractions: number[]): VoiceIo {
 }
 
 /** An engine whose model is loaded: a press started the load, `stop()` dropped that press, and the init reply came. */
-async function readyEngine(): Promise<VoiceEngine> {
-  const engine = makeEngine();
+async function readyEngine(clips?: Clips): Promise<VoiceEngine> {
+  const engine = makeEngine(completeIo(), clips);
   engine.speak('warm up', 'en-GB');
   engine.stop();
   await flush();
@@ -264,20 +287,20 @@ describe('KokoroEngine', () => {
     expect(workers[0]!.posted).toHaveLength(posts);
   });
 
-  test('prefetch then speak of the same text posts once and plays once', async () => {
+  test('plan then speak of the same text posts once and plays once', async () => {
     const engine = await readyEngine();
-    engine.prefetch('ephemeral', 'en-US');
-    expect(workers[0]!.posted.filter((m) => m.type === 'speak')).toHaveLength(1);
+    engine.plan(['ephemeral'], 'en-US');
+    expect(speaks(workers[0]!)).toHaveLength(1);
     engine.speak('ephemeral', 'en-US');
-    expect(workers[0]!.posted.filter((m) => m.type === 'speak')).toHaveLength(1);
+    expect(speaks(workers[0]!)).toHaveLength(1);
     workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(1), rate: 24000 });
     await flush();
     expect(plays).toHaveLength(1);
   });
 
-  test('prefetch does nothing before the model is ready', () => {
+  test('plan does nothing before the model is ready', () => {
     const engine = makeEngine();
-    engine.prefetch('lucid', 'en-US');
+    engine.plan(['lucid'], 'en-US');
     expect(workers).toEqual([]);
   });
 
@@ -337,20 +360,20 @@ describe('KokoroEngine', () => {
     expect(plays).toEqual([{ first: 3, rate: 24000 }]);
   });
 
-  test('a failed prefetch is retried by the next press for that text', async () => {
+  test('a failed planned text is retried by the next press for that text', async () => {
     const engine = await readyEngine();
-    engine.prefetch('broken', 'en-US');
+    engine.plan(['broken'], 'en-US');
     workers[0]!.reply({ type: 'error', id: workers[0]!.request().id, message: 'bad input' });
     engine.speak('broken', 'en-US');
-    expect(workers[0]!.posted.filter((m) => m.type === 'speak')).toHaveLength(2);
+    expect(speaks(workers[0]!)).toHaveLength(2);
   });
 
-  test('prefetches are posted with the prefetch flag, presses without it', async () => {
+  test('planned clips are posted with the prefetch flag, presses without it', async () => {
     const engine = await readyEngine();
-    engine.prefetch('ephemeral', 'en-US');
+    engine.plan(['ephemeral'], 'en-US');
     engine.speak('lucid', 'en-US');
-    const [prefetched, pressed] = workers[0]!.posted.filter((m) => m.type === 'speak');
-    expect(prefetched).toMatchObject({ text: 'ephemeral', prefetch: true });
+    const [planned, pressed] = speaks(workers[0]!);
+    expect(planned).toMatchObject({ text: 'ephemeral', prefetch: true });
     expect(pressed).toMatchObject({ text: 'lucid', prefetch: false });
   });
 
@@ -958,5 +981,175 @@ describe('KokoroEngine waiting text', () => {
     expect(engine.waiting()).toBeNull();
     engine.speak('four', 'en-GB');
     expect(engine.waiting()).toBeNull();
+  });
+});
+
+describe('KokoroEngine warm', () => {
+  test('warm on an idle voice starts one load; a second warm or a press starts no other', async () => {
+    const engine = makeEngine();
+    engine.warm();
+    engine.warm();
+    await flush();
+    expect(engine.status()).toBe('loading');
+    expect(workers).toHaveLength(1);
+    engine.warm();
+    engine.speak('lucid', 'en-GB');
+    await flush();
+    expect(workers).toHaveLength(1);
+    workers[0]!.reply({ type: 'ready' });
+    expect(engine.status()).toBe('ready');
+  });
+
+  test('warm on a failed voice does nothing', async () => {
+    const engine = makeEngine();
+    engine.warm();
+    await flush();
+    workers[0]!.reply({ type: 'error', message: 'no wasm' });
+    expect(engine.status()).toBe('failed');
+    engine.warm();
+    await flush();
+    expect(engine.status()).toBe('failed');
+    expect(workers).toHaveLength(1);
+  });
+});
+
+describe('KokoroEngine plan', () => {
+  test('planned clips go one at a time, in plan order', async () => {
+    const engine = await readyEngine();
+    engine.plan(['a', 'b', 'c'], 'en-GB');
+    expect(speaks(workers[0]!).map((m) => m.text)).toEqual(['a']);
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(1), rate: 24000 });
+    await flush();
+    expect(speaks(workers[0]!).map((m) => m.text)).toEqual(['a', 'b']);
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(2), rate: 24000 });
+    await flush();
+    expect(speaks(workers[0]!).map((m) => m.text)).toEqual(['a', 'b', 'c']);
+    expect(speaks(workers[0]!).every((m) => m.prefetch === true)).toBe(true);
+  });
+
+  test('a text already known is skipped', async () => {
+    const engine = await readyEngine();
+    engine.speak('a', 'en-GB');
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(1), rate: 24000 });
+    await flush();
+    engine.plan(['a', 'b'], 'en-GB');
+    expect(speaks(workers[0]!).map((m) => m.text)).toEqual(['a', 'b']);
+    expect(workers[0]!.request()).toMatchObject({ text: 'b', prefetch: true });
+  });
+
+  test('a plan made before ready starts at ready', async () => {
+    const engine = makeEngine();
+    engine.warm();
+    await flush();
+    engine.plan(['one', 'two'], 'en-GB');
+    expect(speaks(workers[0]!)).toEqual([]);
+    workers[0]!.reply({ type: 'ready' });
+    expect(speaks(workers[0]!)).toHaveLength(1);
+    expect(workers[0]!.request()).toMatchObject({ text: 'one', voice: 'bf_emma', prefetch: true });
+  });
+
+  test('a new plan while a clip is in flight: that clip is kept, the next post is the new plan first text', async () => {
+    const engine = await readyEngine();
+    engine.plan(['a', 'b'], 'en-GB');
+    const first = workers[0]!.request().id;
+    engine.plan(['c', 'd'], 'en-GB');
+    expect(speaks(workers[0]!).map((m) => m.text)).toEqual(['a']);
+    workers[0]!.reply({ type: 'audio', id: first, pcm: pcm(1), rate: 24000 });
+    await flush();
+    expect(speaks(workers[0]!).map((m) => m.text)).toEqual(['a', 'c']);
+    const posts = speaks(workers[0]!).length;
+    engine.speak('a', 'en-GB');
+    expect(plays).toEqual([{ first: 1, rate: 24000 }]);
+    expect(speaks(workers[0]!)).toHaveLength(posts);
+  });
+
+  test('a press during a planned clip is posted at once, as a press', async () => {
+    const engine = await readyEngine();
+    engine.plan(['a', 'b'], 'en-GB');
+    engine.speak('x', 'en-GB');
+    const [planned, pressed] = speaks(workers[0]!);
+    expect(planned).toMatchObject({ text: 'a', prefetch: true });
+    expect(pressed).toMatchObject({ text: 'x', prefetch: false });
+    expect(speaks(workers[0]!)).toHaveLength(2);
+  });
+
+  test('a press for the in-flight planned text posts nothing new and plays its clip', async () => {
+    const engine = await readyEngine();
+    engine.plan(['a'], 'en-GB');
+    engine.speak('a', 'en-GB');
+    expect(speaks(workers[0]!)).toHaveLength(1);
+    expect(engine.waiting()).toBe('a');
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(5), rate: 24000 });
+    await flush();
+    expect(plays).toEqual([{ first: 5, rate: 24000 }]);
+    expect(engine.waiting()).toBeNull();
+  });
+
+  test('a failed planned text is not posted again and the pump moves on', async () => {
+    const engine = await readyEngine();
+    engine.plan(['a', 'b'], 'en-GB');
+    workers[0]!.reply({ type: 'error', id: workers[0]!.request().id, message: 'bad input' });
+    await flush();
+    expect(speaks(workers[0]!).map((m) => m.text)).toEqual(['a', 'b']);
+    workers[0]!.reply({ type: 'error', id: workers[0]!.request().id, message: 'bad input' });
+    await flush();
+    expect(speaks(workers[0]!).map((m) => m.text)).toEqual(['a', 'b']);
+  });
+});
+
+describe('KokoroEngine clip store', () => {
+  test('a disk hit plays with no post to the worker and logs disk', async () => {
+    const clips = fakeClips({ 'bf_emma:lucid': { pcm: pcm(7), rate: 22050 } });
+    const engine = await readyEngine(clips.deps);
+    engine.speak('lucid', 'en-GB');
+    await flush();
+    expect(speaks(workers[0]!)).toEqual([]);
+    expect(plays).toEqual([{ first: 7, rate: 22050 }]);
+    expect(logs).toContainEqual(['voice', 'disk "lucid"']);
+    expect(clips.puts).toEqual([]);
+  });
+
+  test('a disk miss posts to the worker and the reply is saved under its key', async () => {
+    const clips = fakeClips();
+    const engine = await readyEngine(clips.deps);
+    engine.speak('lucid', 'en-GB');
+    await flush();
+    expect(clips.gets).toEqual(['bf_emma:lucid']);
+    expect(workers[0]!.request()).toMatchObject({ text: 'lucid', voice: 'bf_emma', prefetch: false });
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(3), rate: 24000 });
+    await flush();
+    expect(plays).toEqual([{ first: 3, rate: 24000 }]);
+    expect(clips.puts).toEqual([['bf_emma:lucid', { pcm: pcm(3), rate: 24000 }]]);
+  });
+
+  test('a planned text found on disk makes the pump continue', async () => {
+    const clips = fakeClips({ 'bf_emma:a': { pcm: pcm(1), rate: 24000 } });
+    const engine = await readyEngine(clips.deps);
+    engine.plan(['a', 'b'], 'en-GB');
+    await flush();
+    expect(speaks(workers[0]!).map((m) => m.text)).toEqual(['b']);
+    expect(workers[0]!.request()).toMatchObject({ text: 'b', prefetch: true });
+    engine.speak('a', 'en-GB');
+    expect(plays).toEqual([{ first: 1, rate: 24000 }]);
+  });
+
+  test('a voice failure during a pending disk read rejects the press without sound', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const clips = fakeClips({ 'bf_emma:lucid': { pcm: pcm(7), rate: 24000 } }, gate);
+    const engine = await readyEngine(clips.deps);
+    engine.speak('lucid', 'en-GB');
+    await flush();
+    expect(engine.waiting()).toBe('lucid');
+    workers[0]!.reply({ type: 'error', message: 'worker died' });
+    expect(engine.status()).toBe('failed');
+    release();
+    await flush();
+    expect(plays).toEqual([]);
+    expect(speaks(workers[0]!)).toEqual([]);
+    expect(engine.waiting()).toBeNull();
+    expect(engine.sentenceError()).toBeNull();
   });
 });

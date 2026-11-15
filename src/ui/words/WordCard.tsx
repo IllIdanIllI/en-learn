@@ -62,12 +62,6 @@ export function WordCard({ word, lang, spelling, onKnown, onRemove, busy = false
     if (voice) voice.stop();
     else if (canSpeak()) cancelSpeech();
   }, [voice]);
-  // The card's texts are synthesised in the background once the voice is ready, so a press plays at once.
-  useEffect(() => {
-    if (!voice) return;
-    voice.prefetch(word.word, spelling);
-    if (word.example !== '') voice.prefetch(word.example, spelling);
-  }, [voice, word.word, word.example, spelling]);
   // The pressed speaker shows a loader until its sound starts (the voice starts, or the clip is still being made).
   const waiting = useSyncExternalStore(
     useCallback((onChange: () => void) => voice?.subscribe(onChange) ?? (() => {}), [voice]),

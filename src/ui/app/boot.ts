@@ -60,7 +60,12 @@ export async function bootTauri(): Promise<CoreInit> {
   const clock = new TauriClock();
   clock.configure({ dayStartHour: settings.dayStartHour, overrideDate: settings.dayOverride });
   const deps: Deps = { db, llm, clock, prompts: new TauriPromptStore(dataDir), net: new TauriNet() };
-  const [{ createKokoroEngine, playPcm, unlockAudio }, { TauriVoiceIo }] = await Promise.all([import('@/ui/voice/engine'), import('@/ui/voice/io')]);
+  const [{ createKokoroEngine, playPcm, unlockAudio }, { TauriVoiceIo, TauriClipIo }, { createClipStore, clipKey }, { VOICE_REVISION }] = await Promise.all([
+    import('@/ui/voice/engine'),
+    import('@/ui/voice/io'),
+    import('@/ui/voice/clipStore'),
+    import('@/ui/voice/files'),
+  ]);
   // The model lives in the app data folder, not the chosen data folder: it is a download, not user data.
   const voice = createKokoroEngine({
     io: new TauriVoiceIo(),
@@ -69,6 +74,10 @@ export async function bootTauri(): Promise<CoreInit> {
     play: playPcm,
     unlock: unlockAudio,
     log: logDebug,
+    clips: {
+      store: createClipStore(new TauriClipIo(), `${appData}/voice/clips`, 200 * 1024 * 1024, (text) => logDebug('voice', text)),
+      key: (voiceName, text) => clipKey(VOICE_REVISION, voiceName, text),
+    },
   });
   return {
     deps,

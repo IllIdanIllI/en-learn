@@ -311,7 +311,10 @@ describe('KokoroEngine', () => {
     const engine = await readyEngine();
     expect(engine.sentenceError()).toBeNull();
     const seen: (string | null)[] = [];
-    engine.subscribe(() => seen.push(engine.sentenceError()));
+    // Each change is recorded once: the waiting text notifies the subscribers too.
+    engine.subscribe(() => {
+      if (seen.length === 0 ? engine.sentenceError() !== null : seen.at(-1) !== engine.sentenceError()) seen.push(engine.sentenceError());
+    });
     engine.speak('lucid', 'en-US');
     workers[0]!.reply({ type: 'error', id: workers[0]!.request().id, message: 'bad input' });
     await flush();
@@ -614,11 +617,14 @@ describe('KokoroEngine', () => {
   test('with every file on disk the statuses seen are loading, ready', async () => {
     const engine = makeEngine();
     const seen: string[] = [];
-    engine.subscribe(() => seen.push(engine.status()));
+    // Each status is recorded once: the waiting text notifies the subscribers too.
+    engine.subscribe(() => {
+      if (seen.at(-1) !== engine.status()) seen.push(engine.status());
+    });
     engine.speak('lucid', 'en-GB');
     await flush();
     workers[0]!.reply({ type: 'ready' });
-    expect(seen).toEqual(['loading', 'ready']);
+    expect(seen).toEqual(['idle', 'loading', 'ready']);
   });
 
   test('a missing file shows downloading while it downloads, then loading', async () => {
@@ -895,5 +901,62 @@ describe('KokoroEngine start steps and time limit', () => {
     engine.retry();
     await settle();
     expect(downloads).toBe(2);
+  });
+});
+
+describe('KokoroEngine waiting text', () => {
+  test('a press before ready waits until its clip plays', async () => {
+    const engine = makeEngine();
+    let notified = 0;
+    engine.subscribe(() => {
+      notified += 1;
+    });
+    expect(engine.waiting()).toBeNull();
+    engine.speak('word', 'en-GB');
+    expect(engine.waiting()).toBe('word');
+    expect(notified).toBeGreaterThan(0);
+    await flush();
+    workers[0]!.reply({ type: 'ready' });
+    expect(engine.waiting()).toBe('word');
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(1), rate: 24000 });
+    await flush();
+    expect(plays).toHaveLength(1);
+    expect(engine.waiting()).toBeNull();
+  });
+
+  test('a cached clip plays at once and never waits', async () => {
+    const engine = await readyEngine();
+    engine.speak('word', 'en-GB');
+    workers[0]!.reply({ type: 'audio', id: workers[0]!.request().id, pcm: pcm(1), rate: 24000 });
+    await flush();
+    engine.speak('word', 'en-GB');
+    expect(engine.waiting()).toBeNull();
+  });
+
+  test('a later press replaces the waiting text', async () => {
+    const engine = await readyEngine();
+    engine.speak('one', 'en-GB');
+    engine.speak('two', 'en-GB');
+    expect(engine.waiting()).toBe('two');
+  });
+
+  test('stop, a failed text and a failed voice end the wait', async () => {
+    const engine = await readyEngine();
+    engine.speak('one', 'en-GB');
+    engine.stop();
+    expect(engine.waiting()).toBeNull();
+
+    engine.speak('two', 'en-GB');
+    workers[0]!.reply({ type: 'error', id: workers[0]!.request().id, message: 'bad text' });
+    await flush();
+    expect(engine.waiting()).toBeNull();
+
+    engine.speak('three', 'en-GB');
+    workers[0]!.reply({ type: 'error', message: 'worker died' });
+    await flush();
+    expect(engine.status()).toBe('failed');
+    expect(engine.waiting()).toBeNull();
+    engine.speak('four', 'en-GB');
+    expect(engine.waiting()).toBeNull();
   });
 });

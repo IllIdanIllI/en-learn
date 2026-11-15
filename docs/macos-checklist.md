@@ -261,4 +261,6 @@ AA. **First press, no system voice.**
       Expected: `press "<word>" … held`, the `load` and `worker` lines up to `model loaded`, then a `play` line; no time-out line.
    4. Action: if the voice fails, press a speaker again.
       Expected: silence; the notification "Голос не работает: <reason>" with "Повторить" appears again; "Повторить" starts the voice.
+   5. Action: press a speaker whose sound does not start at once (the first press, or a new card right after it opens).
+      Expected: the pressed speaker shows a spinning loader until the sound starts; the other speaker keeps its icon.
    If it fails: record the notification text and the debug log tail.

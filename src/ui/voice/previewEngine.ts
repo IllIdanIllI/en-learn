@@ -24,6 +24,8 @@ export function previewVoice(search: string): VoiceEngine | null {
   let status: VoiceStatus = downloading || downloaded ? 'downloading' : failed ? 'failed' : starting ? 'loading' : 'ready';
   let error: string | null = failed ? 'start timed out after 20 s at: worker model loading' : null;
   let timerStarted = false;
+  // The text pressed while the voice is not ready; it never plays in the preview, so the speaker keeps its loader.
+  let waiting: string | null = null;
   const listeners = new Set<() => void>();
   return {
     status: () => status,
@@ -40,6 +42,7 @@ export function previewVoice(search: string): VoiceEngine | null {
       }, 300);
     },
     sentenceError: () => null,
+    waiting: () => waiting,
     subscribe(fn) {
       listeners.add(fn);
       fn();
@@ -56,6 +59,10 @@ export function previewVoice(search: string): VoiceEngine | null {
     },
     speak: (text) => {
       if (status === 'failed') listeners.forEach((listener) => listener());
+      if (status === 'downloading' || status === 'loading') {
+        waiting = text;
+        listeners.forEach((listener) => listener());
+      }
       if (status === 'ready') (window.__spoken ??= []).push(text);
     },
     prefetch: () => {},

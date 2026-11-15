@@ -944,6 +944,18 @@ test.describe('two trainings, the word card and its buttons', () => {
     await expect(page.getByText('Голос готов')).toBeVisible();
   });
 
+  test('a speaker pressed before the voice is ready shows a loader; the other speaker does not', async ({ page }) => {
+    await page.goto('/?state=words&voice=starting#/words/practice?mode=new');
+    await card(page).waitFor();
+    const speakers = card(page).getByRole('button', { name: 'Произнести' });
+    await expect(speakers.nth(0)).toHaveAttribute('aria-busy', 'false');
+    await speakers.nth(0).click();
+    await expect(speakers.nth(0)).toHaveAttribute('aria-busy', 'true');
+    await expect(speakers.nth(0).locator('.animate-spin')).toBeVisible();
+    await expect(speakers.nth(0)).toBeEnabled();
+    await expect(speakers.nth(1)).toHaveAttribute('aria-busy', 'false');
+  });
+
   test('while the voice starts, one notification says so', async ({ page }) => {
     await page.goto('/?state=words&voice=starting#/words/practice?mode=new');
     await card(page).waitFor();

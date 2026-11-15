@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { AlertTriangle, Check, Volume2, X } from 'lucide-react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { AlertTriangle, Check, LoaderCircle, Volume2, X } from 'lucide-react';
 import { t, type Lang } from '@/core/i18n';
 import { dictMatches } from '@/core/words/dictionary';
 import type { Word } from '@/core/words/types';
@@ -68,6 +68,11 @@ export function WordCard({ word, lang, spelling, onKnown, onRemove, busy = false
     voice.prefetch(word.word, spelling);
     if (word.example !== '') voice.prefetch(word.example, spelling);
   }, [voice, word.word, word.example, spelling]);
+  // The pressed speaker shows a loader until its sound starts (the voice starts, or the clip is still being made).
+  const waiting = useSyncExternalStore(
+    useCallback((onChange: () => void) => voice?.subscribe(onChange) ?? (() => {}), [voice]),
+    () => voice?.waiting() ?? null,
+  );
   const meta = [word.transcription, word.partOfSpeech].filter((p) => p !== '').join(' · ');
   const speaker = (text: string) => (
     <Button
@@ -75,9 +80,10 @@ export function WordCard({ word, lang, spelling, onKnown, onRemove, busy = false
       size="icon"
       className="shrink-0 text-current hover:bg-white/10"
       aria-label={t(lang, 'words.speak')}
+      aria-busy={waiting === text}
       onClick={() => (voice ? voice.speak(text, spelling) : speak(text, spelling))}
     >
-      <Volume2 aria-hidden />
+      {waiting === text ? <LoaderCircle className="animate-spin motion-reduce:animate-none" aria-hidden /> : <Volume2 aria-hidden />}
     </Button>
   );
 

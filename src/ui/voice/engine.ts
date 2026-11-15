@@ -17,6 +17,8 @@ export interface VoiceEngine {
   speak(text: string, variant: SpellingVariant): void;
   /** The message of the latest press whose synthesis failed; null again at the next press. */
   sentenceError(): string | null;
+  /** The text of the latest press that has not started to sound yet (the voice starts or the clip is made); else null. */
+  waiting(): string | null;
   /** Synthesises the text into the cache in the background; does nothing before the model is ready. */
   prefetch(text: string, variant: SpellingVariant): void;
   /** Stops the sound, drops a held press, and ignores a reply still on its way. */
@@ -73,6 +75,13 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
   let held: { text: string; variant: SpellingVariant; token: number; hadClip: boolean } | null = null;
   // The message of the latest press whose synthesis failed.
   let sentence: string | null = null;
+  // The text of the latest press still waiting for its sound.
+  let waitingText: string | null = null;
+  const setWaiting = (text: string | null) => {
+    if (text === waitingText) return;
+    waitingText = text;
+    notify();
+  };
   // Bumped by each failure, so a load still awaiting its file reads gives up once it has failed.
   let generation = 0;
   let startTimer: ReturnType<typeof setTimeout> | null = null;
@@ -127,6 +136,7 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
     clearStartTimer();
     generation += 1;
     held = null;
+    setWaiting(null);
     worker?.terminate();
     worker = null;
     for (const { key, entry } of waiting.values()) {
@@ -285,17 +295,21 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
     const entry = request(text, variant, false);
     if (entry.clip) {
       log(`press "${text}" ${variant} kokoro-cached`);
+      setWaiting(null);
       playing = playClip(text, entry.clip, hadClip);
       return;
     }
     log(`press "${text}" ${variant} kokoro-wait`);
+    setWaiting(text);
     entry.promise.then(
       (clip) => {
         if (press !== token) return;
+        setWaiting(null);
         playing = playClip(text, clip, hadClip);
       },
       (e: Error) => {
         if (press !== token) return;
+        setWaiting(null);
         log(`press "${text}" ${variant} failed`);
         // A worker failure rejects its waiting presses too; the failure toast covers that, not the text one.
         if (status !== 'ready') return;
@@ -310,6 +324,7 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
     progress: () => fraction,
     lastError: () => error,
     sentenceError: () => sentence,
+    waiting: () => waitingText,
     subscribe(fn) {
       listeners.add(fn);
       return () => {
@@ -331,11 +346,13 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       if (status !== 'ready') {
         if (status === 'failed' && !loading) {
           log(`press "${text}" ${variant} silent-failed`);
+          setWaiting(null);
           notify();
           return;
         }
         log(`press "${text}" ${variant} held`);
         held = { text, variant, token, hadClip };
+        setWaiting(text);
         if (status === 'idle' && !loading) void load();
         return;
       }
@@ -350,6 +367,7 @@ export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
       press = ++seq;
       stopPlayback();
       held = null;
+      setWaiting(null);
     },
     retry() {
       if (status !== 'failed' || loading) return;

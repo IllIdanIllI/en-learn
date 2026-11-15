@@ -1,0 +1,7 @@
+{
+  "wordOk": true,
+  "wordNote": "Слово употреблено верно.",
+  "errors": [
+    { "fragment": "She go", "fix": "She goes", "topicKey": "third-person-s", "suggestedTopic": "", "ruleSection": "Ловушки", "explanation": "После she глагол получает окончание -s." }
+  ]
+}

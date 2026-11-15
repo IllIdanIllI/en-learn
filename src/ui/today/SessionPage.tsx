@@ -10,6 +10,7 @@ import { useCore } from '@/ui/app/CoreProvider';
 import { ActionBar } from './ActionBar';
 import { Block } from './Block';
 import { ErrorNotice } from './ErrorNotice';
+import { NewTopicButton } from './NewTopicButton';
 import { FeedbackSummary } from './FeedbackSummary';
 import { GradedItem } from './GradedItem';
 import { ItemRow } from './ItemRow';
@@ -35,12 +36,14 @@ const DRAFT_DELAY_MS = 300;
  * Answers live in component state keyed by item id and `${blockId}:${paragraph}`, and are saved as drafts (debounced)
  * so a reload or another page does not lose them. Without `onRebuild` the session cannot be rebuilt (an earlier day).
  */
-export function SessionPage({ sessionId, rebuilding, loader = null, solving = false, onRebuild, onGraded, onClose }: {
+export function SessionPage({ sessionId, rebuilding, loader = null, solving = false, onRebuild, onGraded, onClose, afterHeader }: {
   sessionId: number; rebuilding: boolean; loader?: LoaderView | null; onRebuild?: (light: boolean) => void; onGraded?: () => void;
   /** Reopened skipped items of a graded session: only the blocks with unanswered items, nothing else. */
   solving?: boolean;
   /** Today's session only: a button in the action bar once everything is graded. */
   onClose?: () => void;
+  /** Rendered right under the lesson header. */
+  afterHeader?: React.ReactNode;
 }) {
   const { deps, lang, settings } = useCore();
   const [view, setView] = useState<SessionView | null>(null);
@@ -295,7 +298,31 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
     // An added round continues the numbering of the task blocks before it.
     const offset = view.blocks.filter((b) => b.kind === 'task' && b.round < block.round).reduce((n, b) => n + b.itemCount, 0);
     return (
-      <Block key={block.id} block={block} number={i + 1} lang={lang} hideTitle={hideTitle} divider={divider}>
+      <Block
+        key={block.id}
+        block={block}
+        number={i + 1}
+        lang={lang}
+        hideTitle={hideTitle}
+        divider={divider}
+        afterPrompt={answerable && block.format === 'essay' && block.writing?.text === null ? (
+          <NewTopicButton
+            deps={deps}
+            blockId={block.id}
+            hasText={(texts[block.id] ?? '').trim() !== ''}
+            lang={lang}
+            disabled={busy}
+            onChanged={(clear) => {
+              // A cleared text empties its draft too; the saved draft is written with it.
+              if (clear) {
+                setTexts((prev) => ({ ...prev, [block.id]: '' }));
+                persist(writingDraftKey(block.id), '');
+              }
+              setReload((n) => n + 1);
+            }}
+          />
+        ) : undefined}
+      >
         {block.format === 'question' ? (
           <QuestionBlock block={block} />
         ) : block.kind === 'writing' ? (
@@ -355,6 +382,7 @@ export function SessionPage({ sessionId, rebuilding, loader = null, solving = fa
     <SessionActionsProvider value={actions}>
       <div ref={root}>
         <SessionHeader view={view} lang={lang} rebuilding={rebuilding} solving={solving} onRebuild={rebuild} />
+        {afterHeader}
         {settings.design === 'grove' && answerable && !solving && <AnswerMeter filled={answerSegments(view, items, spot)} lang={lang} />}
         {loader && <Loader lang={lang} {...loader} />}
         {solving ? (

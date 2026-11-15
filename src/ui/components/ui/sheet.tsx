@@ -15,7 +15,7 @@ function SheetClose(props: React.ComponentProps<typeof SheetPrimitive.Close>) {
   return <SheetPrimitive.Close data-slot="sheet-close" {...props} />;
 }
 
-/** Right side panel (420px). No dimming overlay: it sits over the content area, not as a modal. Use it with `modal={false}` on Sheet. */
+/** Right side panel (420px) with no dimming overlay. Use `modal={false}` on Sheet to leave the page usable behind it (RulePanel); the default modal traps focus (WordEditPanel). */
 function SheetContent({ className, children, closeLabel = 'Close', ...props }: React.ComponentProps<typeof SheetPrimitive.Content> & { closeLabel?: string }) {
   return (
     <SheetPrimitive.Portal>

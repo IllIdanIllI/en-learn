@@ -1,25 +1,37 @@
+import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Toaster } from '@/ui/components/ui/sonner';
 import { TooltipProvider } from '@/ui/components/ui/tooltip';
+import { VoiceProvider } from '@/ui/voice/VoiceProvider';
+import { VoiceDownloadToast } from '@/ui/voice/VoiceDownloadToast';
+import { logDebug } from '@/ui/debug/debugLog';
+import { useCopyLogShortcut } from '@/ui/debug/useCopyLogShortcut';
 import { ErrorBoundary } from './ErrorBoundary';
+import { useCore } from './CoreProvider';
 import { Sidebar } from './Sidebar';
 
 /** Without `claude` only Today changes (it shows the prerequisites notice); every other page stays usable. */
 export function AppShell() {
   const { pathname } = useLocation();
+  const { lang } = useCore();
+  useEffect(() => logDebug('route', pathname), [pathname]);
+  useCopyLogShortcut(lang);
   return (
-    <TooltipProvider>
-      <div className="flex h-full bg-background text-foreground">
-        <Sidebar />
-        <main className="min-w-0 flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-[720px] px-6 pt-12 pb-12">
-            <ErrorBoundary resetKey={pathname}>
-              <Outlet />
-            </ErrorBoundary>
-          </div>
-        </main>
-      </div>
-      <Toaster />
-    </TooltipProvider>
+    <VoiceProvider>
+      <TooltipProvider>
+        <div className="flex h-full bg-background text-foreground">
+          <Sidebar />
+          <main className="min-w-0 flex-1 overflow-y-auto">
+            <div className="mx-auto max-w-[720px] px-6 pt-12 pb-12">
+              <ErrorBoundary resetKey={pathname}>
+                <Outlet />
+              </ErrorBoundary>
+            </div>
+          </main>
+        </div>
+        <Toaster />
+        <VoiceDownloadToast />
+      </TooltipProvider>
+    </VoiceProvider>
   );
 }

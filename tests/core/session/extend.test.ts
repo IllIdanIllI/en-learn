@@ -119,7 +119,7 @@ describe('extendSession', () => {
     const gen = extra(7);
     const { db, deps, sid } = await setup({ generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
     const results = await Promise.all([extendSession(deps, sid, round({ formats: ['fix'] })), extendSession(deps, sid, round({ formats: ['fix'] }))]);
-    expect(results).toEqual([{ ok: true, sessionId: sid }, { ok: false, message: 'A lesson is already being generated', code: 'busy' }]);
+    expect(results).toEqual([{ ok: true, sessionId: sid }, { ok: false, message: 'Another task is running', code: 'busy' }]);
     expect((await db.select<{ round: number }>('SELECT MAX(round) AS round FROM block'))[0]!.round).toBe(2);
   });
 

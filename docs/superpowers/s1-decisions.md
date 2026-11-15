@@ -133,6 +133,31 @@ Spec `specs/2026-11-02-writing-design.md`, plan `plans/2026-11-02-writing.md`.
 - The gear segment keeps the Start button's background while open (learner's request) — cost if wrong: the open state is less visible on the button.
 - An empty essay is not stored until the lesson is finished (then it counts as skipped, with no check and no items) — cost if wrong: an essay left empty keeps the lesson open until "Завершить урок".
 
+## Words (2026-11-04)
+
+Spec `specs/2026-11-04-words-design.md`, plan `plans/2026-11-04-words.md`.
+
+- D10 (S1 core-loop spec: the learner enters vocabulary manually, S2) is superseded: words come from a one-off Obsidian paste import plus adding by hand — cost if wrong: a later vocabulary source (deck files, sync) needs its own import path.
+- Skip on "use it" replaces the card right away with a translation card of the same word (or moves on) — cost if wrong: a skipped "use it" can never come back in the same practice.
+- Words "use it" errors appear in the error bank (label Слова/Words), are not disputable and do not feed the lesson review — cost if wrong: a wrongly flagged word error cannot be disputed and does not come back as a lesson re-check.
+- Choice (pick from 4) only on a word's very first card — cost if wrong: later new-word cards give no recognition step.
+- Oxford search link when a card has no https link; the LLM never writes links — cost if wrong: a card may open a search page instead of the exact entry.
+- Opener plugin added with permission `opener:allow-open-url` scoped to `https://*` only (addition to security round 1, approved by the learner); rule-source links in RuleBody are unchanged (open item) — cost if wrong: any https site can be opened from the app, and rule sources stay plain text.
+- UI wording: "again" and "—" are banned by `tests/core/i18n.test.ts`, so EN busy = "A lesson is being built, try later" and Almost = "Almost: one letter is off. Try once more." / "Почти: одна буква не та. Попробуйте ещё раз." — cost if wrong: copy is slightly less natural than the spec's first wording.
+- Generation: batches of 5, 300 s timeout, job lock per batch; a failed batch marks its words failed and the run continues; busy stops the run and leaves the rest pending (shown with Retry) — cost if wrong: a long import takes several lock windows, and a busy lesson build delays word generation.
+- ts-fsrs pinned at 5.4.2 (6.0.0 was too new); `@tauri-apps/plugin-opener` pinned at 2.5.2 — cost if wrong: a newer release's fixes are missed until the pins are raised.
+
+## Words feedback round 1 (2026-11-05)
+
+Spec `specs/2026-11-05-words-feedback-1.md`, plan `plans/2026-11-05-words-feedback-1.md`.
+
+- Start of day: setting "Day starts at" (whole hours 00 to 12, default 05:00); app date = max(rule date, "Start a new day" override), so an override never moves the date back — cost if wrong: a new day started by mistake cannot be undone.
+- The clock stays synchronous and gets `configure({ dayStartHour, overrideDate })`; the app re-checks the date every minute and on focus — cost if wrong: a day can roll over up to a minute late.
+- Extra new words: "+10 new words" adds 10 to the day's new-word limit (stored per day as `wordsExtraNew`), on the Words page and the end screen — cost if wrong: the extra is tied to the app date and resets with the next day.
+- A page per word at `/words/:id` replaces the inline detail; the search stays in `?q=` — cost if wrong: old inline-detail links do not exist.
+- Icon: new bamboo "EN" icon; Light/Night Dock icon is macOS only and set while the app runs (Rust `set_app_icon`, choice in `app_icon.txt`); Finder, Launchpad and the closed Dock always show the bundled Light icon — cost if wrong: the Night choice is invisible when the app is closed; Rust is unverified until the Mac check (S).
+- Settings keys are stored camelCase (`dayStartHour`, `dayOverride`, `wordsExtraNew`, `appIcon`) following the existing convention, instead of the spec's snake_case names; `objc2-foundation` 0.3.2 is a third macOS-only direct dependency (needed for NSData) — cost if wrong: none for data, but a reader of the spec will look for snake_case keys.
+
 ## Still open
 
 - **Mac-only checks** (`docs/macos-checklist.md`): `$HOME` in the shell permission, long multi-line arguments, plugin-sql migrations, the not-signed-in output, PATH/HOME when launched from Finder. Not verifiable in the Linux build container.

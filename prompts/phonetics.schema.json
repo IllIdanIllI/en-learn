@@ -1,0 +1,32 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "words"
+  ],
+  "properties": {
+    "words": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "word",
+          "transcription",
+          "partOfSpeech"
+        ],
+        "properties": {
+          "word": {
+            "type": "string"
+          },
+          "transcription": {
+            "type": "string"
+          },
+          "partOfSpeech": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

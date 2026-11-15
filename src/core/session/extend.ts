@@ -4,7 +4,7 @@ import { getSettings } from '@/core/db/repos/settings';
 import { deleteRound, getSession, hasOpenItems, reopenSession } from '@/core/db/repos/sessions';
 import { listGradedAnswerRows } from '@/core/db/repos/answers';
 import { listSessionSpellingWordIds, listSpellingWords, type SpellingWord } from '@/core/db/repos/spelling';
-import { latestWritingSource } from '@/core/db/repos/writing';
+import { latestWritingSource, recentEssayPrompts, RECENT_ESSAY_PROMPTS } from '@/core/db/repos/writing';
 import { getSpellingStates } from '@/core/progress/history';
 import { selectSpellingWords } from '@/core/schedule/spelling';
 import { buildGenerationContext, todayMistakes, type BlockSpec, type GenerationContext, type RuleRef } from './context';
@@ -132,6 +132,7 @@ async function extendUnlocked(deps: Deps, sessionId: number, choice: AddRound, o
     inattention: [],
     dueTopics: [],
     allowed,
+    recentEssays: withWriting ? await recentEssayPrompts(deps.db, RECENT_ESSAY_PROMPTS) : [],
     extra: { prompts: prompts.map((p) => p.prompt).filter((p) => p !== '') },
   };
 

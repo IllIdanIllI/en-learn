@@ -3,6 +3,7 @@ import { t } from '@/core/i18n';
 import { getTopics } from '@/core/db/repos/programme';
 import { errorBank, type ErrorBankRow } from '@/core/progress/derive';
 import { loadGradedFacts } from '@/core/progress/history';
+import { wordErrorRows } from '@/core/progress/wordErrors';
 import { useCore } from '@/ui/app/CoreProvider';
 import { useLoaded } from '@/ui/app/useLoaded';
 import { SHOULD_TONE, SnippetText, WAS_TONE } from '@/ui/components/SnippetText';
@@ -16,14 +17,17 @@ const KINDS: ErrorBankRow['kind'][] = ['grammar', 'spelling', 'inattention'];
 /** The topic filter's "Other": grammar errors with no programme topic. */
 const OTHER = '__other__';
 const isOther = (r: ErrorBankRow) => r.topicId === null && r.kind === 'grammar';
+/** Newest first; on the same date lesson rows come before word rows, then by item. */
+const byDate = (a: ErrorBankRow, b: ErrorBankRow) =>
+  a.date < b.date ? 1 : a.date > b.date ? -1 : a.source === b.source ? a.itemId - b.itemId : a.source === 'lesson' ? -1 : 1;
 
 export function ErrorBank() {
   const { deps, lang, settings } = useCore();
   const [kind, setKind] = useState('');
   const [topic, setTopic] = useState('');
   const loaded = useLoaded(async () => {
-    const [facts, topics] = await Promise.all([loadGradedFacts(deps.db), getTopics(deps.db)]);
-    return { rows: errorBank(facts.errorRows), topics };
+    const [facts, topics, words] = await Promise.all([loadGradedFacts(deps.db), getTopics(deps.db), wordErrorRows(deps.db)]);
+    return { rows: [...errorBank(facts.errorRows), ...words].sort(byDate), topics };
   });
 
   return (
@@ -78,7 +82,7 @@ export function ErrorBank() {
               </TableHeader>
               <TableBody>
                 {shown.map((r) => (
-                  <TableRow key={r.itemId}>
+                  <TableRow key={`${r.source}-${r.itemId}`}>
                     <TableCell className="answer" title={r.sentence === '' ? undefined : r.sentence}>
                       {settings.design === 'grove' && <Pixel rows={DRY_LEAF} className="mr-2 inline-block" />}
                       <SnippetText s={r.was} tone={WAS_TONE} />
@@ -89,7 +93,10 @@ export function ErrorBank() {
                       <SnippetText s={r.shouldBe} tone={SHOULD_TONE} />
                     </TableCell>
                     <TableCell className="text-muted-foreground">{t(lang, `kind.${r.kind}`)}</TableCell>
-                    <TableCell className="text-muted-foreground">{r.topicId === null ? '' : (titles.get(r.topicId) ?? '')}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {r.topicId === null ? '' : (titles.get(r.topicId) ?? '')}
+                      {r.source === 'words' && <div className="mt-1 text-sm text-muted-foreground">{t(lang, 'errors.source.words')}</div>}
+                    </TableCell>
                     <TableCell className="tabular whitespace-nowrap text-muted-foreground">{r.date}</TableCell>
                   </TableRow>
                 ))}

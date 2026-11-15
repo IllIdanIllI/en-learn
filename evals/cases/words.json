@@ -1,0 +1,39 @@
+{
+  "cases": [
+    {
+      "id": "full",
+      "description": "all fields filled in",
+      "word": "reluctant",
+      "definition": "unwilling and hesitant to do something",
+      "translation": "неохотный",
+      "example": "She was reluctant to admit that she had made a mistake.",
+      "synonyms": ["unwilling", "hesitant"],
+      "link": "https://dictionary.cambridge.org/dictionary/english/reluctant"
+    },
+    {
+      "id": "word-only",
+      "description": "only the word; the model fills in everything",
+      "word": "mitigate"
+    },
+    {
+      "id": "phrasal-verb",
+      "description": "a phrasal verb",
+      "word": "put off",
+      "definition": "to delay something until later",
+      "translation": "откладывать"
+    },
+    {
+      "id": "no-family",
+      "description": "a word with no useful word family",
+      "word": "ubiquitous",
+      "translation": "вездесущий"
+    },
+    {
+      "id": "near-synonym",
+      "description": "a word with a near-synonym that is easy to confuse with it",
+      "word": "affect",
+      "translation": "влиять",
+      "synonyms": ["influence"]
+    }
+  ]
+}

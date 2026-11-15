@@ -1,0 +1,386 @@
+import type { SpellingVariant } from '@/ui/words/speech';
+import { ensureVoiceFiles } from './download';
+import { VOICE_BY_VARIANT, VOICE_FILES } from './files';
+import type { VoiceIo } from './io';
+import { outline } from './outline';
+
+export type VoiceStatus = 'idle' | 'downloading' | 'loading' | 'ready' | 'failed';
+
+export interface VoiceEngine {
+  status(): VoiceStatus;
+  /** Download progress, 0..1; meaningful while `downloading`. */
+  progress(): number;
+  /** The message of the last failure; null after a new load starts. */
+  lastError(): string | null;
+  subscribe(fn: () => void): () => void;
+  /** Plays the text with Kokoro once it is ready; until then, and on failure, with the system voice. Never throws. */
+  speak(text: string, variant: SpellingVariant): void;
+  /** Synthesises the text into the cache in the background; does nothing before the model is ready. */
+  prefetch(text: string, variant: SpellingVariant): void;
+  /** Stops the sound and the system voice, and ignores a reply still on its way. */
+  stop(): void;
+  /** After a failed start, or a failed download, starts the voice again; does nothing while a load runs or when not failed. */
+  retry(): void;
+}
+
+export interface KokoroDeps {
+  io: VoiceIo;
+  /** The folder holding the voice files (`<appData>/voice`). */
+  dir: string;
+  makeWorker: () => Worker;
+  system: { canSpeak(): boolean; speak(text: string, variant: SpellingVariant): void; cancel(): void; speaking(): boolean };
+  /** Plays the clip; `onEnd` runs when it ends, stopped or not. */
+  play: (pcm: Float32Array, rate: number, onEnd: () => void) => { stop(): void };
+  /** Called synchronously on every press, so WebKit lets the later playback start. */
+  unlock?: () => void;
+  /** The debug log; it never changes what the engine does. */
+  log?: (kind: string, text: string) => void;
+  /** How long the start may take once the files are on disk; the default, 20 s, is what the app uses. */
+  startLimitMs?: number;
+}
+
+interface Clip {
+  pcm: Float32Array;
+  rate: number;
+}
+
+/** One synthesis. `clip` is set as soon as it arrives, so a cached clip plays without waiting. */
+interface Entry {
+  promise: Promise<Clip>;
+  clip?: Clip;
+  resolve: (clip: Clip) => void;
+  reject: (e: Error) => void;
+}
+
+type WorkerOut =
+  | { type: 'ready' }
+  | { type: 'audio'; id: number; pcm: Float32Array; rate: number }
+  | { type: 'error'; id?: number; message: string }
+  | { type: 'log'; text: string };
+
+const CACHE_LIMIT = 200;
+const START_LIMIT_MS = 20_000;
+
+/** Kokoro voice: the model is loaded on the first press, synthesis runs in `makeWorker()`, and the system voice covers every gap. */
+export function createKokoroEngine(deps: KokoroDeps): VoiceEngine {
+  let status: VoiceStatus = 'idle';
+  let fraction = 0;
+  let error: string | null = null;
+  // Set from the first line of load() until it is ready or has failed: a press during the file checks starts no second load.
+  let loading = false;
+  // Set by a failure once the status has reached `loading` in this run: a press does not start Kokoro again, only retry does.
+  let startFailed = false;
+  let reachedLoading = false;
+  // Bumped by each failure, so a load still awaiting its file reads gives up once it has failed.
+  let generation = 0;
+  let startTimer: ReturnType<typeof setTimeout> | null = null;
+  // The text of the last `load …` or `worker …` line of this start, for the time-out reason.
+  let lastStep = '';
+  const listeners = new Set<() => void>();
+  const notify = () => listeners.forEach((fn) => fn());
+  const setStatus = (next: VoiceStatus) => {
+    if (next === status) return;
+    log(`status ${next}`);
+    status = next;
+    notify();
+  };
+
+  // The debug log. A failing log never reaches the caller.
+  const log = (text: string) => {
+    if (/^(load|worker) /.test(text)) lastStep = text;
+    try {
+      deps.log?.('voice', text);
+    } catch {
+      // Logging is best effort.
+    }
+  };
+  const logError = (message: string) => log(`error ${message.slice(0, 200)}`);
+  // The last whole 10% of the download logged in this load; 0% is never logged.
+  let lastPercent = 0;
+  // The clip that is playing, by id: a stopped clip's late end must not clear the mark of the clip that replaced it.
+  let clipSeq = 0;
+  let clipPlaying: number | null = null;
+
+  let worker: Worker | null = null;
+  // Requests sent to the worker and not answered yet, by request id.
+  const waiting = new Map<number, { key: string; entry: Entry }>();
+  const cache = new Map<string, Entry>();
+  // Ids for requests and presses. Only the latest press may play its reply.
+  let seq = 0;
+  let press = 0;
+  let playing: { stop(): void } | null = null;
+
+  function stopPlayback() {
+    playing?.stop();
+    playing = null;
+  }
+
+  function clearStartTimer() {
+    if (startTimer !== null) clearTimeout(startTimer);
+    startTimer = null;
+  }
+
+  function fail(cause: Error) {
+    logError(cause.message);
+    clearStartTimer();
+    generation += 1;
+    startFailed = reachedLoading;
+    worker?.terminate();
+    worker = null;
+    for (const { key, entry } of waiting.values()) {
+      if (cache.get(key) === entry) cache.delete(key);
+      entry.reject(cause);
+    }
+    waiting.clear();
+    loading = false;
+    error = cause.message;
+    setStatus('failed');
+  }
+
+  // The system voice, guarded: it does nothing where the browser cannot speak.
+  const system = {
+    speak: (text: string, variant: SpellingVariant) => {
+      if (deps.system.canSpeak()) deps.system.speak(text, variant);
+    },
+    cancel: () => {
+      if (deps.system.canSpeak()) deps.system.cancel();
+    },
+    speaking: () => {
+      try {
+        return deps.system.canSpeak() && deps.system.speaking() === true;
+      } catch {
+        return false;
+      }
+    },
+  };
+
+  /** Starts a clip and logs it; `system` and `clip` say what was playing when the press came. */
+  function playClip(text: string, clip: Clip, systemSpeaking: boolean, hadClip: boolean): { stop(): void } {
+    const id = ++clipSeq;
+    let shape: string;
+    try {
+      shape = outline(clip.pcm);
+    } catch {
+      shape = '?';
+    }
+    log(
+      `play "${text}" ${clip.pcm.length} samples ${clip.rate}Hz ${(clip.pcm.length / clip.rate).toFixed(2)}s ${shape} system=${systemSpeaking ? 'yes' : 'no'} clip=${hadClip ? 'yes' : 'no'}`,
+    );
+    let ended = false;
+    let handle: { stop(): void };
+    try {
+      handle = deps.play(clip.pcm, clip.rate, () => {
+        ended = true;
+        log(`end "${text}"`);
+        if (clipPlaying === id) clipPlaying = null;
+      });
+    } catch (e) {
+      clipPlaying = null;
+      throw e;
+    }
+    // Marked only once the clip really started; a clip that already ended leaves no mark.
+    if (!ended) clipPlaying = id;
+    return handle;
+  }
+
+  function onMessage(w: Worker, data: WorkerOut) {
+    if (worker !== w) return;
+    if (data.type === 'log') {
+      log(`worker ${data.text}`);
+    } else if (data.type === 'ready') {
+      clearStartTimer();
+      loading = false;
+      setStatus('ready');
+    } else if (data.type === 'audio') {
+      const request = waiting.get(data.id);
+      if (!request) return;
+      waiting.delete(data.id);
+      request.entry.clip = { pcm: data.pcm, rate: data.rate };
+      request.entry.resolve(request.entry.clip);
+    } else if (data.id !== undefined) {
+      logError(data.message);
+      // One sentence failed: only its entry is dropped, so its press falls back to the system voice and the worker stays.
+      const request = waiting.get(data.id);
+      if (!request) return;
+      waiting.delete(data.id);
+      if (cache.get(request.key) === request.entry) cache.delete(request.key);
+      request.entry.reject(new Error(data.message));
+    } else {
+      fail(new Error(data.message));
+    }
+  }
+
+  async function load() {
+    loading = true;
+    startFailed = false;
+    reachedLoading = false;
+    fraction = 0;
+    error = null;
+    lastPercent = 0;
+    lastStep = '';
+    const gen = generation;
+    try {
+      await ensureVoiceFiles(
+        deps.io,
+        deps.dir,
+        (f) => {
+          fraction = f;
+          const percent = Math.floor(f * 10) * 10;
+          if (percent > lastPercent) {
+            lastPercent = percent;
+            log(`status downloading ${percent}%`);
+          }
+          notify();
+        },
+        () => setStatus('downloading'),
+      );
+      setStatus('loading');
+      reachedLoading = true;
+      startTimer = setTimeout(() => {
+        startTimer = null;
+        fail(new Error(`start timed out after 20 s at: ${lastStep || 'no step logged'}`));
+      }, deps.startLimitMs ?? START_LIMIT_MS);
+      const files: Record<string, ArrayBuffer> = {};
+      for (const file of VOICE_FILES) {
+        const started = Date.now();
+        files[file.path] = await deps.io.read(`${deps.dir}/${file.path}`);
+        log(`load read ${file.path} ${files[file.path]!.byteLength}B ${Date.now() - started}ms`);
+      }
+      // The start time-out may have failed this run while the files were read.
+      if (gen !== generation) return;
+      const w = deps.makeWorker();
+      worker = w;
+      log('load worker created');
+      w.onmessage = (e: MessageEvent<WorkerOut>) => onMessage(w, e.data);
+      w.onerror = (e: ErrorEvent) => {
+        if (worker !== w) return;
+        log(`worker error ${e.message} ${e.filename}:${e.lineno}`);
+        fail(new Error('voice worker crashed'));
+      };
+      w.onmessageerror = () => {
+        if (worker === w) log('worker messageerror');
+      };
+      w.postMessage({ type: 'init', files }, Object.values(files));
+      log('load init sent');
+    } catch (e) {
+      if (gen === generation) fail(e instanceof Error ? e : new Error(String(e)));
+    }
+  }
+
+  /** The clip for this text: from the cache, or posted to the worker. */
+  function request(text: string, variant: SpellingVariant, prefetch: boolean): Entry {
+    const voice = VOICE_BY_VARIANT[variant];
+    const key = `${voice}|${text}`;
+    const cached = cache.get(key);
+    if (cached) return cached;
+    const id = ++seq;
+    let resolve!: (clip: Clip) => void;
+    let reject!: (e: Error) => void;
+    const promise = new Promise<Clip>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    promise.catch(() => undefined); // a failed prefetch is not an unhandled rejection
+    const entry: Entry = { promise, resolve, reject };
+    cache.set(key, entry);
+    if (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value!);
+    waiting.set(id, { key, entry });
+    worker!.postMessage({ type: 'speak', id, text, voice, prefetch });
+    return entry;
+  }
+
+  return {
+    status: () => status,
+    progress: () => fraction,
+    lastError: () => error,
+    subscribe(fn) {
+      listeners.add(fn);
+      return () => {
+        listeners.delete(fn);
+      };
+    },
+    speak(text, variant) {
+      deps.unlock?.();
+      const token = ++seq;
+      press = token;
+      // Whether a previous clip was still playing at this press.
+      const hadClip = clipPlaying !== null;
+      stopPlayback();
+      if (status !== 'ready') {
+        log(`press "${text}" ${variant} ${startFailed ? 'system-start-failed' : 'system-not-ready'}`);
+        system.speak(text, variant);
+        if (!loading && !startFailed && (status === 'idle' || status === 'failed')) void load();
+        return;
+      }
+      const systemSpeaking = system.speaking();
+      system.cancel();
+      const entry = request(text, variant, false);
+      if (entry.clip) {
+        log(`press "${text}" ${variant} kokoro-cached`);
+        playing = playClip(text, entry.clip, systemSpeaking, hadClip);
+        return;
+      }
+      log(`press "${text}" ${variant} kokoro-wait`);
+      entry.promise.then(
+        (clip) => {
+          if (press !== token) return;
+          playing = playClip(text, clip, systemSpeaking, hadClip);
+        },
+        () => {
+          if (press !== token) return;
+          log(`press "${text}" ${variant} system-fallback`);
+          system.speak(text, variant);
+        },
+      );
+    },
+    prefetch(text, variant) {
+      if (status !== 'ready') return;
+      request(text, variant, true);
+    },
+    stop() {
+      log('stop');
+      press = ++seq;
+      stopPlayback();
+      system.cancel();
+    },
+    retry() {
+      if (status !== 'failed' || loading) return;
+      void load();
+    },
+  };
+}
+
+let audio: AudioContext | null = null;
+
+/** The one shared AudioContext, created or resumed on demand. */
+function sharedContext(): AudioContext {
+  audio ??= new AudioContext();
+  if (audio.state === 'suspended') void audio.resume();
+  return audio;
+}
+
+/** Creates or resumes the shared context; called on each press from a user gesture. */
+export function unlockAudio(): void {
+  sharedContext();
+}
+
+/** Plays mono PCM through the shared context. */
+export function playPcm(pcm: Float32Array, rate: number, onEnd: () => void): { stop(): void } {
+  const ctx = sharedContext();
+  const buffer = ctx.createBuffer(1, pcm.length, rate);
+  buffer.getChannelData(0).set(pcm);
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(ctx.destination);
+  source.onended = onEnd;
+  source.start();
+  return {
+    stop() {
+      try {
+        source.stop();
+      } catch {
+        // Already ended.
+      }
+    },
+  };
+}

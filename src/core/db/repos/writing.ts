@@ -61,3 +61,21 @@ export async function findTopicRule(db: Db, key: string): Promise<{ topicId: num
   const r = rows[0];
   return r ? { topicId: r.topic_id, ruleId: r.rule_id, ruleVersion: r.version } : null;
 }
+
+/** How many past essay prompts a lesson and a new topic are told about. */
+export const RECENT_ESSAY_PROMPTS = 30;
+
+/** The essay prompts (blocks of kind writing, format essay) of any session, newest session first, then newest block. */
+export async function recentEssayPrompts(db: Db, limit: number): Promise<string[]> {
+  const rows = await db.select<{ instruction: string }>(
+    `SELECT b.instruction AS instruction FROM block b JOIN session s ON s.id = b.session_id
+     WHERE b.kind = 'writing' AND b.format = 'essay'
+     ORDER BY s.date DESC, b.id DESC LIMIT ?`,
+    [limit],
+  );
+  return rows.map((r) => r.instruction);
+}
+
+export async function setBlockInstruction(db: Db, blockId: number, instruction: string): Promise<void> {
+  await db.execute('UPDATE block SET instruction = ? WHERE id = ?', [instruction, blockId]);
+}

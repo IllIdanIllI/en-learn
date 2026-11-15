@@ -1,4 +1,5 @@
 import type { Effort, ISODate, LlmKind } from './domain';
+import type { DayConfig } from './day';
 
 export interface Db {
   execute(sql: string, params?: unknown[]): Promise<{ lastInsertId: number; rowsAffected: number }>;
@@ -6,7 +7,13 @@ export interface Db {
 }
 
 export interface Clock {
+  /** The app's date: the calendar date shifted by the day start hour and the new-day override. */
   today(): ISODate;
+  /** The local calendar date. */
+  calendarDate(): ISODate;
+  configure(cfg: DayConfig): void;
+  /** True while the app's date is behind the calendar date and a new day may be started. */
+  canStartNewDay(): boolean;
   now(): string;
 }
 
@@ -74,9 +81,18 @@ export interface PromptStore {
   load(kind: LlmKind): Promise<{ system: string; schema: object }>;
 }
 
+/** Plain-text HTTP GET. Resolves with any status; rejects only when the request fails. */
+export interface Net {
+  getText(url: string): Promise<{ status: number; text: string }>;
+}
+
 export interface Deps {
   db: Db;
   llm: Llm;
   clock: Clock;
   prompts: PromptStore;
+  /** Random source for the words feature; defaults to Math.random. */
+  rand?: () => number;
+  /** HTTP GET for the dictionary lookup; absent where the app has no network adapter. */
+  net?: Net;
 }

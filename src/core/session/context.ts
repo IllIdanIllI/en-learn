@@ -4,6 +4,7 @@ import { addDays, formatTitleDate } from '@/core/dates';
 import { dueTopicIds, replayTopics } from '@/core/schedule/topics';
 import { listGradedSessions } from '@/core/db/repos/sessions';
 import { listSkippedItems } from '@/core/db/repos/answers';
+import { recentEssayPrompts, RECENT_ESSAY_PROMPTS } from '@/core/db/repos/writing';
 import type { LessonChoice } from './choice';
 import { loadDayInfo, spottingTopics, taskTopic, type DayInfo } from './plan';
 
@@ -27,6 +28,8 @@ export interface GenerationContext {
   dueTopics: RuleRef[];
   /** Every topic whose rule is part of the context, once each. */
   allowed: RuleRef[];
+  /** Past essay prompts, newest first, when the blocks include an essay: the new essay must differ from them. */
+  recentEssays: string[];
   /** An extra set for a lesson already done: the prompts of that lesson, not to be repeated. */
   extra?: { prompts: string[] };
 }
@@ -141,6 +144,8 @@ export async function buildGenerationContext(deps: Deps, d: ISODate, light: bool
   if (choice?.writing) blocks.push({ kind: 'writing', format: 'essay' });
   if (!choice || choice.speaking) blocks.push({ kind: 'speaking', format: 'question' });
 
+  const recentEssays = blocks.some((b) => b.kind === 'writing') ? await recentEssayPrompts(deps.db, RECENT_ESSAY_PROMPTS) : [];
+
   return {
     date: d,
     weekNo: plan.weekNo,
@@ -156,6 +161,7 @@ export async function buildGenerationContext(deps: Deps, d: ISODate, light: bool
     inattention,
     dueTopics,
     allowed: [...allowed.values()],
+    recentEssays,
   };
 }
 
@@ -214,6 +220,9 @@ export function renderContext(ctx: GenerationContext): string {
     '',
     blocks,
     '',
+    ...(ctx.recentEssays.length > 0
+      ? ['## Recent essay prompts (do not reuse or paraphrase)', '', ctx.recentEssays.map((p) => `- ${p}`).join('\n'), '']
+      : []),
     ...(ctx.extra
       ? [
           '## Extra set',

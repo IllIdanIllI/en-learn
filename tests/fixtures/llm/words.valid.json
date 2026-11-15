@@ -1,0 +1,32 @@
+{
+  "words": [
+    {
+      "word": "supersede",
+      "definition": "to take the place of something that is older or less suitable",
+      "translation": "заменять, вытеснять",
+      "example": "The new rules supersede the old ones.",
+      "synonyms": ["replace", "displace"],
+      "transcription": "/ˈsuːpəsiːd/",
+      "partOfSpeech": "verb",
+      "gaps": [
+        { "sentence": "Paper tickets were ___ by mobile ones.", "answer": "superseded", "translation": "Бумажные билеты заменили мобильными." },
+        { "sentence": "This law will ___ the earlier regulation.", "answer": "supersede", "translation": "Этот закон заменит прежнее постановление." },
+        { "sentence": "The older model has been ___ by a faster one.", "answer": "superseded", "translation": "Старую модель сменила более быстрая." }
+      ],
+      "collocations": [
+        { "phrase": "___ an earlier agreement", "answer": "supersede" },
+        { "phrase": "completely ___ the old system", "answer": "supersede" }
+      ],
+      "forms": [
+        { "sentence": "Its ___ was announced last week.", "cue": "supersede", "answer": "supersession" }
+      ],
+      "confusables": [
+        { "sentence": "The new policy will ___ the old one.", "options": ["supersede", "supervise"], "answer": "supersede", "reason": "supervise means to watch over, not to replace." }
+      ],
+      "translations": [
+        { "text": "Новая версия заменит старую.", "answers": ["The new version will supersede the old one.", "The new version will supersede the old version."] },
+        { "text": "Эти правила вытеснили прежние.", "answers": ["These rules have superseded the previous ones.", "These rules superseded the earlier ones."] }
+      ]
+    }
+  ]
+}

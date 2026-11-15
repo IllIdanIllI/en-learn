@@ -132,3 +132,10 @@ export function scoreEval(results: CaseResult[], cases: GradeCase[]): EvalScore 
   out.fix.accuracy = ratio(out.fix.matched, out.fix.checked);
   return out;
 }
+
+export type Suite = 'generate' | 'grade' | 'words' | 'all';
+
+/** Which suites a `--suite` value runs: each is gated by inclusion, so `words` alone never starts a billed generate or grade run. */
+export function suitesFor(suite: Suite): { generate: boolean; grade: boolean; words: boolean } {
+  return { generate: suite === 'generate' || suite === 'all', grade: suite === 'grade' || suite === 'all', words: suite === 'words' || suite === 'all' };
+}

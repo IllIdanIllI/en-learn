@@ -151,3 +151,102 @@ R. **The stop button ends the real CLI call.**
    - Action: answer at least one task question wrongly, press "Завершить урок", then press the stop button (ring with a square) within a few seconds.
    - Expected: the lesson stays open with your answers, no error message; in Activity Monitor no `claude` process stays running; `sqlite3 enlearn.db "select kind, ok, error from llm_call order by id desc limit 1"` prints `grade|0|cancelled: Stopped by the learner`.
    - If it fails: record what stayed (process, error message) and the `llm_call` row.
+
+## Words (2026-11-04)
+
+S. **Words: opener plugin, import, generation, "use it".**
+   - Action 1: in `src-tauri`, run `cargo check` (and `cargo build` or `yarn tauri build`) with `tauri-plugin-opener` added.
+   - Expected: it compiles with no error.
+   - Action 2: on the Words page open a word that has an https link and click its dictionary link; then a word with no link (Oxford search link).
+   - Expected: the page opens in the default browser; a link that does not start with `https://` is never opened (the Oxford search link is used instead).
+   - Action 3: paste a real Obsidian export into the import field and import it.
+   - Expected: the words appear with their fields, the summary counts match, and nothing is lost or duplicated.
+   - Action 4: generate exercises for a few words with the real CLI.
+   - Expected: the words become ready (or failed with Retry), with no error toast; a lesson build running at the same time leaves the rest pending with Retry.
+   - Action 5: practise until a "use it" card appears and answer it with a sentence.
+   - Expected: the real CLI checks it; errors show with an explanation and appear in the error bank under Слова/Words.
+   - If it fails: record the message and the `llm_call` rows (kinds `words`, `word_check`).
+
+## App icon and day start (2026-11-05)
+
+T. **Night Dock icon, Light restore, day start.**
+   - Action 1: Settings → App icon → Night. Quit and start the app (release build, then `yarn tauri dev`).
+   - Expected: the Dock shows the Night icon from launch, in both. Finder and Launchpad show the Light icon.
+   - Action 2: switch App icon back to Light.
+   - Expected: the Dock shows the bundle icon (in `tauri dev` there is no bundle, so Light may show a generic icon until restart).
+   - Action 3: leave the app open across the day start hour; then, before 05:00, press "Start a new day".
+   - Expected: the date changes at the start hour with the app open; "Start a new day" moves the date to today.
+   - If it fails: record the step, the macOS version and the Rust console output.
+
+## Words: sound (2026-11-12)
+
+U. **Speaker buttons on the word card.**
+   - Action 1: Words → Новые слова (New words) → a word card. Press the speaker next to the word, then the one next to the example.
+   - Expected: the system English voice says the word, then the example, in the spelling variant set in Settings (British or American).
+   - Action 2: press a speaker while another is speaking.
+   - Expected: the first speech stops and the new text is spoken.
+   - If it is silent: note the macOS version and the voices installed; the macOS `say` command is the fallback to consider.
+
+## Words: round 6 (2026-11-14)
+
+V. **Build with the HTTP plugin.**
+   - Action: `cd src-tauri && cargo check`, then `yarn tauri dev`.
+   - Expected: it builds. `tauri-plugin-http` 2.9.0 is in Cargo.lock, matching `@tauri-apps/plugin-http` 2.9.0, and the Tauri CLI reports no version mismatch.
+   - If it fails: record the compiler output.
+
+W. **Transcriptions and dictionary fill.**
+   - Action 1: open Words with the existing vocabulary.
+   - Expected: "Добавляю транскрипции: X из Y" counts up and then disappears. Word cards show `/IPA/ · part of speech`.
+   - Action 2: while it runs, add a word.
+   - Expected: no "lesson is being built" notice; the new word is generated after the current batch.
+   - Action 3: open "assertion" (or any word whose translation is narrow).
+   - Expected: "Словарь: утверждение" and the warning "Перевода нет в словаре, проверьте"; the Wiktionary link opens in the browser.
+   - Action 4: turn Wi-Fi off and revisit Words.
+   - Expected: after at most 3 failed lookups the notice "Не удалось добавить транскрипции: …" with Повторить. The app stays usable.
+   - If it fails: record the notice text and the `llm_call` rows of kind `phonetics`.
+
+X. **Kokoro voice.**
+   - Action 1: on a word card, press the speaker for the first time.
+   - Expected: the system voice says the word at once. A notification at the bottom right shows "Загрузка голоса: N%" and then "Голос загружен" while about 92 MB downloads into `~/Library/Application Support/<app>/voice/`. Later presses use Kokoro.
+   - Action 2: measure the time from a press to sound for a word and for the example (go/no-go: a word under about 2 s once ready).
+   - Action 3: quit, turn Wi-Fi off, start the app, press a speaker.
+   - Expected: Kokoro plays offline (the files are not downloaded again).
+   - Action 4: listen to `bf_emma` (British) and `af_heart` (American, Settings → spelling).
+   - Expected: both sound natural. Note any word they mispronounce.
+   - Action 5: open the Web Inspector console during Actions 1 and 2.
+   - Expected: no Content Security Policy errors. The `.mjs` engine file loads (JavaScript MIME type).
+   - If the download fails: record the console error. Check that the Hugging Face redirect host (`*.hf.co`) is allowed by the HTTP scope.
+
+## Debug tools: round 7 (2026-11-14)
+
+Y. **Debug tools (round 7).**
+   1. Action: `cd src-tauri && cargo check`.
+      Expected: it builds with the `devtools` feature.
+   2. Action: right-click in the app and choose "Inspect Element".
+      Expected: the Web Inspector opens, and its Console shows no Content Security Policy errors.
+   3. Action: Settings, Debug log: press Copy, Show, Clear.
+      Expected: Copy shows "Скопировано"; Show lists the log with `--- this run ---`; Clear makes the count `Записей: 0`.
+   4. Action: on Today, press Cmd+Option+L.
+      Expected: the toast "Журнал скопирован" appears.
+   5. Action: quit and start the app again, then Settings, Debug log, Show.
+      Expected: the log starts with `--- previous run ---`.
+   6. Action: start with an empty voice folder and press a speaker.
+      Expected: the download notification appears and turns into "Голос загружен".
+   7. Action: press a few speakers, then copy the log.
+      Expected: it has `press "<word>" … kokoro-*` and a `play` line with its outline.
+   8. Action: copy the log before using the app for long or restarting twice.
+      Expected: a second restart replaces the previous run, so the earlier one is gone.
+   If it fails: record the notice text, the Console error and the Settings screenshot.
+
+## Words: voice status (round 8)
+
+Z. **Settings voice row.**
+   1. Action: start the app with an empty voice folder, open Settings, and press a speaker on a word.
+      Expected: the Settings row "Голос" shows "Загрузка: N%" while the files download, then "Запускается", then "Готов".
+   2. Action: copy the debug log (Settings, Debug log, Copy) after that press.
+      Expected: the `load` and `worker` step lines run up to `ready`, with no time-out line.
+   3. Action: in a run where the voice does not start within 20 s, open Settings.
+      Expected: the row shows "Не работает: start timed out after 20 s at: <step>. Звучит системный голос." and a "Повторить" button. Pressing it shows "Запускается", then "Готов".
+   4. Action: read the "Системный голос:" line, then switch Settings, spelling variant, to American.
+      Expected: the line names an American voice (en-US), or "по умолчанию" when none matches.
+   If it fails: record the row text, the debug log tail and a Settings screenshot.

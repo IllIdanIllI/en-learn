@@ -14,7 +14,7 @@ Produce exactly the blocks listed under "Blocks to produce", in that order; ther
 
 - format "gap" or "fix": fill "items"; "paragraphs" is [] and "question" is "".
 - format "spot" (error spotting): fill "paragraphs"; "items" is [] and "question" is "".
-- format "essay" (writing block, kind "writing"): the "instruction" is the essay prompt, in English: an IELTS Task 2 prompt (opinion or discussion) for an essay of about 250 words. Where it fits naturally, the prompt invites the use of the week's grammar topic, without naming the topic. formatExample is "", "items" and "paragraphs" are [], "question" is "", minutes 40.
+- format "essay" (writing block, kind "writing"): the "instruction" is the essay prompt, in English: an IELTS Task 2 prompt (opinion or discussion) for an essay of about 250 words. Where it fits naturally, the prompt invites the use of the week's grammar topic, without naming the topic. The prompt must differ in subject from every prompt listed under Recent essay prompts. formatExample is "", "items" and "paragraphs" are [], "question" is "", minutes 40.
 - format "question" (speaking block, kind "speaking"): fill "question"; "items" and "paragraphs" are [] and formatExample is "". Always exactly one question, and it always starts with "Describe a time when".
 
 Counts:

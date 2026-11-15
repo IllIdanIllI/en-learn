@@ -38,13 +38,13 @@ function counting(db: Db): { db: Db; executed: string[] } {
 }
 
 describe('runMigrations', () => {
-  test('fresh db returns 5; second run returns 5 and executes nothing new', async () => {
+  test('fresh db returns 8; second run returns 8 and executes nothing new', async () => {
     const raw = await createTestDb(); // already migrated once
     const rows = await raw.select<{ schema_version: number }>('SELECT schema_version FROM meta');
-    expect(rows).toEqual([{ schema_version: 5 }]);
+    expect(rows).toEqual([{ schema_version: 8 }]);
     const c = counting(raw);
     const list = [{ version: 1, sql: 'CREATE TABLE zzz (x INTEGER);' }];
-    expect(await runMigrations(c.db, list)).toBe(5);
+    expect(await runMigrations(c.db, list)).toBe(8);
     expect(c.executed.some((s) => s.includes('zzz'))).toBe(false);
     expect(await raw.select('SELECT * FROM meta')).toHaveLength(1);
   });
@@ -53,11 +53,11 @@ describe('runMigrations', () => {
     const db = await createTestDb();
     const v = await runMigrations(db, [
       { version: 4, sql: 'CREATE TABLE ignored (x INTEGER);' },
-      { version: 6, sql: 'CREATE TABLE t2 (x INTEGER);' },
+      { version: 9, sql: 'CREATE TABLE t2 (x INTEGER);' },
     ]);
-    expect(v).toBe(6);
+    expect(v).toBe(9);
     expect(await db.select('SELECT * FROM t2')).toEqual([]);
-    expect(await db.select('SELECT * FROM meta')).toEqual([{ schema_version: 6 }]);
+    expect(await db.select('SELECT * FROM meta')).toEqual([{ schema_version: 9 }]);
   });
 
   test('0003 adds rule_gap.base_version to an existing db; old rows get NULL', async () => {
@@ -66,7 +66,7 @@ describe('runMigrations', () => {
     const db = wrapSqlite(raw);
     expect(await runMigrations(db, migrations.filter((m) => m.version <= 2))).toBe(2);
     await db.execute("INSERT INTO rule_gap (id, item_id, rule_id, proposal, explanation, sources) VALUES (1, 1, 1, 'p', 'e', '[]')");
-    expect(await runMigrations(db, migrations)).toBe(5);
+    expect(await runMigrations(db, migrations)).toBe(8);
     expect(await db.select('SELECT id, base_version FROM rule_gap')).toEqual([{ id: 1, base_version: null }]);
   });
 });
@@ -88,7 +88,7 @@ describe('migration 5 (writing blocks)', () => {
     await db.execute("INSERT INTO spot_answer (block_id, paragraph, text) VALUES (11,1,'s')");
     await db.execute("INSERT INTO extra_finding (block_id, paragraph, text, explanation) VALUES (11,1,'x','e')");
 
-    expect(await runMigrations(db, migrations)).toBe(5);
+    expect(await runMigrations(db, migrations)).toBe(8);
 
     expect(await db.select('SELECT id, session_id, ord, kind, format, title, instruction, minutes, round FROM block')).toEqual([
       { id: 11, session_id: 7, ord: 1, kind: 'task', format: 'spot', title: 'B', instruction: 'do it', minutes: 10, round: 2 },

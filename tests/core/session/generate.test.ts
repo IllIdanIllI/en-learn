@@ -651,6 +651,15 @@ describe('writing blocks', () => {
     expect(violations({ blocks: [essay({ format: 'question' })] }, ctx)).toEqual(['b0 format: writing block must be essay, got question']);
   });
 
+  test('a lesson without review asks for no due re-checks', async () => {
+    const gen: GeneratedSession = { blocks: [essay()] };
+    const { db, llm, deps } = await setup('2026-10-20', { generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });
+    await gradeWrong(db, '2026-10-19');
+    const res = await generateSession(deps, { light: false, choice: choice({ writing: true }) });
+    expect(res).toMatchObject({ ok: true });
+    expect(llm.calls[0]?.userPrompt).toContain('## Due re-checks\n\nNone.');
+  });
+
   test('an essay block is stored with its prompt as the instruction and no passage', async () => {
     const gen: GeneratedSession = { blocks: [essay()] };
     const { db, deps } = await setup('2026-10-20', { generate_session: [ok(gen)], validate_session: [ok(allOk(gen))] });

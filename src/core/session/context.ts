@@ -121,7 +121,11 @@ export async function buildGenerationContext(deps: Deps, d: ISODate, light: bool
   const noticeRef = noticeT && (!choice || choice.formats.includes('spot')) ? ref(info, noticeT) : null;
   const spotTopics = choice && !choice.formats.includes('spot') ? [] : spottingTopics(info, d).included.flatMap((t) => ref(info, t) ?? []);
 
-  const { reviewDate, reviewInputs, inattention, dueTopics } = await reviewSources(deps, info, d);
+  const sources = await reviewSources(deps, info, d);
+  const { reviewDate, reviewInputs, inattention } = sources;
+  const withReview = (!choice || choice.review) && (reviewInputs.length > 0 || sources.dueTopics.length > 0);
+  // A due re-check is an item of the review block, so a lesson without that block asks for none.
+  const dueTopics = withReview ? sources.dueTopics : [];
 
   const allowed = new Map<string, RuleRef>();
   for (const r of [taskRef, noticeRef, ...spotTopics, ...dueTopics]) if (r) allowed.set(r.topic.key, r);
@@ -132,7 +136,7 @@ export async function buildGenerationContext(deps: Deps, d: ISODate, light: bool
   }
 
   const blocks: BlockSpec[] = [];
-  if ((!choice || choice.review) && (reviewInputs.length > 0 || dueTopics.length > 0)) blocks.push({ kind: 'review', format: 'gap or fix' });
+  if (withReview) blocks.push({ kind: 'review', format: 'gap or fix' });
   if (choice) {
     for (const f of choice.formats) {
       const key = f === 'spot' ? noticeRef?.topic.key : taskRef?.topic.key;

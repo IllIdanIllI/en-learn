@@ -5,8 +5,8 @@ import { divider, LEAF } from '@/ui/grove/sprites';
 import type { ViewBlock } from '@/core/session/view';
 
 /** A heading plus its content, separated by space: no card. `hideTitle` leaves out the heading line (an added round). */
-export function Block({ block, number, lang, hideTitle = false, divider: withDivider = false, children }: {
-  block: ViewBlock; number: number; lang: Lang; hideTitle?: boolean; divider?: boolean; children: React.ReactNode;
+export function Block({ block, number, lang, hideTitle = false, divider: withDivider = false, afterPrompt, children }: {
+  block: ViewBlock; number: number; lang: Lang; hideTitle?: boolean; divider?: boolean; afterPrompt?: React.ReactNode; children: React.ReactNode;
 }) {
   const grove = useCore().settings.design === 'grove';
   return (
@@ -23,6 +23,7 @@ export function Block({ block, number, lang, hideTitle = false, divider: withDiv
         </div>
       )}
       <p className="mt-2 text-muted-foreground">{block.format === 'spot' ? t(lang, 'spot.hint') : block.instruction}</p>
+      {afterPrompt}
       {block.format !== 'spot' && block.kind !== 'writing' && block.formatExample && (
         <p className="answer mt-2 inline-block rounded-sm bg-input px-2.5 py-1 text-foreground">{block.formatExample}</p>
       )}

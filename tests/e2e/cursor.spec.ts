@@ -247,3 +247,11 @@ test('pointer cursor: the debug log buttons with the text area open', async ({ p
   expect(await cursor('Очистить')).toBe('pointer');
   expect(await wrongCursors(page)).toEqual([]);
 });
+
+test('pointer cursor: new topic button and its dialog', async ({ page }) => {
+  await page.goto('/?state=writing#/today');
+  await page.getByRole('textbox', { name: 'Ваш текст' }).fill('Working from home gives people more freedom.');
+  await page.getByRole('button', { name: 'Новая тема', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Сменить тему?' }).waitFor();
+  expect(await wrongCursors(page)).toEqual([]);
+});

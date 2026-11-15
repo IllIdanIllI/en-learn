@@ -1,10 +1,11 @@
 import { env } from '@huggingface/transformers';
 import { KokoroTTS } from 'kokoro-js';
-// The JSEP build of onnxruntime-web, the one @huggingface/transformers bundles. Served from the app's own origin.
+// The plain wasm build of onnxruntime-web, served from the app's own origin. Not the JSEP build (the WebGPU one that
+// @huggingface/transformers loads by default): WebKit's wasm compiler never finishes it, so the voice never started.
 // Relative paths, not a package name: the package exports block these files, and the dev server would pre-bundle
 // a bare `.mjs?url` import into a module (a function instead of a URL, and the voice fails to start).
-import wasmUrl from '../../../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm?url';
-import mjsUrl from '../../../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs?url';
+import wasmUrl from '../../../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm?url';
+import mjsUrl from '../../../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs?url';
 import { nextRequest } from './queue';
 
 const MODEL = 'onnx-community/Kokoro-82M-v1.0-ONNX';

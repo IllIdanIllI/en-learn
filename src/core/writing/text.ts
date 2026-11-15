@@ -1,4 +1,4 @@
-import type { TextAssessment } from '@/core/llm/types';
+import type { ErrorKind, TextAssessment } from '@/core/llm/types';
 
 export const MIN_WORDS = 50;
 export const TARGET_WORDS = 250;
@@ -18,6 +18,13 @@ export function errorRate(errors: number, words: number): number | null {
 export function overallBand(a: TextAssessment): number {
   const mean = (a.taskResponse.band + a.coherence.band + a.vocabulary.band + a.grammar.band) / 4;
   return Math.round(mean * 2) / 2;
+}
+
+export const ERROR_KINDS: ErrorKind[] = ['spelling', 'grammar', 'vocabulary', 'punctuation'];
+
+/** Errors per kind in the fixed display order, only kinds above zero; errors without a kind are not counted. */
+export function kindCounts(kinds: (ErrorKind | null)[]): { kind: ErrorKind; count: number }[] {
+  return ERROR_KINDS.map((kind) => ({ kind, count: kinds.filter((k) => k === kind).length })).filter((c) => c.count > 0);
 }
 
 interface Span {

@@ -7,7 +7,7 @@ import { useLoaded } from '@/ui/app/useLoaded';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/ui/components/ui/table';
 import { GradedItem } from '@/ui/today/GradedItem';
 import { Notice } from '@/ui/today/chips';
-import { WritingResult } from '@/ui/today/WritingBlock';
+import { WritingResult, WritingStrengths } from '@/ui/today/WritingBlock';
 
 /** Checked texts, newest first. A row opens in place to the text with its errors; read-only, disputes stay on Today. */
 export function Writing() {
@@ -78,12 +78,16 @@ export function Writing() {
                     {isOpen && block && (
                       <TableRow>
                         <TableCell colSpan={5} data-testid="writing-detail" className="whitespace-normal">
-                          <WritingResult text={r.text} fragments={wrong.map((i) => i.answer?.text ?? '')} words={r.words} lang={lang} />
+                          <WritingResult
+                            text={r.text} fragments={wrong.map((i) => i.answer?.text ?? '')} words={r.words} lang={lang}
+                            assessment={r.assessment} strengths={r.strengths} kinds={wrong.map((i) => i.errorKind)}
+                          />
                           {block.items.length > 0 && (
                             <ol className="mt-6 flex flex-col gap-3">
                               {block.items.map((item, i) => <GradedItem key={item.id} item={item} number={i + 1} lang={lang} readOnly />)}
                             </ol>
                           )}
+                          <WritingStrengths strengths={r.strengths} lang={lang} />
                         </TableCell>
                       </TableRow>
                     )}

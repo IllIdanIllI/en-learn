@@ -278,3 +278,16 @@ AB. **Words play at once.**
       Expected: `.s16` files appear as clips are made.
    If it fails: record the debug log tail (the `press`, `disk` and `play` lines with their times).
 
+
+## Writing: evaluation
+
+AC. **A checked essay shows how good it is.**
+   1. Action: build a lesson with an essay, write at least 50 words and check it.
+      Expected: above the text, "Примерная оценка IELTS" with a band, four criteria rows each with a band and a note, and the line that the band is approximate.
+   2. Action: look at the text and the line under it.
+      Expected: errors are underlined as before; strong parts have a green dotted underline; under the error rate there is a count by type (for example "Орфография 3 · Грамматика 5").
+   3. Action: look at the error list and below it.
+      Expected: each error shows its type; after the list, "Сильные места" lists each strong fragment with a note.
+   4. Action: open the Writing page and open this text, then a text checked before this version.
+      Expected: the new text shows the same evaluation; the older text looks as it did, without evaluation.
+   If it fails: note whether the check itself failed (the message under the Check button) or the parts are missing.

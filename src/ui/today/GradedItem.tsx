@@ -57,6 +57,7 @@ export function GradedItem({ item, number, lang, readOnly = false }: { item: Vie
               onOpen={item.ruleId === null || readOnly || session === null ? undefined : (opener) => session.openRule({ ruleId: item.ruleId!, topicId: item.topicId, section }, opener)}
             />
           )}
+          {item.errorKind !== null && <span className="label text-muted-foreground">{t(lang, `writing.errorKind.${item.errorKind}`)}</span>}
         </p>
         {a && a.explanation !== '' && !ok && <p className="reading mt-2 text-muted-foreground">{a.explanation}</p>}
         {a && a.vocabularyNote !== '' && <p className="reading mt-2 rounded-sm bg-note/10 px-3 py-2 text-note">{a.vocabularyNote}</p>}

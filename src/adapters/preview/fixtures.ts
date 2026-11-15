@@ -23,7 +23,7 @@ export { LIMIT_WORD_ANSWERS, PHRASE_WORD_ANSWERS, PREVIEW_WORD_ANSWERS } from '.
 export const PREVIEW_STATES = [
   'empty', 'no_session', 'generated', 'questions', 'graded', 'progress', 'rest', 'rule_missing', 'spot_rule_missing', 'prereq_missing',
   'earlier_session', 'progress_archived', 'closed', 'open-round', 'round-graded', 'skipped', 'skipped-round', 'fireflies',
-  'spot', 'spot-graded', 'writing', 'writing-graded', 'rewrite', 'words', 'words-done', 'words-limit', 'words-phrase', 'words-fill', 'words-dict',
+  'spot', 'spot-graded', 'writing', 'writing-graded', 'writing-graded-old', 'rewrite', 'words', 'words-done', 'words-limit', 'words-phrase', 'words-fill', 'words-dict',
 ] as const;
 export type PreviewState = (typeof PREVIEW_STATES)[number];
 
@@ -298,7 +298,7 @@ export async function buildPreview(state: PreviewState, options: { early?: boole
     await answerToday(deps, 'graded');
     clock.set(today);
   }
-  const written = state === 'writing' || state === 'writing-graded' || state === 'rewrite';
+  const written = state === 'writing' || state === 'writing-graded' || state === 'writing-graded-old' || state === 'rewrite';
   const answered = state === 'graded' || state === 'closed' || state === 'open-round' || state === 'round-graded' || state === 'skipped' || state === 'skipped-round';
   if (written) {
     requireOk(await generateSession(deps, { light: false, choice: (await lessonOptions(deps, today, false)).defaults }), 'generateSession');
@@ -309,7 +309,12 @@ export async function buildPreview(state: PreviewState, options: { early?: boole
   if (state === 'questions' || answered || progressLike) {
     await answerToday(deps, state === 'questions' || state === 'skipped' ? state : 'graded');
   }
-  if (state === 'spot-graded' || state === 'writing-graded') await answerToday(deps, 'graded');
+  if (state === 'spot-graded' || state === 'writing-graded' || state === 'writing-graded-old') await answerToday(deps, 'graded');
+  if (state === 'writing-graded-old') {
+    // A text checked before evaluation existed: no assessment, strong parts or error kinds.
+    await deps.db.execute('UPDATE writing_text SET assessment = NULL, strengths = NULL');
+    await deps.db.execute('UPDATE answer SET error_kind = NULL');
+  }
   if (state === 'closed' || state === 'open-round' || state === 'round-graded' || state === 'skipped-round') {
     const session = await getSessionByDate(deps.db, today);
     if (!session) throw new Error('Preview fixture: no session');

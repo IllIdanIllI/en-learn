@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { countWords, errorRate, markFragments, markText, MIN_WORDS, overallBand, placeFragments, RATE_TARGET, TARGET_WORDS } from '@/core/writing/text';
+import { countWords, errorRate, kindCounts, markFragments, markText, MIN_WORDS, overallBand, placeFragments, RATE_TARGET, TARGET_WORDS } from '@/core/writing/text';
 import type { TextAssessment } from '@/core/llm/types';
 
 describe('writing text constants', () => {
@@ -113,5 +113,20 @@ describe('overallBand', () => {
     expect(overallBand(of(6, 6.5, 6.5, 6.5))).toBe(6.5); // 6.375
     expect(overallBand(of(5.5, 5.5, 6, 6.5))).toBe(6); // 5.875
     expect(overallBand(of(9, 9, 9, 9))).toBe(9);
+  });
+});
+
+describe('kindCounts', () => {
+  test('counts per kind in the fixed order and skips zeros and missing kinds', () => {
+    expect(kindCounts(['grammar', 'spelling', 'grammar', null, 'punctuation'])).toEqual([
+      { kind: 'spelling', count: 1 },
+      { kind: 'grammar', count: 2 },
+      { kind: 'punctuation', count: 1 },
+    ]);
+  });
+
+  test('is empty when no error has a kind', () => {
+    expect(kindCounts([null, null])).toEqual([]);
+    expect(kindCounts([])).toEqual([]);
   });
 });

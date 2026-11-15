@@ -231,7 +231,7 @@ Y. **Debug tools (round 7).**
    5. Action: quit and start the app again, then Settings, Debug log, Show.
       Expected: the log starts with `--- previous run ---`.
    6. Action: start with an empty voice folder and press a speaker.
-      Expected: the download notification appears and turns into "Голос загружен".
+      Expected: the download notification appears, turns into "Голос запускается…" and then into "Голос готов" (round 9).
    7. Action: press a few speakers, then copy the log.
       Expected: it has `press "<word>" … kokoro-*` and a `play` line with its outline.
    8. Action: copy the log before using the app for long or restarting twice.
@@ -246,7 +246,19 @@ Z. **Settings voice row.**
    2. Action: copy the debug log (Settings, Debug log, Copy) after that press.
       Expected: the `load` and `worker` step lines run up to `ready`, with no time-out line.
    3. Action: in a run where the voice does not start within 20 s, open Settings.
-      Expected: the row shows "Не работает: start timed out after 20 s at: <step>. Звучит системный голос." and a "Повторить" button. Pressing it shows "Запускается", then "Готов".
-   4. Action: read the "Системный голос:" line, then switch Settings, spelling variant, to American.
-      Expected: the line names an American voice (en-US), or "по умолчанию" when none matches.
+      Expected: the row shows "Не работает: start timed out after 20 s at: <step>." and a "Повторить" button (round 9: no system voice). Pressing it shows "Запускается", then "Готов".
+   4. (Dropped in round 9: the app no longer shows or uses the system voice.)
    If it fails: record the row text, the debug log tail and a Settings screenshot.
+
+## Words: voice start (round 9)
+
+AA. **First press, no system voice.**
+   1. Action: with the voice files on disk, start the app and press a speaker on a word.
+      Expected: no sound at once and no system voice; the notification "Голос запускается…" appears, turns into "Голос готов" within a few seconds, and the pressed word plays with the Kokoro voice.
+   2. Action: with an empty voice folder, press a speaker.
+      Expected: "Загрузка голоса: N%", then "Голос запускается…", then "Голос готов", and the word plays.
+   3. Action: copy the debug log after step 1.
+      Expected: `press "<word>" … held`, the `load` and `worker` lines up to `model loaded`, then a `play` line; no time-out line.
+   4. Action: if the voice fails, press a speaker again.
+      Expected: silence; the notification "Голос не работает: <reason>" with "Повторить" appears again; "Повторить" starts the voice.
+   If it fails: record the notification text and the debug log tail.
